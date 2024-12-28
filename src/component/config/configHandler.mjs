@@ -5,7 +5,7 @@ class ConfigHandler {
 
   getConfig(key) {
     return this.store.get(key);
-  }s
+  }
 
   setConfig(key, value) {
     this.store.set(key, value);
