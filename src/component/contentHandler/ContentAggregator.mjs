@@ -22,5 +22,5 @@ class ContentAggregator {
     return relevantLines.join('\n');
   }
 }
-这个地方要重新写一下。阿斯蒂芬阿斯顿发斯蒂芬
+
 export default ContentAggregator;
