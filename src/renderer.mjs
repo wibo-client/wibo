@@ -102,17 +102,15 @@ async function sendMessage() {
 
     feedbackBox.scrollTop = feedbackBox.scrollHeight;
  
-    window.electron.sendMessage(message, type, path).then(response => {
-      if (response) {
-        wibaMessageElement.innerHTML += response;
+    const requestContext = {
+      onChunk: (chunk) => {
+        wibaMessageElement.innerHTML += marked(chunk); // 确保使用全局 marked
         feedbackBox.scrollTop = feedbackBox.scrollHeight;
       }
-    });
-
-    window.electron.onStreamChunk((chunk) => {
-      wibaMessageElement.innerHTML += marked(chunk); // 确保使用全局 marked
-      feedbackBox.scrollTop = feedbackBox.scrollHeight;
-    });
+      
+    }
+    window.electron.sendMessage(message, type, path,requestContext);
+ 
   } catch (error) {
     console.error('发送消息错误:', error);
   }

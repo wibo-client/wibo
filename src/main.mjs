@@ -86,16 +86,15 @@ ipcMain.handle('remove-token', () => {
   configHandler.removeToken();
 });
 
-ipcMain.handle('removeAllListeners', (event, channel) => {
-  ipcMain.removeAllListeners(channel);
-});
 
 async function fetchAggregatedContent(summaryList) {
   const contentAggregator = new ContentAggregator();
   return await contentAggregator.aggregateContent(summaryList.slice(0, 2));
 }
 
-ipcMain.handle('send-message', async (event, message, type, path) => {
+ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
+  console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
+  
   try {
     const pluginHandler = new PluginHandlerImpl();
     const selectedPlugin = await pluginHandler.select(path);
@@ -104,13 +103,13 @@ ipcMain.handle('send-message', async (event, message, type, path) => {
     if (type === 'search') {
       const searchResult = await selectedPlugin.search(message, path);
       const markdownResult = buildSearchResultsString(searchResult);
-      event.sender.send('llm-stream', markdownResult);
+      event.sender.send('llm-stream', markdownResult,requestId);
     } else if (type === 'searchWithRerank') {
       const requeryResult = await selectedPlugin.rewriteQuery(message);
       const searchResult = await selectedPlugin.search(requeryResult, path);
       const rerankResult = await selectedPlugin.rerank(searchResult, message);
       const markdownResult = buildSearchResultsString(rerankResult);
-      event.sender.send('llm-stream', markdownResult);
+      event.sender.send('llm-stream', markdownResult,requestId);
     } else if (type === 'searchAndChat') {
       const requeryResult = await selectedPlugin.rewriteQuery(message);
       const searchResult = await selectedPlugin.search(requeryResult, path);
@@ -159,16 +158,16 @@ ipcMain.handle('send-message', async (event, message, type, path) => {
       const collectedResults = [];
 
       await llmCaller.callAsync(messages, true, (chunk) => {
-        event.sender.send('llm-stream', chunk);
+        event.sender.send('llm-stream', chunk,requestId);
       });
     } else if (type === 'chat') {
       await llmCaller.callAsync([{ role: 'user', content: message }], true, (chunk) => {
-        event.sender.send('llm-stream', chunk);
+        event.sender.send('llm-stream', chunk,requestId);
       });
     }
   } catch (error) {
     console.error(`Error occurred in handler for 'send-message': ${error}`);
-    event.sender.send('error', { message: error.message });
+    event.sender.send('error', { message: error.message },requestId);
   }
 });
 
