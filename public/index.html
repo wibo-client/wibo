@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智融 WIBO</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      height: 90vh;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tabs {
+      display: flex;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+
+    .tab {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-bottom: none;
+      background-color: #f1f1f1;
+    }
+
+    .tab.active {
+      background-color: #fff;
+      border-bottom: 1px solid #fff;
+    }
+
+    .tab-content {
+      display: none;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    #chatBox {
+      width: 100%;
+      height: 300px;
+      border: 1px solid #ccc;
+      overflow-y: scroll;
+      padding: 10px;
+    }
+
+    #feedbackBox {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .message {
+      margin: 5px 0;
+    }
+
+    .user {
+      color: blue;
+    }
+
+    .wiba {
+      color: green;
+    }
+
+    #interaction {
+      flex: 1;
+      flex-direction: column;
+      gap: 1px;
+      min-height: 0;
+      padding: 1px;
+    }
+
+    #feedbackBox {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    #chatInput {
+      min-height: 40px;
+      max-height: 100px;
+      resize: none;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .bottom-toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      position: relative;
+    }
+
+    #typeSelect {
+      flex: 1;
+    }
+
+    #pathInput {
+      flex: 2;
+    }
+
+    #pathDropdown {
+      display: none;
+      position: relative;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+
+    #pathDropdown div {
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    #pathDropdown div:hover {
+      background-color: #f1f1f1;
+    }
+
+    #sendButton {
+      width: 80px;
+      height: 32px;
+    }
+
+    /* 登录表单样式 */
+    .login-form {
+      max-width: 300px;
+      margin: 0 auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+
+    .login-form input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      box-sizing: border-box;
+    }
+
+    .login-form button {
+      width: 100%;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .login-form button:hover {
+      background-color: #45a049;
+    }
+
+
+    /* status-bar */
+    .status-bar {
+      padding: 10px;
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+
+    .task-list {
+      margin-bottom: 10px;
+    }
+
+    .task-item {
+      padding: 5px;
+      margin: 5px 0;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+
+    .progress {
+      height: 20px;
+      background: #ddd;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #4CAF50;
+      transition: width 0.3s ease;
+    }
+
+    .sync-stats {
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+    }
+  </style>
+  
+</head>
+
+<body>
+ 
+  
+  <h1>围脖儿 WIBO</h1>
+  <div class="tabs">
+    <div class="tab" data-tab="login">登录</div>
+    <div class="tab active" data-tab="interaction">交互界面</div>
+    <div class="tab" data-tab="config">配置</div>
+    <div class="tab" data-tab="register">注册</div> <!-- 注册标签 -->
+  </div>
+
+  <!-- 登录内容区域 -->
+  <div id="login" class="tab-content">
+    <div class="login-form">
+      <h2>用户登录</h2>
+      <input type="text" id="username" placeholder="用户名" required />
+      <input type="password" id="password" placeholder="密码" required />
+      <button id="loginButton">登录</button>
+      <button id="registerButton">注册</button> <!-- 注册按钮 -->
+    </div>
+  </div>
+
+  <!-- 注册内容区域（隐藏默认） -->
+  <div id="register" class="tab-content">
+    <div class="register-form">
+      <h2>用户注册</h2>
+      <input type="text" id="regUsername" placeholder="用户名" required />
+      <input type="password" id="regPassword" placeholder="密码" required />
+      <button id="submitRegisterButton">提交注册</button>
+      <button id="cancelRegisterButton">取消</button>
+    </div>
+  </div>
+
+  <!-- 交互界面内容区域 -->
+  <div id="interaction" class="tab-content active">
+    <div id="feedbackBox"></div>
+    <textarea id="chatInput" placeholder="输入..." rows="1"></textarea>
+    <div class="bottom-toolbar">
+      <select id="typeSelect">
+        <option value="search">搜索 - WIBO去广告的标准搜索</option>
+        <option value="searchWithRerank">LLM增强检索 - WIBO帮你找到最相关内容</option>
+        <option value="searchAndChat">基于知识库的问答 - 基于最相关内容直接回答你的问题</option>
+        <option value="chat">纯模型问答 - 后端大模型直出</option>
+      </select>
+      <input type="text" id="pathInput" placeholder="Path (optional)" />
+      <div id="pathDropdown"></div>
+      <button id="sendButton">Send</button>
+    </div>
+  </div>
+
+  <!-- 配置内容区域 -->
+  <div id="config" class="tab-content">
+    <style>
+      .directory-config {
+        margin-bottom: 20px;
+      }
+
+      .directory-list {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin: 10px 0;
+      }
+
+      .directory-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+      }
+    </style>
+
+    <div class="directory-config">
+      <h3>文档同步配置</h3>
+      <div class="config-item">
+        <button id="addLocalDirButton">新增本地目录</button>
+        <button id="addRemoteDirButton">新增远端目录</button>
+      </div>
+
+      <div class="directory-list" id="dirList">
+        <!-- 目录列表将在这里动态显示 -->
+      </div>
+
+      <div class="status-bar">
+        <div class="task-list">
+          <h3>同步任务列表</h3>
+          <div id="taskContainer"></div>
+        </div>
+        <div class="sync-info">
+          <div class="sync-stats">
+            追踪文件：<span id="totalFiles">0</span> |
+            待同步：<span id="pendingFiles">0</span> |
+          </div>
+        </div>
+      </div>
+
+      <button id="synchronizeFilesButton">全量同步</button>
+      <button id="clearTasksButton">清空当前同步任务</button>
+    </div>
+
+    <!-- 远端目录对话框 -->
+    <div id="remoteDirDialog" style="display:none;">
+      <h3>新增远端目录</h3>
+      <label for="remoteUrl">URL:</label>
+      <input type="text" id="remoteUrl" placeholder="请输入URL" required />
+      <label for="remoteConf">Conf:</label>
+      <textarea id="remoteConf" placeholder="请输入配置" required></textarea>
+      <label for="remoteHandlerName">Handler Name:</label>
+      <input type="text" id="remoteHandlerName" placeholder="请输入Handler Name" required />
+      <button id="submitRemoteDirButton">提交</button>
+      <button id="cancelRemoteDirButton">取消</button>
+    </div>
+
+    <!-- 配置对话框 -->
+    <div id="configDialog" style="display:none;">
+      <h3>配置目录</h3>
+      <label for="configUrl">URL:</label>
+      <input type="text" id="configUrl" placeholder="请输入URL" required />
+      <label for="configConf">Conf:</label>
+      <textarea id="configConf" placeholder="请输入配置"></textarea>
+      <label for="configHandlerName">Handler Name:</label>
+      <input type="text" id="configHandlerName" placeholder="请输入Handler Name" required />
+      <button id="configSubmitButton">提交</button>
+      <button id="configCancelButton">取消</button>
+    </div>
+  </div>  
+</body>
+
+</html>
