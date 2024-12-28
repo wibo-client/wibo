@@ -20,7 +20,8 @@
     "openai": "^4.77.0",
     "puppeteer": "^23.8.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "string-similarity-js": "^2.1.4"
   },
   "devDependencies": {
     "@babel/cli": "^7.26.4",

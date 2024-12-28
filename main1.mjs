@@ -115,6 +115,7 @@ ipcMain.handle('send-message', async (event, message, type, path) => {
       const requeryResult = await selectedPlugin.rewriteQuery(message);
       const searchResult = await selectedPlugin.search(requeryResult, path);
       const rerankResult = await selectedPlugin.rerank(searchResult, message);
+
       // 插入获取相关内容的逻辑
       const aggregatedContent = await fetchAggregatedContent(rerankResult);
       const contextBuilder = [];
@@ -157,12 +158,33 @@ ipcMain.handle('send-message', async (event, message, type, path) => {
       const returnStrfinal = { value: '' };
       const collectedResults = [];
 
-      await llmCaller.callAsync([{ role: 'user', content: messages }], true, (chunk) => {
+      const streamListener = (chunk) => {
+        collectedResults.push(chunk);
         event.sender.send('llm-stream', chunk);
+      };
+
+      llmCaller.callAsync(messages, true, streamListener).then(() => {
+        const combinedOutput = collectedResults.join('\n');
+        const referenceDocs = aggregatedContent.map((doc, index) => `doc ${index + 1}: [${doc.title}](${doc.url})`).join('\n\n');
+
+        returnStrfinal.value = `\n\n## Reference Documents:\n${referenceDocs}`;
+        event.sender.send('llm-stream', returnStrfinal.value);
+      }).catch(error => {
+        console.error('Error occurred during LLM call:', error);
+        event.sender.send('error', { message: error.message });
       });
     } else if (type === 'chat') {
-      await llmCaller.callAsync([{ role: 'user', content: message }], true, (chunk) => {
+      const streamListener1 = (chunk) => {
         event.sender.send('llm-stream', chunk);
+      };
+
+      // 添加日志以确保 streamListener 已定义
+      console.log('streamListener:', streamListener1);
+
+
+      await llmCaller.callAsync([{ role: 'user', content: message }], true, streamListener1).catch(error => {
+        console.error('Error occurred during LLM call:', error);
+        event.sender.send('error', { message: error.message });
       });
     }
   } catch (error) {
@@ -172,7 +194,16 @@ ipcMain.handle('send-message', async (event, message, type, path) => {
 });
 
 ipcMain.handle('fetch-path-suggestions', async (event, input) => {
- 
+
+});
+
+ipcMain.handle('fetch-articles', async (event, summaryList) => {
+  try {
+    return await fetchAggregatedContent(summaryList);
+  } catch (error) {
+    console.error('Error occurred while fetching articles:', error);
+    throw error;
+  }
 });
 
 function buildSearchResultsString(searchResults) {
@@ -182,7 +213,7 @@ function buildSearchResultsString(searchResults) {
     sb += `## index ${fileNumber++} 标题 ： [${result.title}](${result.url})\n\n`;
 
     sb += `${result.description}\n`;
-    if(result.date) {
+    if (result.date) {
       sb += `${result.date}\n`;
     }
   });
