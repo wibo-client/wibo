@@ -2,7 +2,6 @@ import AuthClass from './component/auth/auth.mjs';
 import { marked } from 'marked'; // 从 npm 包中导入 marked
 
 document.addEventListener('DOMContentLoaded', () => {
-
   console.log('DOM 加载完成');
   setupEventListeners();
   setupLinkHandler(); // 添加链接处理器
@@ -48,6 +47,14 @@ function setupEventListeners() {
   setupTabSwitching();
   setupMessageHooks();
   setupPathInputHandlers();
+
+  // Event listener for importing local plugin
+  document.getElementById('importLocalPluginButton').addEventListener('click', async () => {
+    const filePath = await window.electron.selectFile();
+    if (filePath) {
+      window.electron.addPluginFromFile(filePath);
+    }
+  });
 }
 
 function setupTabSwitching() {
@@ -58,12 +65,9 @@ function setupTabSwitching() {
   });
 }
 
-
-
 function setupMessageHooks() {
   const sendButton = document.getElementById('sendButton');
   const chatInput = document.getElementById('chatInput');
-
 
   sendButton.addEventListener('click', sendMessage);
   chatInput.addEventListener('keydown', (event) => {
@@ -108,10 +112,8 @@ async function sendMessage() {
         wibaMessageElement.innerHTML = marked(wholeMessage); // 确保使用全局 marked
         feedbackBox.scrollTop = feedbackBox.scrollHeight;
       }
-      
     }
-    window.electron.sendMessage(message, type, path,requestContext);
- 
+    window.electron.sendMessage(message, type, path, requestContext);
   } catch (error) {
     console.error('发送消息错误:', error);
   }

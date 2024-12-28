@@ -66,6 +66,19 @@ ipcMain.handle('select-directory', async () => {
   }).then(result => result.canceled ? null : result.filePaths[0]);
 });
 
+ipcMain.handle('select-file', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'], // Ensure 'openFile' is included to allow file selection
+    filters: [{ name: 'JavaScript Files', extensions: ['js'] }]
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('add-plugin-from-file', async (event, filePath) => {
+  const pluginHandler = new PluginHandlerImpl();
+  await pluginHandler.addPluginFromFile(filePath);
+});
+
 ipcMain.handle('get-config', (event, key) => {
   return configHandler.getConfig(key);
 });

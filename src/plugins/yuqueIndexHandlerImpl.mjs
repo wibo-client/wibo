@@ -1,4 +1,4 @@
-import { IndexHandlerInterface } from './indexHandlerInter.mjs';
+import { IndexHandlerInterface } from '../component/indexHandler/indexHandlerInter.mjs';
 import axios from 'axios';
 
 const API_ENDPOINT = "https://yuque-api.antfin-inc.com/api/v2";

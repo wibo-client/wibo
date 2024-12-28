@@ -2,6 +2,8 @@ import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs';
 import Store from 'electron-store';
 import https from 'https';
+import fs from 'fs';
+import path from 'path';
 
 export class PluginHandlerImpl {
     constructor() {
@@ -58,6 +60,8 @@ export class PluginHandlerImpl {
     }
 
     async storePluginInStore(name, content) {
+    
+        this.store.set('plugins', []);
         const plugins = this.store.get('plugins', []);
         plugins.push({ name, code: content });
         this.store.set('plugins', plugins);
@@ -79,6 +83,27 @@ export class PluginHandlerImpl {
         } catch (error) {
             console.error("Failed to load plugin from URL:", error);
             throw new Error("Failed to load plugin from URL");
+        }
+    }
+
+    async addPluginFromFile(filePath) {
+        try {
+            const pluginCode = await fs.promises.readFile(filePath, 'utf-8');
+            const fileName = path.basename(filePath);
+            await this.storePluginInStore(fileName, pluginCode);
+            console.info(`Plugin ${fileName} added successfully.`);
+            
+            const { default: PluginClass } = await import(URL.createObjectURL(new Blob([pluginCode], { type: 'application/javascript' })));
+            if (PluginClass.prototype instanceof IndexHandlerInterface) {
+                const pluginInstance = new PluginClass(this.handlerConfig);
+                this.plugins.push(pluginInstance);
+                console.log(`Plugin ${fileName} loaded successfully from file.`);
+            } else {
+                console.warn(`Plugin ${fileName} does not extend IndexHandlerInterface and will be ignored.`);
+            }
+        } catch (error) {
+            console.error("Failed to add plugin from file:", error);
+            throw new Error("Failed to add plugin from file");
         }
     }
 

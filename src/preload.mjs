@@ -31,7 +31,9 @@ contextBridge.exposeInMainWorld('electron', {
   calculateMD5: (path) => ipcRenderer.invoke('calculate-md5', path),
   shell: {
     openExternal: (url) => shell.openExternal(url)
-  }
+  },
+  selectFile: () => ipcRenderer.invoke('select-file'),
+  addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath)
 });
 
 contextBridge.exposeInMainWorld('auth', {
