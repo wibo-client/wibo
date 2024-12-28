@@ -9,9 +9,10 @@ export class ContentCrawler {
         console.error("开始处理任务");
 
         for (let attempt = 1; attempt <= 3; attempt++) {
+            let browser;
             try {
                 // 启动浏览器（有头模式）
-                const browser = await puppeteer.launch({
+                browser = await puppeteer.launch({
                     headless: headless,
                     args: [
                         '--window-size=833x731',
@@ -53,14 +54,15 @@ export class ContentCrawler {
                 // 输出页面的所有字符
                 console.log(markdownText);
 
-                // 关闭浏览器
-                await browser.close();
-
-              return markdownText;
+                return markdownText;
             } catch (error) {
                 console.error(`Attempt ${attempt} failed:`, error);
                 if (attempt === 3) {
                     throw error;
+                }
+            } finally {
+                if (browser) {
+                    await browser.close();
                 }
             }
         }

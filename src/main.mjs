@@ -151,13 +151,14 @@ ipcMain.handle('send-message', async (event, message, type, path) => {
       const prompt = `尽可能依托于如下参考信息：\n${suggestionContext}\n\n处理用户的请求：\n${userInput}`;
 
       const messages = [
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt ,}
       ];
+      
 
       const returnStrfinal = { value: '' };
       const collectedResults = [];
 
-      await llmCaller.callAsync([{ role: 'user', content: messages }], true, (chunk) => {
+      await llmCaller.callAsync(messages, true, (chunk) => {
         event.sender.send('llm-stream', chunk);
       });
     } else if (type === 'chat') {
