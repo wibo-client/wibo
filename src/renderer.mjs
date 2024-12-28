@@ -101,10 +101,11 @@ async function sendMessage() {
     feedbackBox.appendChild(wibaMessageElement);
 
     feedbackBox.scrollTop = feedbackBox.scrollHeight;
- 
+    let wholeMessage = '';
     const requestContext = {
       onChunk: (chunk) => {
-        wibaMessageElement.innerHTML += marked(chunk); // 确保使用全局 marked
+        wholeMessage += chunk;
+        wibaMessageElement.innerHTML = marked(wholeMessage); // 确保使用全局 marked
         feedbackBox.scrollTop = feedbackBox.scrollHeight;
       }
       
