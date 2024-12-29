@@ -226,6 +226,15 @@ export class PluginHandlerImpl {
 
         return this.defaultHandler;
     }
+
+    async fetchPathSuggestions(input) {
+        const suggestions = new Set();
+        for (const pluginInstance of this.pluginInstanceMap.values()) {
+            const pluginSuggestions = await pluginInstance.getPossiblePath(input);
+            pluginSuggestions.forEach(suggestion => suggestions.add(suggestion));
+        }
+        return Array.from(suggestions);
+    }
 }
 
 export default PluginHandlerImpl;

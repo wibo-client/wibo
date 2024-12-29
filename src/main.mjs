@@ -195,7 +195,13 @@ ipcMain.handle('send-message', async (event, message, type, path, requestId) => 
 });
 
 ipcMain.handle('fetch-path-suggestions', async (event, input) => {
- 
+  try {
+    const suggestions = await pluginHandler.fetchPathSuggestions(input);
+    event.sender.send('path-suggestions', suggestions);
+  } catch (error) {
+    console.error('获取路径建议错误:', error);
+    event.sender.send('error', { message: error.message });
+  }
 });
 
 function buildSearchResultsString(searchResults) {

@@ -42,3 +42,19 @@ contextBridge.exposeInMainWorld('auth', {
   setToken: (token) => ipcRenderer.invoke('set-token', token),
   removeToken: () => ipcRenderer.invoke('remove-token')
 });
+
+ipcRenderer.on('path-suggestions', (event, suggestions) => {
+  const pathDropdown = document.getElementById('pathDropdown');
+  pathDropdown.innerHTML = '';
+
+  if (suggestions.length > 0) {
+    suggestions.forEach(suggestion => {
+      const div = document.createElement('div');
+      div.textContent = suggestion;
+      pathDropdown.appendChild(div);
+    });
+    pathDropdown.style.display = 'block';
+  } else {
+    pathDropdown.style.display = 'none';
+  }
+});
