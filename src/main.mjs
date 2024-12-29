@@ -23,6 +23,8 @@ if (__dirname.endsWith(path.join('src'))) {
 const store = new Store();
 let mainWindow;
 
+const pluginHandler = new PluginHandlerImpl();
+
 app.whenReady().then(() => {
   console.log('App is ready.');
   mainWindow = new MainWindow(__dirname);
@@ -75,7 +77,6 @@ ipcMain.handle('select-file', async () => {
 });
 
 ipcMain.handle('add-plugin-from-file', async (event, filePath) => {
-  const pluginHandler = new PluginHandlerImpl();
   await pluginHandler.addPluginTemplateFromFile(filePath);
 });
 
@@ -99,6 +100,16 @@ ipcMain.handle('remove-token', () => {
   configHandler.removeToken();
 });
 
+ipcMain.handle('get-plugin-instance-map', async () => {
+  await pluginHandler.loadPlugins();
+  const pluginInstanceMap = {};
+  for (const [pathPrefix, pluginInstance] of pluginHandler.pluginInstanceMap) {
+    pluginInstanceMap[pathPrefix] = {
+      getHandlerName: pluginInstance.getHandlerName.bind(pluginInstance)
+    };
+  }
+  return pluginInstanceMap;
+});
 
 async function fetchAggregatedContent(summaryList) {
   const contentAggregator = new ContentAggregator();
@@ -109,7 +120,6 @@ ipcMain.handle('send-message', async (event, message, type, path, requestId) => 
   console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
   
   try {
-    const pluginHandler = new PluginHandlerImpl();
     const selectedPlugin = await pluginHandler.select(path);
     const llmCaller = new LLMCall(process.env.DASHSCOPE_API_KEY);
 

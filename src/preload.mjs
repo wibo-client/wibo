@@ -33,7 +33,8 @@ contextBridge.exposeInMainWorld('electron', {
     openExternal: (url) => shell.openExternal(url)
   },
   selectFile: () => ipcRenderer.invoke('select-file'),
-  addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath)
+  addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath),
+  getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map')
 });
 
 contextBridge.exposeInMainWorld('auth', {
