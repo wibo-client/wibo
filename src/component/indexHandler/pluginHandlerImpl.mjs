@@ -82,13 +82,12 @@ export class PluginHandlerImpl {
                 throw new Error("Handler name is empty, cannot add plugin to map.");
             }
 
-            const possiblePath = await pluginInstance.getPossiblePath('');
-            if (this.pluginInstanceMap.has(possiblePath)) {
-                throw new Error(`Plugin with the same getPossiblePath already exists: ${possiblePath}`);
+            if (this.pluginInstanceMap.has(handlerConfig.pathPrefix)) {
+                throw new Error(`Plugin with the same pathPrefix already exists: ${handlerConfig.pathPrefix}`);
             }
 
             if (this.validatePlugin(PluginClass)) {
-                this.pluginInstanceMap.set(possiblePath, pluginInstance);
+                this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
                 await this.storePluginInStore(path.basename(filePath), pluginCode);
                 console.log(`Plugin ${filePath} loaded successfully from file.`);
             } else {
@@ -140,6 +139,10 @@ export class PluginHandlerImpl {
                 const description = pluginInstance.getInterfaceDescription();
                 console.log(`Plugin description: ${description}`);
 
+                if (this.pluginInstanceMap.has(handlerConfig.pathPrefix)) {
+                    throw new Error(`Plugin with the same pathPrefix already exists: ${handlerConfig.pathPrefix}`);
+                }
+
                 if (this.validatePlugin(pluginInstance.constructor)) {
                     this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
                     console.log(`Plugin ${handlerConfig.indexHandlerInterface} loaded successfully from store.`);
@@ -172,8 +175,12 @@ export class PluginHandlerImpl {
             const description = pluginInstance.getInterfaceDescription();
             console.log(`Plugin description: ${description}`);
 
+            if (this.pluginInstanceMap.has(handlerConfig.pathPrefix)) {
+                throw new Error(`Plugin with the same pathPrefix already exists: ${handlerConfig.pathPrefix}`);
+            }
+
             if (this.validatePlugin(PluginClass)) {
-                this.pluginInstanceMap.set(fileName, pluginInstance);
+                this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
                 console.log(`Plugin ${fileName} loaded successfully from URL.`);
             } else {
                 console.warn(`Plugin ${fileName} does not implement all methods from IndexHandlerInterface and will be ignored.`);
