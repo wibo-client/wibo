@@ -76,7 +76,7 @@ ipcMain.handle('select-file', async () => {
 
 ipcMain.handle('add-plugin-from-file', async (event, filePath) => {
   const pluginHandler = new PluginHandlerImpl();
-  await pluginHandler.addPluginFromFile(filePath);
+  await pluginHandler.addPluginTemplateFromFile(filePath);
 });
 
 ipcMain.handle('get-config', (event, key) => {
