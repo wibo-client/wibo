@@ -229,27 +229,29 @@
 
     .plugin-section {
       margin-bottom: 20px;
+      width: 100%;
     }
 
-    .local-plugins .import-button {
-      padding: 10px 20px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+    .plugin-column {
+      flex: 1;
+      padding: 0 10px;
+    }
+
+    .plugin-actions {
+      display: flex;
+      gap: 10px;
     }
 
     .local-plugins .import-button:hover {
       background-color: #45a049;
     }
   </style>
-  
+
 </head>
 
 <body>
- 
-  
+
+
   <h1>围脖 WIBO</h1>
   <div class="tabs">
     <div class="tab" data-tab="login">登录</div>
@@ -374,27 +376,27 @@
       <button id="configSubmitButton">提交</button>
       <button id="configCancelButton">取消</button>
     </div>
-  </div>  
+  </div>
 
   <!-- 插件内容区域 -->
   <div id="plugins" class="tab-content">
     <div class="plugin-section">
-      <h3>当前我所有的插件</h3>
-      <ul class="plugin-list" id="currentPluginsList">
-        <!-- 插件列表将在这里动态显示 -->
-      </ul>
-    </div>
-
-    <div class="plugin-section">
-      <h3>插件市场</h3>
-      <ul class="plugin-list" id="marketPluginsList">
-        <!-- 插件市场列表将在这里动态显示 -->
-      </ul>
-    </div>
-
-    <div class="plugin-section local-plugins">
-      <h3>本地插件新增</h3>
-      <button class="import-button" id="importLocalPluginButton">从本地导入</button>
+      <div>
+        <h3>当前我所有的插件</h3>
+        <ul class="plugin-list" id="currentPluginsList">
+          <!-- 插件列表将在这里动态显示 -->
+        </ul>
+      </div>
+      <div>
+        <h3>插件市场</h3>
+        <ul class="plugin-list" id="marketPluginsList">
+          <!-- 插件市场列表将在这里动态显示 -->
+        </ul>
+      </div>
+      <div class="local-plugins">
+        <h3>本地插件新增</h3>
+        <button class="import-button" id="importLocalPluginButton">从本地导入</button>
+      </div>
     </div>
   </div>
 
@@ -409,37 +411,7 @@
       });
     });
 
-    // 动态生成插件列表
-    async function renderPlugins() {
-      const currentPluginsList = document.getElementById('currentPluginsList');
-      currentPluginsList.innerHTML = '';
-
-      const pluginInstanceMap = await window.electron.getPluginInstanceMap();
-      for (const [pathPrefix, pluginInstance] of Object.entries(pluginInstanceMap)) {
-        const li = document.createElement('li');
-        li.className = 'plugin-item';
-        li.innerHTML = `
-          <span>${pluginInstance.getHandlerName()}</span>
-          <div class="plugin-actions">
-            <button onclick="editPluginConfig('${pathPrefix}')">修改配置</button>
-            <button onclick="deletePlugin('${pathPrefix}')">删除</button>
-          </div>
-        `;
-        currentPluginsList.appendChild(li);
-      }
-    }
-
-    // 插件操作示例函数
-    function editPluginConfig(pluginId) {
-      alert(`编辑插件配置: ${pluginId}`);
-    }
-
-    function deletePlugin(pluginId) {
-      alert(`删除插件: ${pluginId}`);
-    }
-
-    // 初始化插件列表
-    renderPlugins();
+    // 删除动态生成插件列表的代码
   </script>
 </body>
 
