@@ -1,5 +1,6 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -33,5 +34,12 @@ module.exports = {
       }
     ]
   },
-  devtool: 'source-map' // 启用源映射
+  devtool: 'source-map', // 启用源映射
+  plugins: [
+    new CopyWebpackPlugin({
+      patterns: [
+        { from: 'src/plugins/*.json', to: '[name][ext]' }
+      ]
+    })
+  ]
 };

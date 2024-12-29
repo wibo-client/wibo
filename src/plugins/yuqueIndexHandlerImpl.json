@@ -1,10 +1,5 @@
 {
     "pathPrefix": "/yuque/",
     "authToken": "your-auth-token",
-    "indexHandlerInterface": "YuqueIndexHandlerImpl",
-    "user": {
-        "id": "user-id",
-        "name": "user-name",
-        "email": "user-email@example.com"
-    }
+    "indexHandlerInterface": "YuqueIndexHandlerImpl"
 }
