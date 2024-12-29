@@ -13,16 +13,27 @@ export class PluginHandlerImpl {
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         this.store = new Store({ name: 'pluginTemplates' });
         this.instanceStore = new Store({ name: 'pluginInstancesConfig' });
+        // this.store.clear();
+        // this.instanceStore.clear();
     }
 
-    async storePluginInStore(name, content) {
+    async storePluginInStore(pluginClass, content) {
+        const name = pluginClass.name;
         const pluginTemplates = this.store.get('pluginTemplates', []);
+        const existingPlugin = pluginTemplates.find(plugin => plugin.name === name);
+        if (existingPlugin) {
+            console.log(`Plugin with name ${name} already exists.`);
+        }
         pluginTemplates.push({ name, code: content });
         this.store.set('pluginTemplates', pluginTemplates);
     }
 
     async storeInstanceConfigInStore(name, config) {
         const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
+        const existingInstance = pluginInstancesConfig.find(instance => instance.name === name);
+        if (existingInstance) {
+            console.log(`Instance config with name ${name} already exists.`);
+        }
         pluginInstancesConfig.push({ name, config });
         this.instanceStore.set('pluginInstancesConfig', pluginInstancesConfig);
     }
@@ -69,6 +80,7 @@ export class PluginHandlerImpl {
             const configFilePath = filePath.replace(/\.js$/, '.json');
             const handlerConfig = JSON.parse(await fs.promises.readFile(configFilePath, 'utf-8'));
             const evaluatedModule = this.evaluateModule(pluginCode);
+            
             const PluginClass = evaluatedModule[handlerConfig.indexHandlerInterface];
 
             // 调用加载的代码的 getInterfaceDescription 方法
@@ -88,8 +100,9 @@ export class PluginHandlerImpl {
 
             if (this.validatePlugin(PluginClass)) {
                 this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
-                await this.storePluginInStore(path.basename(filePath), pluginCode);
+                await this.storePluginInStore(PluginClass, pluginCode);
                 console.log(`Plugin ${filePath} loaded successfully from file.`);
+                await this.addNewInstanceConfig(handlerConfig); // 调用 addNewInstanceConfig 并记录到 store 中
             } else {
                 console.warn(`Plugin ${filePath} does not implement all methods from IndexHandlerInterface and will be ignored.`);
             }
@@ -127,12 +140,20 @@ export class PluginHandlerImpl {
 
     async loadPlugins() {
         try {
+            let PluginClass = '';
             this.pluginInstanceMap.clear();
             const pluginTemplates = this.store.get('pluginTemplates', []);
             const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
             for (const instance of pluginInstancesConfig) {
                 const handlerConfig = instance.config;
-                const PluginClass = pluginTemplates.find(template => template.name === handlerConfig.indexHandlerInterface).code;
+               for(const plugin of pluginTemplates) {
+                    if (plugin.name === handlerConfig.indexHandlerInterface) {
+                        PluginClass = plugin.code;
+                        break;
+                    }
+                }
+
+        
                 const evaluatedModule = this.evaluateModule(PluginClass);
                 const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
                 await pluginInstance.loadConfig(handlerConfig);

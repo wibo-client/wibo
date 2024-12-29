@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM 加载完成');
   setupEventListeners();
   setupLinkHandler(); // 添加链接处理器
+  renderPlugins(); // 初始化插件列表
 });
 
 async function handleLogin() {
@@ -52,7 +53,8 @@ function setupEventListeners() {
   document.getElementById('importLocalPluginButton').addEventListener('click', async () => {
     const filePath = await window.electron.selectFile();
     if (filePath) {
-      window.electron.addPluginFromFile(filePath);
+      await window.electron.addPluginFromFile(filePath);
+      await renderPlugins(); // 刷新插件列表
     }
   });
 }
@@ -179,4 +181,24 @@ function setupLinkHandler() {
       window.electron.shell.openExternal(target.href); // 使用 window.electron.shell.openExternal
     }
   });
+}
+
+async function renderPlugins() {
+  const currentPluginsList = document.getElementById('currentPluginsList');
+  currentPluginsList.innerHTML = '';
+
+  const pluginInstanceMap = await window.electron.getPluginInstanceMap();
+  for (const [pathPrefix, handlerConfig] of Object.entries(pluginInstanceMap)) {
+    const li = document.createElement('li');
+    li.className = 'plugin-item';
+    li.innerHTML = `
+      <div class="plugin-column">${pathPrefix}</div>
+      <div class="plugin-column">${JSON.stringify(handlerConfig)}</div>
+      <div class="plugin-actions">
+        <button onclick="editPluginConfig('${pathPrefix}')">修改配置</button>
+        <button onclick="deletePlugin('${pathPrefix}')">删除</button>
+      </div>
+    `;
+    currentPluginsList.appendChild(li);
+  }
 }

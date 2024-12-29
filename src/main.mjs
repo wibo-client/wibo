@@ -105,7 +105,7 @@ ipcMain.handle('get-plugin-instance-map', async () => {
   const pluginInstanceMap = {};
   for (const [pathPrefix, pluginInstance] of pluginHandler.pluginInstanceMap) {
     pluginInstanceMap[pathPrefix] = {
-      getHandlerName: pluginInstance.getHandlerName.bind(pluginInstance)
+      getHandlerName: pluginInstance.handlerConfig
     };
   }
   return pluginInstanceMap;
