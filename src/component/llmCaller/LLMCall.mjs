@@ -2,8 +2,11 @@ import OpenAI from "openai";
 
 export class LLMCall {
   constructor(apiKey, baseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1") {
+
+    let apikeyLocal = apiKey;
+    
     this.openai = new OpenAI({
-      apiKey: apiKey || process.env.DASHSCOPE_API_KEY,
+      apiKey: apikeyLocal,
       baseURL: baseURL
     });
   }

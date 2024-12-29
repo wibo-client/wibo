@@ -1,15 +1,20 @@
 import { IndexHandlerInterface } from '../component/indexHandler/indexHandlerInter.mjs';
+import { LLMBasedRerankImpl } from '../component/rerank/llmbasedRerankImpl.mjs';
 import axios from 'axios';
 
 const API_ENDPOINT = "https://yuque-api.antfin-inc.com/api/v2";
 const YUQUE_ACCESS_URL = "https://yuque.alibaba-inc.com/";
 
 export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
-    constructor(handlerConfig, user) {
+    constructor() {
         super();
-        this.handlerConfig = handlerConfig;
-        this.user = user;
-        this.authToken = handlerConfig.authToken;
+        this.rerankImpl = new LLMBasedRerankImpl(/* isDebugModel */);
+    }
+
+    async loadConfig(config) {
+        this.handlerConfig = config;
+        this.user = config.user;
+        this.authToken = config.authToken;
         this.client = axios.create({
             baseURL: API_ENDPOINT,
             headers: { 'X-Auth-Token': this.authToken }
@@ -19,9 +24,20 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
     async rewriteQuery(query) {
         return [query];
     }
+
+    async rerank(documentPartList, queryString) {
+        if (!Array.isArray(documentPartList) || typeof queryString !== 'string') {
+            throw new TypeError('Invalid input types for rerank method');
+        }
+        return await this.rerankImpl.rerank(documentPartList, queryString);
+    }
     
     getInterfaceDescription() {
         return "This is a Yuque based index implementation";
+    }
+
+    getHandlerName() {
+        return 'YuqueIndexHandlerImpl';
     }
 
     async getPossiblePath(path) {

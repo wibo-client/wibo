@@ -1,39 +1,44 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs';
-import Store from 'electron-store';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import vm from 'vm';
+import Store from 'electron-store';
 
 export class PluginHandlerImpl {
     constructor() {
-        this.plugins = [];
+        this.pluginInstanceMap = new Map();
         this.mktplaceUrl = 'localhost:8080';
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
-        this.store = new Store({ name: 'plugins' });
+        this.store = new Store({ name: 'pluginTemplates' });
+        this.instanceStore = new Store({ name: 'pluginInstancesConfig' });
     }
 
-    async loadPlugins() {
+    async storePluginInStore(name, content) {
+        const pluginTemplates = this.store.get('pluginTemplates', []);
+        pluginTemplates.push({ name, code: content });
+        this.store.set('pluginTemplates', pluginTemplates);
+    }
+
+    async storeInstanceConfigInStore(name, config) {
+        const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
+        pluginInstancesConfig.push({ name, config });
+        this.instanceStore.set('pluginInstancesConfig', pluginInstancesConfig);
+    }
+
+    async addNewInstanceConfig(handlerConfig) {
         try {
-            const plugins = this.store.get('plugins', []);
-            for (const plugin of plugins) {
-                const blob = new Blob([plugin.code], { type: 'application/javascript' });
-                const url = URL.createObjectURL(blob);
-                const { default: PluginClass } = await import(url);
-                if (PluginClass.prototype instanceof IndexHandlerInterface) {
-                    const pluginInstance = new PluginClass(this.handlerConfig);
-                    this.plugins.push(pluginInstance);
-                } else {
-                    console.warn(`Plugin ${plugin.name} does not extend IndexHandlerInterface and will be ignored.`);
-                }
-            }
+            await this.storeInstanceConfigInStore(handlerConfig.pathPrefix, handlerConfig);
+            console.log(`Instance config for ${handlerConfig.indexHandlerInterface} added successfully.`);
+            await this.loadPlugins();
         } catch (error) {
-            console.error("Failed to load plugins:", error);
-            throw new Error("Failed to load plugins");
+            console.error("Failed to add new instance config:", error);
+            throw new Error("Failed to add new instance config");
         }
     }
 
-    async downloadPlugin(url) {
+    async downloadPluginTemplate(url) {
         const fileName = new URL(url).pathname.split('/').pop();
 
         return new Promise((resolve, reject) => {
@@ -48,58 +53,49 @@ export class PluginHandlerImpl {
                     data += chunk;
                 });
 
-                response.on('end', () => {
-                    this.storePluginInStore(fileName, data)
-                        .then(() => resolve(fileName))
-                        .catch(reject);
+                response.on('end', async () => {
+                    await this.storePluginInStore(fileName, data);
+                    resolve(fileName);
                 });
-            }).on('error', (err) => {
-                reject(err);
+            }).on('error', (error) => {
+                reject(error);
             });
         });
     }
 
-    async storePluginInStore(name, content) {
-    
-        this.store.set('plugins', []);
-        const plugins = this.store.get('plugins', []);
-        plugins.push({ name, code: content });
-        this.store.set('plugins', plugins);
-    }
-
-    async loadPluginFromUrl(url) {
-        try {
-            const fileName = await this.downloadPlugin(url);
-            const plugins = this.store.get('plugins', []);
-            const plugin = plugins.find(p => p.name === fileName);
-            const { default: PluginClass } = await import(URL.createObjectURL(new Blob([plugin.code], { type: 'application/javascript' })));
-            if (PluginClass.prototype instanceof IndexHandlerInterface) {
-                const pluginInstance = new PluginClass(this.handlerConfig);
-                this.plugins.push(pluginInstance);
-                console.log(`Plugin ${fileName} loaded successfully.`);
-            } else {
-                console.warn(`Plugin ${fileName} does not extend IndexHandlerInterface and will be ignored.`);
-            }
-        } catch (error) {
-            console.error("Failed to load plugin from URL:", error);
-            throw new Error("Failed to load plugin from URL");
-        }
-    }
-
-    async addPluginFromFile(filePath) {
+    async addPluginTemplateFromFile(filePath) {
         try {
             const pluginCode = await fs.promises.readFile(filePath, 'utf-8');
-            const fileName = path.basename(filePath);
-            await this.storePluginInStore(fileName, pluginCode);
-            console.info(`Plugin ${fileName} added successfully.`);
-            
-            const { default: PluginClass } = await import(URL.createObjectURL(new Blob([pluginCode], { type: 'application/javascript' })));
-            if (PluginClass.prototype instanceof IndexHandlerInterface) {
-                const pluginInstance = new PluginClass(this.handlerConfig);
-                this.plugins.push(pluginInstance);
-                console.log(`Plugin ${fileName} loaded successfully from file.`);
+            const evaluatedModule = this.evaluateModule(pluginCode);
+            const handlerConfig = {
+                pathPrefix: '/yuque/',
+                authToken: 'yuque-auth',
+                indexHandlerInterface: 'YuqueIndexHandlerImpl'
+            };
+            const PluginClass = evaluatedModule[handlerConfig.indexHandlerInterface];
+
+            // 调用加载的代码的 getInterfaceDescription 方法
+            const pluginInstance = new PluginClass();
+            await pluginInstance.loadConfig(handlerConfig);
+            const description = pluginInstance.getInterfaceDescription();
+            console.log(`Plugin description: ${description}`);
+
+            const handlerName = pluginInstance.getHandlerName();
+            if (!handlerName) {
+                throw new Error("Handler name is empty, cannot add plugin to map.");
+            }
+
+            const possiblePath = await pluginInstance.getPossiblePath('');
+            if (this.pluginInstanceMap.has(possiblePath)) {
+                throw new Error(`Plugin with the same getPossiblePath already exists: ${possiblePath}`);
+            }
+
+            if (this.validatePlugin(PluginClass)) {
+                this.pluginInstanceMap.set(possiblePath, pluginInstance);
+                await this.storePluginInStore(path.basename(filePath), pluginCode);
+                console.log(`Plugin ${filePath} loaded successfully from file.`);
             } else {
-                console.warn(`Plugin ${fileName} does not extend IndexHandlerInterface and will be ignored.`);
+                console.warn(`Plugin ${filePath} does not implement all methods from IndexHandlerInterface and will be ignored.`);
             }
         } catch (error) {
             console.error("Failed to add plugin from file:", error);
@@ -107,18 +103,103 @@ export class PluginHandlerImpl {
         }
     }
 
+    evaluateModule(code) {
+        const script = new vm.Script(code, { filename: 'virtual-module.js' });
+        const sandbox = {
+            module: { exports: {} },
+            exports: {},
+            require: (moduleName) => {
+                return require(moduleName);
+            }
+        };
+        const context = vm.createContext(sandbox);
+        script.runInContext(context);
+        return sandbox.module.exports;
+    }
+
+    validatePlugin(plugin) {
+        const interfaceMethods = Object.getOwnPropertyNames(IndexHandlerInterface.prototype).filter(method => method !== 'constructor');
+        const pluginMethods = Object.getOwnPropertyNames(plugin.prototype);
+
+        const missingMethods = interfaceMethods.filter(method => !pluginMethods.includes(method));
+        if (missingMethods.length > 0) {
+            console.warn(`Plugin is missing the following methods: ${missingMethods.join(', ')}`);
+        }
+
+        return missingMethods.length === 0;
+    }
+
+    async loadPlugins() {
+        try {
+            this.pluginInstanceMap.clear();
+            const pluginTemplates = this.store.get('pluginTemplates', []);
+            const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
+            for (const instance of pluginInstancesConfig) {
+                const handlerConfig = instance.config;
+                const PluginClass = pluginTemplates.find(template => template.name === handlerConfig.indexHandlerInterface).code;
+                const evaluatedModule = this.evaluateModule(PluginClass);
+                const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
+                await pluginInstance.loadConfig(handlerConfig);
+                const description = pluginInstance.getInterfaceDescription();
+                console.log(`Plugin description: ${description}`);
+
+                if (this.validatePlugin(pluginInstance.constructor)) {
+                    this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
+                    console.log(`Plugin ${handlerConfig.indexHandlerInterface} loaded successfully from store.`);
+                } else {
+                    console.warn(`Plugin ${handlerConfig.indexHandlerInterface} does not implement all methods from IndexHandlerInterface and will be ignored.`);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to load plugins:", error);
+            throw new Error("Failed to load plugins");
+        }
+    }
+
+    async loadPluginFromUrl(url) {
+        try {
+            const fileName = await this.downloadPluginTemplate(url);
+            const pluginTemplates = this.store.get('pluginTemplates', []);
+            const plugin = pluginTemplates.find(p => p.name === fileName);
+            const evaluatedModule = this.evaluateModule(plugin.code);
+            const handlerConfig = {
+                pathPrefix: '/yuque/',
+                authToken: 'yuque-auth',
+                indexHandlerInterface: 'YuqueIndexHandlerImpl'
+            };
+            const PluginClass = evaluatedModule[handlerConfig.indexHandlerInterface];
+
+            // 调用加载的代码的 getInterfaceDescription 方法
+            const pluginInstance = new PluginClass(handlerConfig, this.user);
+            await pluginInstance.loadConfig(handlerConfig);
+            const description = pluginInstance.getInterfaceDescription();
+            console.log(`Plugin description: ${description}`);
+
+            if (this.validatePlugin(PluginClass)) {
+                this.pluginInstanceMap.set(fileName, pluginInstance);
+                console.log(`Plugin ${fileName} loaded successfully from URL.`);
+            } else {
+                console.warn(`Plugin ${fileName} does not implement all methods from IndexHandlerInterface and will be ignored.`);
+            }
+        } catch (error) {
+            console.error("Failed to load plugin from URL:", error);
+            throw new Error("Failed to load plugin from URL");
+        }
+    }
+
     async select(pathPrefix = '') {
-        if (this.plugins.length === 0) {
+        if (this.pluginInstanceMap.size === 0) {
             await this.loadPlugins();
         }
 
         // 根据 pathPrefix 选出最匹配的插件
-        const plugin = this.plugins.find(plugin => pathPrefix.startsWith(plugin.handlerConfig.pathPrefix));
-        if (!plugin) {
-            return this.defaultHandler;
+        for (const [possiblePath, plugin] of this.pluginInstanceMap) {
+            if (pathPrefix.startsWith(possiblePath)) {
+                return plugin;
+            }
         }
 
-        return plugin;
+        return this.defaultHandler;
     }
 }
 

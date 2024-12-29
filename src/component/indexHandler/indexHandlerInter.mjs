@@ -2,7 +2,15 @@
  * 索引处理接口，提供索引构建和搜索功能
  */
 export class IndexHandlerInterface {
+
+    async loadConfig(config) {
+        throw new Error('Method not implemented.');
+    }
     getInterfaceDescription() {
+        throw new Error('Method not implemented.');
+    }
+
+    getHandlerName() {
         throw new Error('Method not implemented.');
     }
 

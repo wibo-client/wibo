@@ -2,11 +2,15 @@ import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import { LLMBasedRerankImpl } from '../rerank/llmbasedRerankImpl.mjs';
 
 export class PuppeteerIndexHandler extends IndexHandlerInterface {
-    constructor(handlerConfig) {
+    constructor() {
         super();
-        this.handlerConfig = handlerConfig;
         this.rerankImpl = new LLMBasedRerankImpl(/* isDebugModel */);
     }
+
+    async loadConfig(config) {
+        this.handlerConfig = config;
+    }
+
     /**
      * 
      */
@@ -46,6 +50,10 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
             throw new TypeError('Invalid input types for rerank method');
         }
         return await this.rerankImpl.rerank(documentPartList, queryString);
+    }
+
+    getHandlerName() {
+        return 'PuppeteerIndexHandler';
     }
 
     /**

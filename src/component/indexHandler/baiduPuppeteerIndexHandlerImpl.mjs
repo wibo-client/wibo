@@ -5,8 +5,12 @@ import { PuppeteerIndexHandler } from './puppeteerIndexHandler.mjs';
 puppeteer.use(StealthPlugin());
 
 export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
-    constructor(handlerConfig) {
-        super(handlerConfig);
+    constructor() {
+        super();
+    }
+
+    async loadConfig(config) {
+        this.handlerConfig = config;
     }
 
     async search(query, pathPrefix = '', searchItemNumbers = 10, recordDescription = true) {
@@ -116,6 +120,10 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         } catch (error) {
             console.error(`Error in hoverAndClick: ${error}`);
         }
+    }
+
+    getHandlerName() {
+        return 'BaiduPuppeteerIndexHandlerImpl';
     }
 }
 
