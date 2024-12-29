@@ -66,12 +66,9 @@ export class PluginHandlerImpl {
     async addPluginTemplateFromFile(filePath) {
         try {
             const pluginCode = await fs.promises.readFile(filePath, 'utf-8');
+            const configFilePath = filePath.replace(/\.js$/, '.json');
+            const handlerConfig = JSON.parse(await fs.promises.readFile(configFilePath, 'utf-8'));
             const evaluatedModule = this.evaluateModule(pluginCode);
-            const handlerConfig = {
-                pathPrefix: '/yuque/',
-                authToken: 'yuque-auth',
-                indexHandlerInterface: 'YuqueIndexHandlerImpl'
-            };
             const PluginClass = evaluatedModule[handlerConfig.indexHandlerInterface];
 
             // 调用加载的代码的 getInterfaceDescription 方法
