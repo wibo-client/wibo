@@ -1,6 +1,7 @@
 import { DocumentRerankInterface } from './rerankInter.mjs';
 import LLMCall from '../llmCaller/LLMCall.mjs';
 
+
 export class LLMBasedRerankImpl extends DocumentRerankInterface {
     constructor(isDebugModel = false) {
         super();
@@ -10,7 +11,11 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
 
     async rerank(documentPartList, queryString) {
         console.info("Starting rerank process for query:", queryString);
-
+        console.debug("Document part list:", JSON.stringify(documentPartList));
+        let index = 0 ; 
+        for(const part of documentPartList) {
+            part.id = String( index++);
+        }
         const params = {
             userInput: queryString,
             documents: JSON.stringify(documentPartList),
@@ -37,20 +42,28 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
                 jsonResult = response[0];
                 console.info("Received JSON result from LLM:", jsonResult);
 
-                const jsonArray = jsonResult.match(/```json\s*(\[.*?\])\s*```/s);
-                const orderedDocIds = jsonArray ? JSON.parse(jsonArray[1]) : JSON.parse(jsonResult);
+                try {
+                    const jsonArray = jsonResult.match(/```json\s*(\[.*?\])\s*```/s);
+                    const orderedDocIds = jsonArray ? JSON.parse(jsonArray[1]) : JSON.parse(jsonResult);
 
-                if (Array.isArray(orderedDocIds)) {
-                    const documentPartMap = new Map(documentPartList.map((part, index) => [String(index), part]));
-                    const reorderedDocumentParts = orderedDocIds.map(id => documentPartMap.get(String(id))).filter(Boolean);
+                    if (Array.isArray(orderedDocIds)) {
+                        const documentPartMap = new Map(documentPartList.map((part, index) => [String(index), part]));
+                        const reorderedDocumentParts = orderedDocIds.map(id => documentPartMap.get(String(id))).filter(Boolean);
 
-                    console.info("Rerank process completed. Reordered document parts:", reorderedDocumentParts);
-                    return reorderedDocumentParts;
-                } else {
-                    throw new Error("Invalid JSON format");
+                        console.info("Rerank process completed. Reordered document parts:", JSON.stringify(reorderedDocumentParts));
+                        return reorderedDocumentParts;
+                    } else {
+                        throw new Error("Invalid JSON format");
+                    }
+                } catch (jsonError) {
+                    console.error("Failed to parse JSON response or invalid format:", jsonError);
+                    attempts++;
+                    if (attempts >= 3) {
+                        throw new Error("Failed to rerank documents after 3 attempts");
+                    }
                 }
-            } catch (error) {
-                console.error("Failed to parse JSON response or invalid format:", error);
+            } catch (apiError) {
+                console.error("API call failed:", apiError);
                 attempts++;
                 if (attempts >= 3) {
                     throw new Error("Failed to rerank documents after 3 attempts");

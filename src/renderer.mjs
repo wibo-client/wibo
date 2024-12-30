@@ -103,11 +103,11 @@ async function sendMessage() {
     // 系统回复信息
     const wibaMessageElement = document.createElement('div');
     wibaMessageElement.className = 'message wiba';
-    wibaMessageElement.innerHTML = 'WIBO:<br><br>';
+    wibaMessageElement.innerHTML = '';
     feedbackBox.appendChild(wibaMessageElement);
 
     feedbackBox.scrollTop = feedbackBox.scrollHeight;
-    let wholeMessage = '';
+    let wholeMessage = '# WIBO : \n\n';
     const requestContext = {
       onChunk: (chunk) => {
         wholeMessage += chunk;
@@ -183,6 +183,15 @@ function setupLinkHandler() {
   });
 }
 
+async function deletePlugin(pathPrefix) {
+  try {
+    await window.electron.deletePlugin(pathPrefix);
+    await renderPlugins(); // 刷新插件列表
+  } catch (error) {
+    console.error('删除插件错误:', error);
+  }
+}
+
 async function renderPlugins() {
   const currentPluginsList = document.getElementById('currentPluginsList');
   currentPluginsList.innerHTML = '';
@@ -195,10 +204,24 @@ async function renderPlugins() {
       <div class="plugin-column">${pathPrefix}</div>
       <div class="plugin-column">${JSON.stringify(handlerConfig)}</div>
       <div class="plugin-actions">
-        <button onclick="editPluginConfig('${pathPrefix}')">修改配置</button>
-        <button onclick="deletePlugin('${pathPrefix}')">删除</button>
+        <button class="edit-plugin" data-path-prefix="${pathPrefix}">修改配置</button>
+        <button class="delete-plugin" data-path-prefix="${pathPrefix}">删除</button>
       </div>
     `;
     currentPluginsList.appendChild(li);
   }
+
+  document.querySelectorAll('.edit-plugin').forEach(button => {
+    button.addEventListener('click', (event) => {
+      const pathPrefix = event.target.getAttribute('data-path-prefix');
+      editPluginConfig(pathPrefix);
+    });
+  });
+
+  document.querySelectorAll('.delete-plugin').forEach(button => {
+    button.addEventListener('click', (event) => {
+      const pathPrefix = event.target.getAttribute('data-path-prefix');
+      deletePlugin(pathPrefix);
+    });
+  });
 }

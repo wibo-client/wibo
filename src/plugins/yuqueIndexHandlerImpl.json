@@ -1,5 +1,5 @@
 {
-    "pathPrefix": "/yuque/",
-    "authToken": "your-auth-token",
+    "pathPrefix": "/yuque.alibaba-inc.com/ozb6sn/",
+    "authToken": "vc5kvhUDAWxwyDfMifu7Meumflht6jaYMiaBR63y",
     "indexHandlerInterface": "YuqueIndexHandlerImpl"
 }

@@ -11,31 +11,41 @@ export class PluginHandlerImpl {
         this.pluginInstanceMap = new Map();
         this.mktplaceUrl = 'localhost:8080';
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
-        this.store = new Store({ name: 'pluginTemplates' });
+        let conf  = {
+            recordCount : 10,
+        }
+        this.defaultHandler.loadConfig(conf);
+        this.pluginTemplateStore = new Store({ name: 'pluginTemplates' });
         this.instanceStore = new Store({ name: 'pluginInstancesConfig' });
-        // this.store.clear();
+        // this.pluginTemplateStore.clear();
         // this.instanceStore.clear();
     }
 
     async storePluginInStore(pluginClass, content) {
         const name = pluginClass.name;
-        const pluginTemplates = this.store.get('pluginTemplates', []);
-        const existingPlugin = pluginTemplates.find(plugin => plugin.name === name);
-        if (existingPlugin) {
-            console.log(`Plugin with name ${name} already exists.`);
+        const pluginTemplates = this.pluginTemplateStore.get('pluginTemplates', []);
+        const existingPluginIndex = pluginTemplates.findIndex(plugin => plugin.name === name);
+        if (existingPluginIndex !== -1) {
+            console.log(`Plugin with name ${name} already exists. Updating content.`);
+            pluginTemplates[existingPluginIndex].code = content;
+        } else {
+            pluginTemplates.push({ name, code: content });
         }
-        pluginTemplates.push({ name, code: content });
-        this.store.set('pluginTemplates', pluginTemplates);
+        this.pluginTemplateStore.set('pluginTemplates', pluginTemplates);
+        console.debug(`Stored plugin in store: ${name}`);
     }
-
+    
     async storeInstanceConfigInStore(name, config) {
         const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
-        const existingInstance = pluginInstancesConfig.find(instance => instance.name === name);
-        if (existingInstance) {
-            console.log(`Instance config with name ${name} already exists.`);
+        const existingInstanceIndex = pluginInstancesConfig.findIndex(instance => instance.name === name);
+        if (existingInstanceIndex !== -1) {
+            console.log(`Instance config with name ${name} already exists. Updating config.`);
+            pluginInstancesConfig[existingInstanceIndex].config = config;
+        } else {
+            pluginInstancesConfig.push({ name, config });
         }
-        pluginInstancesConfig.push({ name, config });
         this.instanceStore.set('pluginInstancesConfig', pluginInstancesConfig);
+        console.debug(`Stored instance config in store: ${name}`);
     }
 
     async addNewInstanceConfig(handlerConfig) {
@@ -51,6 +61,7 @@ export class PluginHandlerImpl {
 
     async downloadPluginTemplate(url) {
         const fileName = new URL(url).pathname.split('/').pop();
+        console.debug(`Downloading plugin template from URL: ${url}`);
 
         return new Promise((resolve, reject) => {
             https.get(url, (response) => {
@@ -76,6 +87,7 @@ export class PluginHandlerImpl {
 
     async addPluginTemplateFromFile(filePath) {
         try {
+            console.debug(`Adding plugin template from file: ${filePath}`);
             const pluginCode = await fs.promises.readFile(filePath, 'utf-8');
             const configFilePath = filePath.replace(/\.js$/, '.json');
             const handlerConfig = JSON.parse(await fs.promises.readFile(configFilePath, 'utf-8'));
@@ -113,6 +125,7 @@ export class PluginHandlerImpl {
     }
 
     evaluateModule(code) {
+        console.debug(`Evaluating module code.`);
         const script = new vm.Script(code, { filename: 'virtual-module.js' });
         const sandbox = {
             module: { exports: {} },
@@ -127,6 +140,7 @@ export class PluginHandlerImpl {
     }
 
     validatePlugin(plugin) {
+        console.debug(`Validating plugin.`);
         const interfaceMethods = Object.getOwnPropertyNames(IndexHandlerInterface.prototype).filter(method => method !== 'constructor');
         const pluginMethods = Object.getOwnPropertyNames(plugin.prototype);
 
@@ -140,9 +154,10 @@ export class PluginHandlerImpl {
 
     async loadPlugins() {
         try {
+            console.debug(`Loading plugins.`);
             let PluginClass = '';
             this.pluginInstanceMap.clear();
-            const pluginTemplates = this.store.get('pluginTemplates', []);
+            const pluginTemplates = this.pluginTemplateStore.get('pluginTemplates', []);
             const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
             for (const instance of pluginInstancesConfig) {
                 const handlerConfig = instance.config;
@@ -179,8 +194,9 @@ export class PluginHandlerImpl {
 
     async loadPluginFromUrl(url) {
         try {
+            console.debug(`Loading plugin from URL: ${url}`);
             const fileName = await this.downloadPluginTemplate(url);
-            const pluginTemplates = this.store.get('pluginTemplates', []);
+            const pluginTemplates = this.pluginTemplateStore.get('pluginTemplates', []);
             const plugin = pluginTemplates.find(p => p.name === fileName);
             const evaluatedModule = this.evaluateModule(plugin.code);
             const handlerConfig = {
@@ -212,7 +228,22 @@ export class PluginHandlerImpl {
         }
     }
 
+    async deletePlugin(pathPrefix) {
+        console.debug(`Deleting plugin with pathPrefix: ${pathPrefix}`);
+        if (this.pluginInstanceMap.has(pathPrefix)) {
+            this.pluginInstanceMap.delete(pathPrefix);
+            const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
+            const updatedConfig = pluginInstancesConfig.filter(instance => instance.config.pathPrefix !== pathPrefix);
+            this.instanceStore.set('pluginInstancesConfig', updatedConfig);
+            console.log(`Plugin with pathPrefix ${pathPrefix} deleted successfully.`);
+
+        } else {
+            throw new Error(`Plugin with pathPrefix ${pathPrefix} does not exist.`);
+        }
+    }
+
     async select(pathPrefix = '') {
+        console.debug(`Selecting plugin for pathPrefix: ${pathPrefix}`);
         if (this.pluginInstanceMap.size === 0) {
             await this.loadPlugins();
         }
@@ -228,11 +259,13 @@ export class PluginHandlerImpl {
     }
 
     async fetchPathSuggestions(input) {
+        console.debug(`Fetching path suggestions for input: ${input}`);
         const suggestions = new Set();
         for (const pluginInstance of this.pluginInstanceMap.values()) {
             const pluginSuggestions = await pluginInstance.getPossiblePath(input);
             pluginSuggestions.forEach(suggestion => suggestions.add(suggestion));
         }
+        console.debug(`Path suggestions: ${Array.from(suggestions)}`);
         return Array.from(suggestions);
     }
 }

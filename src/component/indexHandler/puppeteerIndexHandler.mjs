@@ -1,5 +1,6 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import { LLMBasedRerankImpl } from '../rerank/llmbasedRerankImpl.mjs';
+import ContentAggregator from '../contentHandler/contentAggregator.mjs';
 
 export class PuppeteerIndexHandler extends IndexHandlerInterface {
     constructor() {
@@ -98,5 +99,11 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
      */
     async search(queryStr, pathPrefix, TopN) {
         throw new Error('Method not implemented.');
+    }
+
+    async fetchAggregatedContent(summaryList) {
+        const contentAggregator = new ContentAggregator();
+        const recordCount = this.handlerConfig.recordCount || 2;
+        return await contentAggregator.aggregateContent(summaryList.slice(0, recordCount));
     }
 }

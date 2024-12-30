@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PuppeteerIndexHandler } from './puppeteerIndexHandler.mjs';
+import ContentAggregator from '../contentHandler/contentAggregator.mjs';
 
 puppeteer.use(StealthPlugin());
 
@@ -108,6 +109,12 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 await browser.close();
             }
         }
+    }
+
+    async fetchAggregatedContent(summaryList) {
+        const contentAggregator = new ContentAggregator();
+        const recordCount = this.handlerConfig.recordCount || 2;
+        return await contentAggregator.aggregateContent(summaryList.slice(0, recordCount));
     }
 
     async hoverAndClick(page, selector, text) {

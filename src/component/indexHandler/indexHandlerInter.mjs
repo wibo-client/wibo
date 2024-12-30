@@ -26,6 +26,11 @@ export class IndexHandlerInterface {
     async rerank(documentPartList, queryString) {
         throw new Error('Method not implemented.');
     }
+
+    async fetchAggregatedContent(summaryList) {
+        throw new Error('Method not implemented.');
+    }
+
     /**
      * 基础搜索方法，使用默认的搜索结果数量限制
      * 

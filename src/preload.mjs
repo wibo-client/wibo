@@ -34,7 +34,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
   selectFile: () => ipcRenderer.invoke('select-file'),
   addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath),
-  getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map')
+  getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map'),
+  deletePlugin: (pathPrefix) => ipcRenderer.invoke('delete-plugin', pathPrefix)
 });
 
 contextBridge.exposeInMainWorld('auth', {
