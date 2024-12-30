@@ -8,8 +8,9 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         this.rerankImpl = new LLMBasedRerankImpl(/* isDebugModel */);
     }
 
-    async loadConfig(config) {
+    async init(config) {
         this.handlerConfig = config;
+
     }
 
     /**

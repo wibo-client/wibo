@@ -2,8 +2,12 @@ import LLMCall from '../llmCaller/LLMCall.mjs';
 import { QueryRewriter } from './rewriteQueryInter.mjs';
 
 export class LLMBasedQueryRewriter extends QueryRewriter {
-    constructor(apiKey) {
-        this.llmCaller = new LLMCall(apiKey);
+    constructor() {
+        super();
+    }
+
+    async init(llmCaller) {
+        this.llmCaller = llmCaller;
     }
 
     /**

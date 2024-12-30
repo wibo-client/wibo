@@ -9,16 +9,21 @@ import Store from 'electron-store';
 export class PluginHandlerImpl {
     constructor() {
         this.pluginInstanceMap = new Map();
-        this.mktplaceUrl = 'localhost:8080';
-        this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
-        let conf  = {
-            recordCount : 10,
-        }
-        this.defaultHandler.loadConfig(conf);
         this.pluginTemplateStore = new Store({ name: 'pluginTemplates' });
         this.instanceStore = new Store({ name: 'pluginInstancesConfig' });
         // this.pluginTemplateStore.clear();
         // this.instanceStore.clear();
+    }
+    async init(handlerConfig) {
+
+        this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
+        this.mktplaceUrl = handlerConfig.mktplaceUrl || 'localhost:8080';
+        let recordCountInner = handlerConfig.recordCount || 10;
+        let conf = {
+            recordCount: recordCountInner,
+        }
+        this.defaultHandler.init(conf);
+
     }
 
     async storePluginInStore(pluginClass, content) {
@@ -34,7 +39,7 @@ export class PluginHandlerImpl {
         this.pluginTemplateStore.set('pluginTemplates', pluginTemplates);
         console.debug(`Stored plugin in store: ${name}`);
     }
-    
+
     async storeInstanceConfigInStore(name, config) {
         const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
         const existingInstanceIndex = pluginInstancesConfig.findIndex(instance => instance.name === name);
@@ -92,12 +97,12 @@ export class PluginHandlerImpl {
             const configFilePath = filePath.replace(/\.js$/, '.json');
             const handlerConfig = JSON.parse(await fs.promises.readFile(configFilePath, 'utf-8'));
             const evaluatedModule = this.evaluateModule(pluginCode);
-            
+
             const PluginClass = evaluatedModule[handlerConfig.indexHandlerInterface];
 
             // 调用加载的代码的 getInterfaceDescription 方法
             const pluginInstance = new PluginClass();
-            await pluginInstance.loadConfig(handlerConfig);
+            await pluginInstance.init(handlerConfig);
             const description = pluginInstance.getInterfaceDescription();
             console.log(`Plugin description: ${description}`);
 
@@ -161,17 +166,17 @@ export class PluginHandlerImpl {
             const pluginInstancesConfig = this.instanceStore.get('pluginInstancesConfig', []);
             for (const instance of pluginInstancesConfig) {
                 const handlerConfig = instance.config;
-               for(const plugin of pluginTemplates) {
+                for (const plugin of pluginTemplates) {
                     if (plugin.name === handlerConfig.indexHandlerInterface) {
                         PluginClass = plugin.code;
                         break;
                     }
                 }
 
-        
+
                 const evaluatedModule = this.evaluateModule(PluginClass);
                 const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
-                await pluginInstance.loadConfig(handlerConfig);
+                await pluginInstance.init(handlerConfig);
                 const description = pluginInstance.getInterfaceDescription();
                 console.log(`Plugin description: ${description}`);
 
@@ -208,7 +213,7 @@ export class PluginHandlerImpl {
 
             // 调用加载的代码的 getInterfaceDescription 方法
             const pluginInstance = new PluginClass(handlerConfig, this.user);
-            await pluginInstance.loadConfig(handlerConfig);
+            await pluginInstance.init(handlerConfig);
             const description = pluginInstance.getInterfaceDescription();
             console.log(`Plugin description: ${description}`);
 
