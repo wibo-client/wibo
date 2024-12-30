@@ -5,8 +5,11 @@ import LLMCall from '../llmCaller/LLMCall.mjs';
 export class LLMBasedRerankImpl extends DocumentRerankInterface {
     constructor(isDebugModel = false) {
         super();
-        this.llmCall = new LLMCall();
         this.isDebugModel = isDebugModel;
+    }
+
+    async init(llmCaller) {
+        this.llmCall = llmCaller;
     }
 
     async rerank(documentPartList, queryString) {

@@ -10,7 +10,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         super();
     }
 
-    async loadConfig(config) {
+    async init(config) {
         this.handlerConfig = config;
     }
 

@@ -11,7 +11,7 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
         this.rerankImpl = new LLMBasedRerankImpl(/* isDebugModel */);
     }
 
-    async loadConfig(config) {
+    async init(config) {
         console.debug(`Loading config: ${JSON.stringify(config)}`);
         this.handlerConfig = config;
         this.user = config.user;
