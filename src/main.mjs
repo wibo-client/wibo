@@ -12,7 +12,6 @@ import { fileURLToPath } from 'url';
 import MainWindow from './component/mainWindow.mjs';
 import FileHandler from './component/file/fileHandler.mjs';
 import ConfigHandler from './component/config/configHandler.mjs';
-import ContentAggregator from './component/contentHandler/ContentAggregator.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 let __dirname = path.dirname(__filename);
@@ -111,10 +110,15 @@ ipcMain.handle('get-plugin-instance-map', async () => {
   return pluginInstanceMap;
 });
 
-async function fetchAggregatedContent(summaryList) {
-  const contentAggregator = new ContentAggregator();
-  return await contentAggregator.aggregateContent(summaryList.slice(0, 2));
-}
+ipcMain.handle('delete-plugin', async (event, pathPrefix) => {
+  try {
+    await pluginHandler.deletePlugin(pathPrefix);
+  } catch (error) {
+    console.error('删除插件错误:', error);
+    throw error;
+  }
+});
+
 
 ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
   console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
@@ -126,19 +130,19 @@ ipcMain.handle('send-message', async (event, message, type, path, requestId) => 
     if (type === 'search') {
       const searchResult = await selectedPlugin.search(message, path);
       const markdownResult = buildSearchResultsString(searchResult);
-      event.sender.send('llm-stream', markdownResult,requestId);
+      event.sender.send('llm-stream', markdownResult, requestId);
     } else if (type === 'searchWithRerank') {
       const requeryResult = await selectedPlugin.rewriteQuery(message);
       const searchResult = await selectedPlugin.search(requeryResult, path);
       const rerankResult = await selectedPlugin.rerank(searchResult, message);
       const markdownResult = buildSearchResultsString(rerankResult);
-      event.sender.send('llm-stream', markdownResult,requestId);
+      event.sender.send('llm-stream', markdownResult, requestId);
     } else if (type === 'searchAndChat') {
       const requeryResult = await selectedPlugin.rewriteQuery(message);
       const searchResult = await selectedPlugin.search(requeryResult, path);
       const rerankResult = await selectedPlugin.rerank(searchResult, message);
       // 插入获取相关内容的逻辑
-      const aggregatedContent = await fetchAggregatedContent(rerankResult);
+      const aggregatedContent = await selectedPlugin.fetchAggregatedContent(rerankResult);
       const contextBuilder = [];
       let currentLength = 0;
       let partIndex = 1;
@@ -158,7 +162,7 @@ ipcMain.handle('send-message', async (event, message, type, path, requestId) => 
 
         if (currentLength + combinedContent.length > MAX_BATCH_SIZE_5000) {
           contextBuilder.push(combinedContent.substring(0, MAX_BATCH_SIZE_5000 - currentLength));
-          console.warn(`Reached max batch size limit at document ${doc.title}`);
+          console.info(`Reached max batch size limit at document ${doc.title}`);
           break;
         }
 
@@ -173,24 +177,38 @@ ipcMain.handle('send-message', async (event, message, type, path, requestId) => 
       const prompt = `尽可能依托于如下参考信息：\n${suggestionContext}\n\n处理用户的请求：\n${userInput}`;
 
       const messages = [
-        { role: 'user', content: prompt ,}
+        { role: 'user', content: prompt }
       ];
-      
 
       const returnStrfinal = { value: '' };
       const collectedResults = [];
 
       await llmCaller.callAsync(messages, true, (chunk) => {
-        event.sender.send('llm-stream', chunk,requestId);
+        event.sender.send('llm-stream', chunk, requestId);
       });
+
+      // 添加参考文档部分
+      const combinedOutput = [];
+      combinedOutput.push("\n\n## Reference Documents:\n");
+      let index = 1;
+      for (const doc of aggregatedContent) {
+        combinedOutput.push(`doc ${index}: [${doc.title}](${doc.url})\n`);
+        combinedOutput.push("\n");
+        if ((index++) > 3) {
+          break;
+        }
+      }
+      returnStrfinal.value += combinedOutput.join('');
+      console.info("Final combined output: ", returnStrfinal.value);
+      event.sender.send('llm-stream', returnStrfinal.value, requestId);
     } else if (type === 'chat') {
       await llmCaller.callAsync([{ role: 'user', content: message }], true, (chunk) => {
-        event.sender.send('llm-stream', chunk,requestId);
+        event.sender.send('llm-stream', chunk, requestId);
       });
     }
   } catch (error) {
     console.error(`Error occurred in handler for 'send-message': ${error}`);
-    event.sender.send('error', { message: error.message },requestId);
+    event.sender.send('error', { message: error.message }, requestId);
   }
 });
 
@@ -217,3 +235,18 @@ function buildSearchResultsString(searchResults) {
   });
   return sb;
 }
+
+// 全局异常处理
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (reason instanceof Error) {
+    console.error('Error message:', reason.message);
+    console.error('Error stack:', reason.stack);
+  }
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  console.error('Error message:', error.message);
+  console.error('Error stack:', error.stack);
+});
