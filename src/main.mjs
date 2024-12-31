@@ -18,13 +18,12 @@ if (__dirname.endsWith(path.join('src'))) {
 
 let mainWindow;
 let llmCaller;
+const configHandler = new ConfigHandler(); // 不再传递 store 实例
 
 async function init() {
   console.log('Initializing application...');
-  const configHandler = new ConfigHandler(); // 不再传递 store 实例
-
-  const globalConfigJson = await configHandler.getConfig('appGlobalConfig');
-  const globalConfig = globalConfigJson ? JSON.parse(globalConfigJson) : {};
+ 
+  const globalConfig = await configHandler.getConfig('appGlobalConfig');
 
   llmCaller = new LLMCall();
 
@@ -42,15 +41,12 @@ async function init() {
     contentAggregator,
     rerankImpl // 添加到 globalContext
   };
+  await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
 
   await rerankImpl.init(globalContext); // 调用 init 方法
   contentAggregator.init(globalContext); // 调用 init 方法
   await pluginHandler.init(globalContext); // 传递 globalConfig
-  await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
-
-  const pageFetchLimit = configHandler.getPageFetchLimit();
-  console.log(`Page Fetch Limit: ${pageFetchLimit}`);
-
+ 
   mainWindow = new MainWindow(__dirname);
   mainWindow.create();
 
@@ -63,9 +59,6 @@ app.whenReady().then(async () => {
   const globalContext = await init();
 
   const { pluginHandler, fileHandler, configHandler } = globalContext;
-
-  const pageFetchLimit = configHandler.getPageFetchLimit();
-  console.log(`Page Fetch Limit: ${pageFetchLimit}`);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -113,12 +106,14 @@ app.whenReady().then(async () => {
     await pluginHandler.addPluginTemplateFromFile(filePath);
   });
 
-  ipcMain.handle('get-config', (event, key) => {
-    return configHandler.getConfig(key);
+  ipcMain.handle('get-config', async (event, key) => {
+    const config = await configHandler.getConfig(key);
+    return JSON.stringify(config); // 返回 JSON 字符串
   });
 
   ipcMain.handle('set-config', (event, { key, value }) => {
-    configHandler.setConfig(key, value);
+    const configValue = JSON.parse(value); // 将 JSON 字符串解析为对象
+    configHandler.setConfig(key, configValue);
   });
 
   ipcMain.handle('get-token', () => {
@@ -252,6 +247,10 @@ app.whenReady().then(async () => {
       console.error('获取路径建议错误:', error);
       event.sender.send('error', { message: error.message });
     }
+  });
+
+  ipcMain.handle('reinitialize', async () => {
+    await init();
   });
 
   function buildSearchResultsString(searchResults) {

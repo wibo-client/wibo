@@ -9,7 +9,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     constructor() {
         super();
     }
-
+    
     async init(globalContext, handlerConfig) {
         await super.init(globalContext, handlerConfig);
         this.globalConfig = globalContext.globalConfig;

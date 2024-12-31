@@ -5,18 +5,20 @@ import ConfigKeys from '../../config/configKeys.mjs';
 
 class ContentAggregator {
   constructor() {
-    this.crawler = new ContentCrawler();
     this.browserConcurrency = 1; // 默认并发数
   }
 
   init(globalContext) {
-    const configHandler = globalContext.configHandler;
-    const pageFetchLimit = configHandler.getPageFetchLimit() || 10; // 默认值为10
-    this.browserConcurrency = configHandler.getConfig(ConfigKeys.BROWSER_CONCURRENCY) || pageFetchLimit;
+    this.globalConfig = globalContext.globalConfig;
+    const pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5; // 默认值为10
+    this.browserConcurrency = this.globalConfig[ConfigKeys.BROWSER_CONCURRENCY] || pageFetchLimit;
+    this.pageFetchLimit = pageFetchLimit;
+    this.crawler = new ContentCrawler(this.globalConfig); // 传递 globalConfig
   }
 
   async aggregateContent(summaryList) {
-    const promises = summaryList.map(async (summary, index) => {
+    const limitedSummaryList = summaryList.slice(0, this.pageFetchLimit); // 根据 pageFetchLimit 取任务
+    const promises = limitedSummaryList.map(async (summary, index) => {
       const content = await this.crawler.fetchPageContent(summary.url);
       summary.content = this.extractRelevantContent(content, summary);
       summary.paragraphOrder = index + 1;

@@ -250,16 +250,22 @@ async function handleSaveConfig() {
   const modelSK = document.getElementById(ConfigKeys.MODEL_SK).value;
   const browserTimeout = document.getElementById(ConfigKeys.BROWSER_TIMEOUT).value;
   const browserConcurrency = document.getElementById(ConfigKeys.BROWSER_CONCURRENCY).value;
+  const headless = document.getElementById(ConfigKeys.HEADLESS).value;
+  const pageFetchLimit = document.getElementById(ConfigKeys.PAGE_FETCH_LIMIT).value;
 
   const config = {
     [ConfigKeys.MODEL_SK]: modelSK,
     [ConfigKeys.BROWSER_TIMEOUT]: browserTimeout,
-    [ConfigKeys.BROWSER_CONCURRENCY]: browserConcurrency
+    [ConfigKeys.BROWSER_CONCURRENCY]: browserConcurrency,
+    [ConfigKeys.HEADLESS]: headless,
+    [ConfigKeys.PAGE_FETCH_LIMIT]: pageFetchLimit
   };
 
-  await window.electron.setConfig({ key: 'appGlobalConfig', value: JSON.stringify(config) });
+  await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
 
   alert('配置已保存');
+  await loadConfigValues(); // 保存后重新加载配置
+  await window.electron.reinitialize(); // 重新调用所有的 init 方法
 }
 
 async function loadConfigValues() {
@@ -269,5 +275,7 @@ async function loadConfigValues() {
     if (config[ConfigKeys.MODEL_SK]) document.getElementById(ConfigKeys.MODEL_SK).value = config[ConfigKeys.MODEL_SK];
     if (config[ConfigKeys.BROWSER_TIMEOUT]) document.getElementById(ConfigKeys.BROWSER_TIMEOUT).value = config[ConfigKeys.BROWSER_TIMEOUT];
     if (config[ConfigKeys.BROWSER_CONCURRENCY]) document.getElementById(ConfigKeys.BROWSER_CONCURRENCY).value = config[ConfigKeys.BROWSER_CONCURRENCY];
+    if (config[ConfigKeys.HEADLESS]) document.getElementById(ConfigKeys.HEADLESS).value = config[ConfigKeys.HEADLESS];
+    if (config[ConfigKeys.PAGE_FETCH_LIMIT]) document.getElementById(ConfigKeys.PAGE_FETCH_LIMIT).value = config[ConfigKeys.PAGE_FETCH_LIMIT];
   }
 }

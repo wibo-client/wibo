@@ -12,7 +12,7 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
     }
 
     async rerank(documentPartList, queryString) {
-        console.info("Starting rerank process for query:", queryString);
+        console.debug("Starting rerank process for query:", queryString);
         console.debug("Document part list:", JSON.stringify(documentPartList));
         let index = 0 ; 
         for(const part of documentPartList) {

@@ -11,8 +11,7 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         this.globalConfig = globalContext.globalConfig;
         this.rerankImpl = globalContext.rerankImpl;
         this.contentAggregator = globalContext.contentAggregator;
-        this.pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 2;
-      
+        this.pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 10;
     }
 
     /**

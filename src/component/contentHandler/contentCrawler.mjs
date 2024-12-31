@@ -1,12 +1,19 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import ConfigKeys from '../../config/configKeys.mjs';
 
 // 使用 stealth 插件
 puppeteer.use(StealthPlugin());
 
 export class ContentCrawler {
-    async fetchPageContent(url, headless = true) {
+    constructor(globalConfig) {
+        this.globalConfig = globalConfig;
+    }
+
+    async fetchPageContent(url) {
         console.error("开始处理任务");
+
+        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? this.globalConfig[ConfigKeys.HEADLESS] : true;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             let browser;
@@ -91,8 +98,8 @@ if (require.main === module) {
         process.exit(1);
     }
 
-    const crawler = new ContentCrawler();
-    crawler.fetchPageContent(url, headless).then(({ markdownText, currentUrl }) => {
+    const crawler = new ContentCrawler({ [ConfigKeys.HEADLESS]: headless });
+    crawler.fetchPageContent(url).then(({ markdownText, currentUrl }) => {
         console.log("Current URL:", currentUrl);
     }).catch(error => {
         console.error("处理任务时出错:", error);
