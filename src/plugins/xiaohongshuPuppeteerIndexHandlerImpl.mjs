@@ -11,7 +11,6 @@ export class XiaohongshuPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler 
     constructor() {
         super();
         this.loginCallback = null;
-        this.siteName = 'xiaohongshu.com';
         this.cookieUtils = new CookieUtils(this.userDataDir);
     }
     
@@ -42,8 +41,11 @@ export class XiaohongshuPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler 
             });
 
             const page = await browser.newPage();
+
+            const url = `https://www.xiaohongshu.com`;
+            const siteName = new URL(url).hostname
             // 加载 cookies
-            await this.cookieUtils.loadCookies(page, this.siteName);
+            await this.cookieUtils.loadCookies(page, siteName);
 
             await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
             await page.setExtraHTTPHeaders({
@@ -55,14 +57,24 @@ export class XiaohongshuPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler 
                 'sec-fetch-site': 'same-site',
                 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
             });
-
-            await page.goto('https://www.xiaohongshu.com');
+            await page.goto(url);
+           
             const inputSelector = '#search-input';
             await page.waitForSelector(inputSelector);
             await page.type(inputSelector, query);
             await page.keyboard.press('Enter');
             await page.waitForSelector('.note-item', { timeout: this.browserTimeout * 1000 });
 
+            // 尝试获取 cookies
+            const cookies = await this.cookieUtils.getCookies(siteName);
+            if (!cookies || cookies.length === 0) {
+                // 如果没有 cookies，进入登录流程
+                const loginSelector = '.login-container';
+                const loginDialogExists = await page.$(loginSelector);
+                if (loginDialogExists) {
+                    await this.handleLogin(page);
+                }
+            }
             // 检查是否需要登录
             const loginSelector = '.login-container';
             const loginDialogExists = await page.$(loginSelector);
@@ -121,7 +133,7 @@ export class XiaohongshuPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler 
 
 
             // 保存 cookies
-            await this.cookieUtils.saveCookies(page, this.siteName);
+            await this.cookieUtils.saveCookies(page, siteName);
 
             return outputContent;
         } catch (error) {
@@ -147,7 +159,25 @@ export class XiaohongshuPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler 
             // await page.type('#password', 'your-password');
             // await page.click('#login-button');
             // 等待登录完成
-            await page.waitForNavigation({timeout: 700000});
+            const maxWaitTime = 10 * 60 * 1000; // 10分钟
+            const interval = 5000; // 5秒
+            let loggedIn = false;
+            let totalWaitTime = 0;
+
+            while (!loggedIn && totalWaitTime < maxWaitTime) {
+                try {
+                    await page.waitForNavigation({ timeout: interval });
+                    loggedIn = true;
+                } catch (error) {
+                    console.info("登录尚未完成，继续等待...");
+                    totalWaitTime += interval;
+                }
+            }
+
+            if (!loggedIn) {
+                throw new Error("登录超时");
+            }
+
             console.info("登录处理完成");
         }
     }

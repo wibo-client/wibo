@@ -65,8 +65,11 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                         if (!anchor) return null;
                         const title = anchor.textContent.trim();
                         const url = anchor.href;
-                        const descriptionElement = block.querySelector('div.c-gap-top-small');
-                        const description = descriptionElement ? descriptionElement.textContent.trim() : '';
+                        const spans = Array.from(block.querySelectorAll('span'));
+                        console.log('Found spans:', spans);
+                        const descriptionElement = spans.find(span => span.className.startsWith('content-right'));
+                        console.log('Found description element:', descriptionElement);
+                        const description = descriptionElement ? descriptionElement.innerHTML.trim() : '';
                         const dateElement = block.querySelector('span.c-color-gray2');
                         const date = dateElement ? dateElement.textContent.trim() : '';
 

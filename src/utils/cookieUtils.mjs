@@ -23,6 +23,15 @@ export class CookieUtils {
         const cookies = await page.cookies();
         fs.writeFileSync(cookiesFilePath, JSON.stringify(cookies, null, 2));
     }
+
+    async getCookies(siteName) {
+        const cookiesFilePath = path.join(this.userDataDir, siteName, 'cookies.json');
+        if (fs.existsSync(cookiesFilePath)) {
+            const cookies = JSON.parse(fs.readFileSync(cookiesFilePath));
+            return cookies;
+        }
+        return [];
+    }
 }
 
 export default CookieUtils;
