@@ -11,11 +11,10 @@ export class ContentCrawler {
     }
 
     async fetchPageContent(url) {
-        console.error("开始处理任务");
-
-        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? this.globalConfig[ConfigKeys.HEADLESS] : true;
-
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        console.info("开始处理任务");
+        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
+        
+        for (let attempt = 1; attempt <= 2; attempt++) { // 修改尝试次数为2次
             let browser;
             try {
                 // 启动浏览器（有头模式）
@@ -64,8 +63,8 @@ export class ContentCrawler {
                 return markdownText;
             } catch (error) {
                 console.error(`Attempt ${attempt} failed:`, error);
-                if (attempt === 3) {
-                    throw error;
+                if (attempt === 2) { // 修改尝试次数为2次
+                    return ''; // 超时返回空的结果页
                 }
             } finally {
                 if (browser) {

@@ -19,12 +19,13 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
     async search(query, pathPrefix = '', recordDescription = true) {
         console.info("开始处理任务");
-
+        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
         let browser;
         try {
             browser = await puppeteer.launch({
-                headless: false,
-                args: [
+               // headless: this.globalConfig.headless !== undefined ? this.globalConfig.headless : false,
+               headless: headless,
+               args: [
                     '--window-size=833x731',
                     '--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure',
                     '--disable-features=BlockThirdPartyCookies',
