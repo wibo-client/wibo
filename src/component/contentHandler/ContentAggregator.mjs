@@ -19,6 +19,9 @@ class ContentAggregator {
   async aggregateContent(summaryList) {
     const limitedSummaryList = summaryList.slice(0, this.pageFetchLimit); // 根据 pageFetchLimit 取任务
     const promises = limitedSummaryList.map(async (summary, index) => {
+      // 随机间隔 0~300 毫秒
+      await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 301)));
+      
       const content = await this.crawler.fetchPageContent(summary.url);
       summary.content = this.extractRelevantContent(content, summary);
       summary.paragraphOrder = index + 1;
