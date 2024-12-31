@@ -1,5 +1,4 @@
 import { DocumentRerankInterface } from './rerankInter.mjs';
-import LLMCall from '../llmCaller/LLMCall.mjs';
 
 
 export class LLMBasedRerankImpl extends DocumentRerankInterface {
@@ -8,8 +7,8 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
         this.isDebugModel = isDebugModel;
     }
 
-    async init(llmCaller) {
-        this.llmCall = llmCaller;
+    async init(globalContext) {
+        this.llmCall = globalContext.llmCaller;
     }
 
     async rerank(documentPartList, queryString) {
@@ -75,3 +74,5 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
         }
     }
 }
+
+export default LLMBasedRerankImpl;

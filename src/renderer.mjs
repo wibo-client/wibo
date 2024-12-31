@@ -1,8 +1,10 @@
 import AuthClass from './component/auth/auth.mjs';
 import { marked } from 'marked'; // 从 npm 包中导入 marked
+import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM 加载完成');
+  await loadConfigValues(); // 加载配置值
   setupEventListeners();
   setupLinkHandler(); // 添加链接处理器
   renderPlugins(); // 初始化插件列表
@@ -57,6 +59,8 @@ function setupEventListeners() {
       await renderPlugins(); // 刷新插件列表
     }
   });
+
+  document.getElementById('saveConfigButton').addEventListener('click', handleSaveConfig);
 }
 
 function setupTabSwitching() {
@@ -240,4 +244,30 @@ async function renderPlugins() {
       deletePlugin(pathPrefix);
     });
   });
+}
+
+async function handleSaveConfig() {
+  const modelSK = document.getElementById(ConfigKeys.MODEL_SK).value;
+  const browserTimeout = document.getElementById(ConfigKeys.BROWSER_TIMEOUT).value;
+  const browserConcurrency = document.getElementById(ConfigKeys.BROWSER_CONCURRENCY).value;
+
+  const config = {
+    [ConfigKeys.MODEL_SK]: modelSK,
+    [ConfigKeys.BROWSER_TIMEOUT]: browserTimeout,
+    [ConfigKeys.BROWSER_CONCURRENCY]: browserConcurrency
+  };
+
+  await window.electron.setConfig({ key: 'appGlobalConfig', value: JSON.stringify(config) });
+
+  alert('配置已保存');
+}
+
+async function loadConfigValues() {
+  const configJson = await window.electron.getConfig('appGlobalConfig');
+  if (configJson) {
+    const config = JSON.parse(configJson);
+    if (config[ConfigKeys.MODEL_SK]) document.getElementById(ConfigKeys.MODEL_SK).value = config[ConfigKeys.MODEL_SK];
+    if (config[ConfigKeys.BROWSER_TIMEOUT]) document.getElementById(ConfigKeys.BROWSER_TIMEOUT).value = config[ConfigKeys.BROWSER_TIMEOUT];
+    if (config[ConfigKeys.BROWSER_CONCURRENCY]) document.getElementById(ConfigKeys.BROWSER_CONCURRENCY).value = config[ConfigKeys.BROWSER_CONCURRENCY];
+  }
 }

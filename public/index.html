@@ -302,80 +302,18 @@
 
   <!-- 配置内容区域 -->
   <div id="config" class="tab-content">
-    <style>
-      .directory-config {
-        margin-bottom: 20px;
-      }
-
-      .directory-list {
-        max-height: 200px;
-        overflow-y: auto;
-        border: 1px solid #ccc;
-        padding: 10px;
-        margin: 10px 0;
-      }
-
-      .directory-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 5px;
-        border-bottom: 1px solid #eee;
-      }
-    </style>
-
-    <div class="directory-config">
-      <h3>文档同步配置</h3>
-      <div class="config-item">
-        <button id="addLocalDirButton">新增本地目录</button>
-        <button id="addRemoteDirButton">新增远端目录</button>
-      </div>
-
-      <div class="directory-list" id="dirList">
-        <!-- 目录列表将在这里动态显示 -->
-      </div>
-
-      <div class="status-bar">
-        <div class="task-list">
-          <h3>同步任务列表</h3>
-          <div id="taskContainer"></div>
-        </div>
-        <div class="sync-info">
-          <div class="sync-stats">
-            追踪文件：<span id="totalFiles">0</span> |
-            待同步：<span id="pendingFiles">0</span> |
-          </div>
-        </div>
-      </div>
-
-      <button id="synchronizeFilesButton">全量同步</button>
-      <button id="clearTasksButton">清空当前同步任务</button>
+    <div class="config-group">
+      <h3>配置项组1：大模型SK</h3>
+      <input type="text" id="modelSK" placeholder="请输入大模型SK" />
     </div>
-
-    <!-- 远端目录对话框 -->
-    <div id="remoteDirDialog" style="display:none;">
-      <h3>新增远端目录</h3>
-      <label for="remoteUrl">URL:</label>
-      <input type="text" id="remoteUrl" placeholder="请输入URL" required />
-      <label for="remoteConf">Conf:</label>
-      <textarea id="remoteConf" placeholder="请输入配置" required></textarea>
-      <label for="remoteHandlerName">Handler Name:</label>
-      <input type="text" id="remoteHandlerName" placeholder="请输入Handler Name" required />
-      <button id="submitRemoteDirButton">提交</button>
-      <button id="cancelRemoteDirButton">取消</button>
+    <div class="config-group">
+      <h3>配置项组2：浏览器</h3>
+      <label for="browserTimeout">浏览器超时时间：</label>
+      <input type="number" id="browserTimeout" placeholder="请输入浏览器超时时间" />
+      <label for="browserConcurrency">并发启动浏览器个数：</label>
+      <input type="number" id="browserConcurrency" placeholder="请输入并发启动浏览器个数" />
     </div>
-
-    <!-- 配置对话框 -->
-    <div id="configDialog" style="display:none;">
-      <h3>配置目录</h3>
-      <label for="configUrl">URL:</label>
-      <input type="text" id="configUrl" placeholder="请输入URL" required />
-      <label for="configConf">Conf:</label>
-      <textarea id="configConf" placeholder="请输入配置"></textarea>
-      <label for="configHandlerName">Handler Name:</label>
-      <input type="text" id="configHandlerName" placeholder="请输入Handler Name" required />
-      <button id="configSubmitButton">提交</button>
-      <button id="configCancelButton">取消</button>
-    </div>
+    <button id="saveConfigButton">保存</button>
   </div>
 
   <!-- 插件内容区域 -->
@@ -412,6 +350,10 @@
     });
 
     // 删除动态生成插件列表的代码
+
+    const config = {
+      pageFetchLimit: 10 // 修改后的配置项
+    };
   </script>
 </body>
 

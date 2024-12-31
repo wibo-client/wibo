@@ -11,19 +11,16 @@ export class PluginHandlerImpl {
         this.pluginInstanceMap = new Map();
         this.pluginTemplateStore = new Store({ name: 'pluginTemplates' });
         this.instanceStore = new Store({ name: 'pluginInstancesConfig' });
-        // this.pluginTemplateStore.clear();
-        // this.instanceStore.clear();
+        this.pluginTemplateStore.clear();
+        this.instanceStore.clear();
     }
-    async init(handlerConfig) {
 
+    async init(globalContext) {
+        this.globalConfig = globalContext.globalConfig;
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
-        this.mktplaceUrl = handlerConfig.mktplaceUrl || 'localhost:8080';
-        let recordCountInner = handlerConfig.recordCount || 10;
-        let conf = {
-            recordCount: recordCountInner,
-        }
-        this.defaultHandler.init(conf);
-
+        await this.defaultHandler.init(globalContext, null);
+        this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
+       
     }
 
     async storePluginInStore(pluginClass, content) {

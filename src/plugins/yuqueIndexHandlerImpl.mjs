@@ -8,10 +8,10 @@ const YUQUE_ACCESS_URL = "https://yuque.alibaba-inc.com/";
 export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
     constructor() {
         super();
-        this.rerankImpl = new LLMBasedRerankImpl(/* isDebugModel */);
+       
     }
 
-    async init(config) {
+    async init(globalContext, config) {
         console.debug(`Loading config: ${JSON.stringify(config)}`);
         this.handlerConfig = config;
         this.user = config.user;
@@ -22,6 +22,7 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
             baseURL: API_ENDPOINT,
             headers: { 'X-Auth-Token': this.authToken }
         });
+        this.rerankImpl = globalContext.rerankImpl;
         console.debug(`YuqueIndexHandlerImpl loaded with pathPrefix: ${this.pathPrefix}`);
         console.debug( `group_slug: ${this.group_slug}, user: ${this.user}, authToken: ${this.authToken} `);
     }

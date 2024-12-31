@@ -1,6 +1,8 @@
+import Store from 'electron-store'; // 确保导入 electron-store
+import ConfigKeys from '../../config/configKeys.mjs'; // 引入共享的配置枚举值
 class ConfigHandler {
-  constructor(store) {
-    this.store = store;
+  constructor() {
+    this.store = new Store(); // 在这里实例化 Store
   }
 
   getConfig(key) {
@@ -21,6 +23,14 @@ class ConfigHandler {
 
   removeToken() {
     this.store.delete('authToken');
+  }
+
+  getPageFetchLimit() {
+    return this.store.get(ConfigKeys.PAGE_FETCH_LIMIT);
+  }
+
+  setPageFetchLimit(limit) {
+    this.store.set(ConfigKeys.PAGE_FETCH_LIMIT, limit);
   }
 }
 
