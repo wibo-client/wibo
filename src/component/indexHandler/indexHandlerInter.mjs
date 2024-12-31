@@ -74,4 +74,5 @@ export class IndexHandlerInterface {
     async search(queryStr, pathPrefix, TopN) {
         throw new Error('Method not implemented.');
     }
+    
 }
