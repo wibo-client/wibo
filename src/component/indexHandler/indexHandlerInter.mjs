@@ -3,7 +3,7 @@
  */
 export class IndexHandlerInterface {
 
-    async init(config) {
+    async init(globalContext, config) {
         throw new Error('Method not implemented.');
     }
     getInterfaceDescription() {

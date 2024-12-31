@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PuppeteerIndexHandler } from './puppeteerIndexHandler.mjs';
-import ContentAggregator from '../contentHandler/contentAggregator.mjs';
+import ConfigKeys from '../../config/configKeys.mjs';
 
 puppeteer.use(StealthPlugin());
 
@@ -10,17 +10,20 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         super();
     }
 
-    async init(config) {
-        this.handlerConfig = config;
+    async init(globalContext, handlerConfig) {
+        await super.init(globalContext, handlerConfig);
+        this.globalConfig = globalContext.globalConfig;
+        this.browserTimeout = this.globalConfig.browserTimeout || 30;
+        this.searchItemNumbers = this.globalConfig.searchItemNumbers || 20;
     }
 
-    async search(query, pathPrefix = '', searchItemNumbers = 10, recordDescription = true) {
-        console.error("开始处理任务");
+    async search(query, pathPrefix = '', recordDescription = true) {
+        console.info("开始处理任务");
 
         let browser;
         try {
             browser = await puppeteer.launch({
-                headless: true,
+                headless: false,
                 args: [
                     '--window-size=833x731',
                     '--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure',
@@ -47,12 +50,12 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
             await page.waitForSelector(inputSelector);
             await page.type(inputSelector, query);
             await page.keyboard.press('Enter');
-            await page.waitForSelector('h3', { timeout: 30000 });
+            await page.waitForSelector('h3', { timeout: this.browserTimeout * 1000 });
 
             const results = [];
             let totalResults = 0;
 
-            while (totalResults < searchItemNumbers) {
+            while (totalResults < this.searchItemNumbers) {
                 const pageResults = await page.$$eval('#content_left > div', blocks => {
                     return blocks.map(block => {
                         const adElement = block.querySelector('span.ec-tuiguang');
@@ -75,7 +78,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 results.push(...filteredResults);
                 totalResults += filteredResults.length;
 
-                if (totalResults >= searchItemNumbers) {
+                if (totalResults >= this.searchItemNumbers) {
                     break;
                 }
 
@@ -85,13 +88,13 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                     await page.click(nextPageSelector);
                     const randomWaitTime = Math.floor(Math.random() * 500) + 500;
                     await new Promise(resolve => setTimeout(resolve, randomWaitTime));
-                    await page.waitForSelector('h3', { timeout: 20000 });
+                    await page.waitForSelector('h3', { timeout: this.browserTimeout * 1000 });
                 } else {
                     break;
                 }
             }
 
-            const outputContent = results.slice(0, searchItemNumbers).map(result => {
+            const outputContent = results.slice(0, this.searchItemNumbers).map(result => {
                 if (recordDescription) {
                     if (result.description) {
                         result.description = result.description.replace(/(播报|暂停|||爱企查|\n)/g, '');
@@ -99,7 +102,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 }
                 return result;
             });
-
+            console.info("任务处理完成 , 结果数量:", outputContent.length);
             return outputContent;
         } catch (error) {
             console.error("处理任务时出错:", error);
@@ -111,11 +114,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         }
     }
 
-    async fetchAggregatedContent(summaryList) {
-        const contentAggregator = new ContentAggregator();
-        const recordCount = this.handlerConfig.recordCount || 2;
-        return await contentAggregator.aggregateContent(summaryList.slice(0, recordCount));
-    }
+
 
     async hoverAndClick(page, selector, text) {
         try {

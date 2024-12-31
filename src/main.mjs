@@ -1,12 +1,14 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
-import Store from 'electron-store';
 import PluginHandlerImpl from './component/indexHandler/pluginHandlerImpl.mjs';
 import LLMCall from './component/llmCaller/LLMCall.mjs';
 import { fileURLToPath } from 'url';
 import MainWindow from './component/mainWindow.mjs';
 import FileHandler from './component/file/fileHandler.mjs';
 import ConfigHandler from './component/config/configHandler.mjs';
+import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
+import ContentAggregator from './component/contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
+import LLMBasedRerankImpl from './component/rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
 
 const __filename = fileURLToPath(import.meta.url);
 let __dirname = path.dirname(__filename);
@@ -14,29 +16,56 @@ if (__dirname.endsWith(path.join('src'))) {
   __dirname = path.resolve(__dirname, '..', 'dist');
 }
 
-const store = new Store();
 let mainWindow;
 let llmCaller;
 
 async function init() {
   console.log('Initializing application...');
+  const configHandler = new ConfigHandler(); // 不再传递 store 实例
+
+  const globalConfigJson = await configHandler.getConfig('appGlobalConfig');
+  const globalConfig = globalConfigJson ? JSON.parse(globalConfigJson) : {};
+
   llmCaller = new LLMCall();
-  await llmCaller.init();
 
   const pluginHandler = new PluginHandlerImpl();
-
   const fileHandler = new FileHandler(__dirname);
-  const configHandler = new ConfigHandler(store);
+  const contentAggregator = new ContentAggregator();
+  const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
+
+  const globalContext = {
+    pluginHandler,
+    globalConfig,
+    llmCaller,
+    fileHandler,
+    configHandler,
+    contentAggregator,
+    rerankImpl // 添加到 globalContext
+  };
+
+  await rerankImpl.init(globalContext); // 调用 init 方法
+  contentAggregator.init(globalContext); // 调用 init 方法
+  await pluginHandler.init(globalContext); // 传递 globalConfig
+  await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
+
+  const pageFetchLimit = configHandler.getPageFetchLimit();
+  console.log(`Page Fetch Limit: ${pageFetchLimit}`);
 
   mainWindow = new MainWindow(__dirname);
   mainWindow.create();
 
-  return { pluginHandler, fileHandler, configHandler };
+  return globalContext;
 }
 
 app.whenReady().then(async () => {
   console.log('App is ready.');
-  const { pluginHandler, fileHandler, configHandler } = await init();
+
+  const globalContext = await init();
+
+  const { pluginHandler, fileHandler, configHandler } = globalContext;
+
+  const pageFetchLimit = configHandler.getPageFetchLimit();
+  console.log(`Page Fetch Limit: ${pageFetchLimit}`);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

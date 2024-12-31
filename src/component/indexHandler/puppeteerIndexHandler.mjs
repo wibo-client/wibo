@@ -1,16 +1,18 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
-import { LLMBasedRerankImpl } from '../rerank/llmbasedRerankImpl.mjs';
-import ContentAggregator from '../contentHandler/contentAggregator.mjs';
+import ConfigKeys from '../../config/configKeys.mjs';
 
 export class PuppeteerIndexHandler extends IndexHandlerInterface {
     constructor() {
         super();
-        this.rerankImpl = new LLMBasedRerankImpl(/* isDebugModel */);
+       
     }
 
-    async init(config) {
-        this.handlerConfig = config;
-
+    async init(globalContext,handlerConfig) {
+        this.globalConfig = globalContext.globalConfig;
+        this.rerankImpl = globalContext.rerankImpl;
+        this.contentAggregator = globalContext.contentAggregator;
+        this.pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 2;
+      
     }
 
     /**
@@ -102,9 +104,9 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         throw new Error('Method not implemented.');
     }
 
-    async fetchAggregatedContent(summaryList) {
-        const contentAggregator = new ContentAggregator();
-        const recordCount = this.handlerConfig.recordCount || 2;
-        return await contentAggregator.aggregateContent(summaryList.slice(0, recordCount));
+    async fetchAggregatedContent(summaryList) {    
+         return await this.contentAggregator.aggregateContent(summaryList.slice(0, this.pageFetchLimit));
     }
 }
+
+export default PuppeteerIndexHandler;
