@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import ConfigKeys from '../../config/configKeys.mjs';
 import CookieUtils from '../../utils/cookieUtils.mjs';
+import path from 'path';
 
 // 使用 stealth 插件
 puppeteer.use(StealthPlugin());

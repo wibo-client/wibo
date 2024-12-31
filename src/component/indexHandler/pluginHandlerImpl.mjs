@@ -18,7 +18,7 @@ export class PluginHandlerImpl {
 
     async init(globalContext) {
         this.globalConfig = globalContext.globalConfig;
-        this.defaultHandler = new XiaohongshuPuppeteerIndexHandlerImpl();
+        this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
         this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
        
