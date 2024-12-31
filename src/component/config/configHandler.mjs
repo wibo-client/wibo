@@ -9,6 +9,12 @@ class ConfigHandler {
     let ret =  this.store.get(key,[]);
     return ret;
   }
+  async getGlobalConfig() {
+    return this.store.get(ConfigKeys.APP_GLOBAL_CONFIG, {});
+  }
+  async setGlobalConfig(value) {
+    this.store.set(ConfigKeys.APP_GLOBAL_CONFIG, value);
+  }
 
   async setConfig(key, value) {
     this.store.set(key, value);

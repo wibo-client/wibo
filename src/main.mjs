@@ -17,39 +17,37 @@ if (__dirname.endsWith(path.join('src'))) {
 }
 
 let mainWindow;
-let llmCaller;
 const configHandler = new ConfigHandler(); // 不再传递 store 实例
+const pluginHandler = new PluginHandlerImpl();
+const fileHandler = new FileHandler(__dirname);
+const contentAggregator = new ContentAggregator();
+const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
+const llmCaller = new LLMCall();
 
-async function init() {
+async function init(createWindow = true) {
   console.log('Initializing application...');
  
-  const globalConfig = await configHandler.getConfig('appGlobalConfig');
-
-  llmCaller = new LLMCall();
-
-  const pluginHandler = new PluginHandlerImpl();
-  const fileHandler = new FileHandler(__dirname);
-  const contentAggregator = new ContentAggregator();
-  const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
+  const globalConfig = await configHandler.getGlobalConfig(); // 获取全局配置
 
   const globalContext = {
     pluginHandler,
-    globalConfig,
     llmCaller,
+    globalConfig,
     fileHandler,
     configHandler,
     contentAggregator,
     rerankImpl // 添加到 globalContext
   };
+  
   await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
-
   await rerankImpl.init(globalContext); // 调用 init 方法
-  contentAggregator.init(globalContext); // 调用 init 方法
+  await contentAggregator.init(globalContext); // 调用 init 方法
   await pluginHandler.init(globalContext); // 传递 globalConfig
  
-  mainWindow = new MainWindow(__dirname);
-  mainWindow.create();
-
+  if(createWindow) {
+    mainWindow = new MainWindow(__dirname);
+    mainWindow.create();
+  }
   return globalContext;
 }
 
@@ -250,7 +248,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('reinitialize', async () => {
-    await init();
+    await init(false);
   });
 
   function buildSearchResultsString(searchResults) {

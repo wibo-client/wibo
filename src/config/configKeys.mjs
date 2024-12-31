@@ -1,4 +1,5 @@
 const ConfigKeys = {
+  APP_GLOBAL_CONFIG: 'appGlobalConfig',
   MODEL_SK: 'modelSK',
   BROWSER_TIMEOUT: 'browserTimeout',
   BROWSER_CONCURRENCY: 'browserConcurrency',

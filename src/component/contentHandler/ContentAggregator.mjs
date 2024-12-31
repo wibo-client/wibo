@@ -8,13 +8,13 @@ class ContentAggregator {
     this.browserConcurrency = 1; // 默认并发数
   }
 
-  init(globalContext) {
+  async init(globalContext) {
     this.globalConfig = globalContext.globalConfig;
     const pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5; // 默认值为10
     this.browserConcurrency = this.globalConfig[ConfigKeys.BROWSER_CONCURRENCY] || pageFetchLimit;
     this.pageFetchLimit = pageFetchLimit;
     this.crawler = new ContentCrawler(this.globalConfig); // 传递 globalConfig
-  }
+  } 
 
   async aggregateContent(summaryList) {
     const limitedSummaryList = summaryList.slice(0, this.pageFetchLimit); // 根据 pageFetchLimit 取任务
