@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import ConfigKeys from '../../config/configKeys.mjs';
+import CookieUtils from '../../utils/cookieUtils.mjs';
 
 // 使用 stealth 插件
 puppeteer.use(StealthPlugin());
@@ -8,6 +9,8 @@ puppeteer.use(StealthPlugin());
 export class ContentCrawler {
     constructor(globalConfig) {
         this.globalConfig = globalConfig;
+        this.userDataDir = path.resolve(this.globalConfig.userDataDir || './user_data');
+        this.cookieUtils = new CookieUtils(this.userDataDir);
     }
 
     async fetchPageContent(url) {
@@ -41,6 +44,9 @@ export class ContentCrawler {
                     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
                 });
 
+                // 加载 cookies
+                await this.cookieUtils.loadCookies(page, new URL(url).hostname);
+
                 // 设置 protocolTimeout
                 page.setDefaultNavigationTimeout(60000);
 
@@ -59,6 +65,9 @@ export class ContentCrawler {
                 const markdownText = this.convertToMarkdown(pageContent);
                 // 输出页面的所有字符
                 console.log(markdownText);
+
+                // 保存 cookies
+                await this.cookieUtils.saveCookies(page, new URL(url).hostname);
 
                 return markdownText;
             } catch (error) {

@@ -1,5 +1,8 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import ConfigKeys from '../../config/configKeys.mjs';
+import path from 'path';
+import fs from 'fs';
+
 
 export class PuppeteerIndexHandler extends IndexHandlerInterface {
     constructor() {
@@ -12,6 +15,8 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         this.rerankImpl = globalContext.rerankImpl;
         this.contentAggregator = globalContext.contentAggregator;
         this.pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 10;
+        this.userDataDir = path.resolve(this.globalConfig.userDataDir || './user_data');
+  
     }
 
     /**

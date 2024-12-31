@@ -1,5 +1,6 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs';
+import XiaohongshuPuppeteerIndexHandlerImpl from '../../plugins/xiaohongshuPuppeteerIndexHandlerImpl.mjs';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
@@ -17,7 +18,7 @@ export class PluginHandlerImpl {
 
     async init(globalContext) {
         this.globalConfig = globalContext.globalConfig;
-        this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
+        this.defaultHandler = new XiaohongshuPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
         this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
        

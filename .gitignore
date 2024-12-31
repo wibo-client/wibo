@@ -4,3 +4,4 @@ node_modules
 src/.DS_Store
 dist
 .vscode
+user_data

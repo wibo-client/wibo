@@ -1,0 +1,4 @@
+{
+    "pathPrefix": "/xiaohongshu/",
+    "indexHandlerInterface": "XiaohongshuPuppeteerIndexHandlerImpl"
+}
