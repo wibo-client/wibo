@@ -35,7 +35,8 @@ contextBridge.exposeInMainWorld('electron', {
   selectFile: () => ipcRenderer.invoke('select-file'),
   addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath),
   getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map'),
-  deletePlugin: (pathPrefix) => ipcRenderer.invoke('delete-plugin', pathPrefix)
+  deletePlugin: (pathPrefix) => ipcRenderer.invoke('delete-plugin', pathPrefix),
+  reinitialize: () => ipcRenderer.invoke('reinitialize') // 补全 reinitialize 实现
 });
 
 contextBridge.exposeInMainWorld('auth', {
