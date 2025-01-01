@@ -36,27 +36,51 @@ class PluginStore {
     }
 
     // Instance Store 操作方法
+    encodePathPrefix(pathPrefix) {
+        // 方案1：使用 Base64 编码
+        return Buffer.from(pathPrefix).toString('base64');
+        
+        // 或者方案2：替换特殊字符
+        // return pathPrefix.replace(/[\/\.]/g, '_');
+    }
+
+    decodePathPrefix(encodedPrefix) {
+        // 方案1：Base64 解码
+        return Buffer.from(encodedPrefix, 'base64').toString();
+        
+        // 或者方案2：还原特殊字符
+        // return encodedPrefix.replace(/_/g, '/');
+    }
+
     putInstanceConfig(pathPrefix, handlerConfig) {
         if (!pathPrefix || !handlerConfig) {
             throw new Error('PathPrefix and handlerConfig are required');
         }
-        this.instanceStore.set(pathPrefix, handlerConfig);
+        const encodedKey = this.encodePathPrefix(pathPrefix);
+        this.instanceStore.set(encodedKey, handlerConfig);
     }
 
     removeInstanceConfig(pathPrefix) {
-        if (this.instanceStore.has(pathPrefix)) {
-            this.instanceStore.delete(pathPrefix);
+        const encodedKey = this.encodePathPrefix(pathPrefix);
+        if (this.instanceStore.has(encodedKey)) {
+            this.instanceStore.delete(encodedKey);
             return true;
         }
         return false;
     }
 
     getInstanceConfig(pathPrefix) {
-        return this.instanceStore.get(pathPrefix);
+        const encodedKey = this.encodePathPrefix(pathPrefix);
+        return this.instanceStore.get(encodedKey);
     }
 
     getAllInstanceConfigs() {
-        return this.instanceStore.store;
+        const configs = {};
+        for (const [encodedKey, config] of Object.entries(this.instanceStore.store)) {
+            const originalKey = this.decodePathPrefix(encodedKey);
+            configs[originalKey] = config;
+        }
+        return configs;
     }
 
     // 清理方法
@@ -71,7 +95,8 @@ class PluginStore {
     }
 
     hasInstanceConfig(pathPrefix) {
-        return this.instanceStore.has(pathPrefix);
+        const encodedKey = this.encodePathPrefix(pathPrefix);
+        return this.instanceStore.has(encodedKey);
     }
 }
 
