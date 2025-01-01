@@ -91,7 +91,7 @@ export class PluginHandlerImpl {
                 this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
                 await this.storePluginInStore(PluginClass, pluginCode);
                 console.log(`Plugin ${filePath} loaded successfully from file.`);
-                await this.addNewInstanceConfig(handlerConfig); // 调用 addNewInstanceConfig 并记录到 store 中
+                await this.addNewInstanceConfig(handlerConfig); 
             } else {
                 console.warn(`Plugin ${filePath} does not implement all methods from IndexHandlerInterface and will be ignored.`);
             }
