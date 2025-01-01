@@ -1,8 +1,0 @@
-{
-    "pathPrefix": "/yuque.com/whisper-hiu2k/",
-    "authToken": "IHlIekWv3CHoIqGQMCfdCk5Gj4UyPjrhmOwiR2Hu",
-    "indexHandlerInterface": "YuqueIndexHandlerImpl",
-    "api_endpoint": "https://www.yuque.com/api/v2/",
-    "yuque_access_url": "https://www.yuque.com/"
-
-}
