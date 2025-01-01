@@ -12,75 +12,51 @@ class PluginStore {
     }
 
     // Plugin Template Store 操作方法
-    addPluginTemplate(handlerInterfaceName, pluginCode) {
+    putPluginTemplate(handlerInterfaceName, pluginCode) {
         if (!handlerInterfaceName || !pluginCode) {
             throw new Error('HandlerInterfaceName and pluginCode are required');
         }
-        const templates = this.pluginTemplateStore.get('templates', {});
-        templates[handlerInterfaceName] = pluginCode;
-        this.pluginTemplateStore.set('templates', templates);
+        this.pluginTemplateStore.set(handlerInterfaceName, pluginCode);
     }
 
     removePluginTemplate(handlerInterfaceName) {
-        const templates = this.pluginTemplateStore.get('templates', {});
-        if (templates[handlerInterfaceName]) {
-            delete templates[handlerInterfaceName];
-            this.pluginTemplateStore.set('templates', templates);
+        if (this.pluginTemplateStore.has(handlerInterfaceName)) {
+            this.pluginTemplateStore.delete(handlerInterfaceName);
             return true;
         }
         return false;
-    }
-
-    updatePluginTemplate(handlerInterfaceName, pluginCode) {
-        if (!this.getPluginTemplate(handlerInterfaceName)) {
-            throw new Error(`Plugin template ${handlerInterfaceName} not found`);
-        }
-        this.addPluginTemplate(handlerInterfaceName, pluginCode);
     }
 
     getPluginTemplate(handlerInterfaceName) {
-        const templates = this.pluginTemplateStore.get('templates', {});
-        return templates[handlerInterfaceName];
+        return this.pluginTemplateStore.get(handlerInterfaceName);
     }
 
     getAllPluginTemplates() {
-        return this.pluginTemplateStore.get('templates', {});
+        return this.pluginTemplateStore.store;
     }
 
     // Instance Store 操作方法
-    addInstanceConfig(pathPrefix, handlerConfig) {
+    putInstanceConfig(pathPrefix, handlerConfig) {
         if (!pathPrefix || !handlerConfig) {
             throw new Error('PathPrefix and handlerConfig are required');
         }
-        const instances = this.instanceStore.get('instances', {});
-        instances[pathPrefix] = handlerConfig;
-        this.instanceStore.set('instances', instances);
+        this.instanceStore.set(pathPrefix, handlerConfig);
     }
 
     removeInstanceConfig(pathPrefix) {
-        const instances = this.instanceStore.get('instances', {});
-        if (instances[pathPrefix]) {
-            delete instances[pathPrefix];
-            this.instanceStore.set('instances', instances);
+        if (this.instanceStore.has(pathPrefix)) {
+            this.instanceStore.delete(pathPrefix);
             return true;
         }
         return false;
     }
 
-    updateInstanceConfig(pathPrefix, handlerConfig) {
-        if (!this.getInstanceConfig(pathPrefix)) {
-            throw new Error(`Instance config ${pathPrefix} not found`);
-        }
-        this.addInstanceConfig(pathPrefix, handlerConfig);
-    }
-
     getInstanceConfig(pathPrefix) {
-        const instances = this.instanceStore.get('instances', {});
-        return instances[pathPrefix];
+        return this.instanceStore.get(pathPrefix);
     }
 
     getAllInstanceConfigs() {
-        return this.instanceStore.get('instances', {});
+        return this.instanceStore.store;
     }
 
     // 清理方法
@@ -91,13 +67,11 @@ class PluginStore {
 
     // 实用方法
     hasPluginTemplate(handlerInterfaceName) {
-        const templates = this.pluginTemplateStore.get('templates', {});
-        return !!templates[handlerInterfaceName];
+        return this.pluginTemplateStore.has(handlerInterfaceName);
     }
 
     hasInstanceConfig(pathPrefix) {
-        const instances = this.instanceStore.get('instances', {});
-        return !!instances[pathPrefix];
+        return this.instanceStore.has(pathPrefix);
     }
 }
 
