@@ -62,32 +62,6 @@ export class PluginHandlerImpl {
         }
     }
 
-    async downloadPluginTemplate(url) {
-        const fileName = new URL(url).pathname.split('/').pop();
-        console.debug(`Downloading plugin template from URL: ${url}`);
-
-        return new Promise((resolve, reject) => {
-            https.get(url, (response) => {
-                if (response.statusCode !== 200) {
-                    reject(new Error(`Failed to download plugin: ${response.statusCode}`));
-                    return;
-                }
-
-                let data = '';
-                response.on('data', (chunk) => {
-                    data += chunk;
-                });
-
-                response.on('end', async () => {
-                    await this.storePluginInStore(fileName, data);
-                    resolve(fileName);
-                });
-            }).on('error', (error) => {
-                reject(error);
-            });
-        });
-    }
-
     async addPluginTemplateFromFile(filePath) {
         try {
             console.debug(`Adding plugin template from file: ${filePath}`);
@@ -192,42 +166,6 @@ export class PluginHandlerImpl {
         } catch (error) {
             console.error("Failed to load plugins:", error);
             throw new Error("Failed to load plugins");
-        }
-    }
-
-    async loadPluginFromUrl(url) {
-        try {
-            console.debug(`Loading plugin from URL: ${url}`);
-            const fileName = await this.downloadPluginTemplate(url);
-            const pluginTemplates = this.pluginTemplateStore.get('pluginTemplates', []);
-            const plugin = pluginTemplates.find(p => p.name === fileName);
-            const evaluatedModule = this.evaluateModule(plugin.code);
-            const handlerConfig = {
-                pathPrefix: '/yuque/',
-                authToken: 'yuque-auth',
-                indexHandlerInterface: 'YuqueIndexHandlerImpl'
-            };
-            const PluginClass = evaluatedModule[handlerConfig.indexHandlerInterface];
-
-            // 调用加载的代码的 getInterfaceDescription 方法
-            const pluginInstance = new PluginClass(handlerConfig, this.user);
-            await pluginInstance.init(handlerConfig);
-            const description = pluginInstance.getInterfaceDescription();
-            console.log(`Plugin description: ${description}`);
-
-            if (this.pluginInstanceMap.has(handlerConfig.pathPrefix)) {
-                throw new Error(`Plugin with the same pathPrefix already exists: ${handlerConfig.pathPrefix}`);
-            }
-
-            if (this.validatePlugin(PluginClass)) {
-                this.pluginInstanceMap.set(handlerConfig.pathPrefix, pluginInstance);
-                console.log(`Plugin ${fileName} loaded successfully from URL.`);
-            } else {
-                console.warn(`Plugin ${fileName} does not implement all methods from IndexHandlerInterface and will be ignored.`);
-            }
-        } catch (error) {
-            console.error("Failed to load plugin from URL:", error);
-            throw new Error("Failed to load plugin from URL");
         }
     }
 
