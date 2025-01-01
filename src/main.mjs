@@ -10,6 +10,7 @@ import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举
 import ContentAggregator from './component/contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
 import LLMBasedRerankImpl from './component/rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
 
+import LLMBasedQueryRewriter from './component/requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
 const __filename = fileURLToPath(import.meta.url);
 let __dirname = path.dirname(__filename);
 if (__dirname.endsWith(path.join('src'))) {
@@ -22,6 +23,8 @@ const pluginHandler = new PluginHandlerImpl();
 const fileHandler = new FileHandler(__dirname);
 const contentAggregator = new ContentAggregator();
 const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
+const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
+
 const llmCaller = new LLMCall();
 
 async function init(createWindow = true) {
@@ -36,10 +39,11 @@ async function init(createWindow = true) {
     fileHandler,
     configHandler,
     contentAggregator,
-    rerankImpl // 添加到 globalContext
+    rerankImpl ,// 添加到 globalContext
+    rewriteQueryer
   };
-  
   await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
+  await rewriteQueryer.init(globalConfig[ConfigKeys.MODEL_SK]);
   await rerankImpl.init(globalContext); // 调用 init 方法
   await contentAggregator.init(globalContext); // 调用 init 方法
   await pluginHandler.init(globalContext); // 传递 globalConfig
@@ -151,6 +155,7 @@ app.whenReady().then(async () => {
 
     try {
       const selectedPlugin = await pluginHandler.select(path);
+      const pageFetchLimit = globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5;
 
       if (type === 'search') {
         const searchResult = await selectedPlugin.search(message, path);
@@ -158,14 +163,28 @@ app.whenReady().then(async () => {
         event.sender.send('llm-stream', markdownResult, requestId);
       } else if (type === 'searchWithRerank') {
         const requeryResult = await selectedPlugin.rewriteQuery(message);
-        const searchResult = await selectedPlugin.search(requeryResult, path);
-        const rerankResult = await selectedPlugin.rerank(searchResult, message);
+        let searchResults = [];
+        for (const query of requeryResult) {
+          const result = await selectedPlugin.search(query, path);
+          searchResults = searchResults.concat(result);
+          if (searchResults.length >= pageFetchLimit) {
+            break;
+          }
+        }
+        const rerankResult = await selectedPlugin.rerank(searchResults, message);
         const markdownResult = buildSearchResultsString(rerankResult);
         event.sender.send('llm-stream', markdownResult, requestId);
       } else if (type === 'searchAndChat') {
         const requeryResult = await selectedPlugin.rewriteQuery(message);
-        const searchResult = await selectedPlugin.search(requeryResult, path);
-        const rerankResult = await selectedPlugin.rerank(searchResult, message);
+        let searchResults = [];
+        for (const query of requeryResult) {
+          const result = await selectedPlugin.search(query, path);
+          searchResults = searchResults.concat(result);
+          if (searchResults.length >= pageFetchLimit) {
+            break;
+          }
+        }
+        const rerankResult = await selectedPlugin.rerank(searchResults, message);
         // 插入获取相关内容的逻辑
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(rerankResult);
         const contextBuilder = [];

@@ -5,3 +5,4 @@ src/.DS_Store
 dist
 .vscode
 user_data
+src/plugins
