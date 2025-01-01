@@ -2,34 +2,38 @@ import { IndexHandlerInterface } from '../component/indexHandler/indexHandlerInt
 import { LLMBasedRerankImpl } from '../component/rerank/llmbasedRerankImpl.mjs';
 import axios from 'axios';
 
-const API_ENDPOINT = "https://yuque-api.antfin-inc.com/api/v2/";
-const YUQUE_ACCESS_URL = "https://yuque.alibaba-inc.com/";
-
 export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
     constructor() {
         super();
-       
     }
 
     async init(globalContext, config) {
         console.debug(`Loading config: ${JSON.stringify(config)}`);
         this.handlerConfig = config;
-        this.user = config.user;
         this.pathPrefix = this.handlerConfig.pathPrefix || '';
         this.group_slug = this.pathPrefix.split('/')[2];
         this.authToken = config.authToken;
+        this.apiEndpoint = config.api_endpoint || "https://yuque-api.antfin-inc.com/api/v2/";
+        this.yuqueAccessUrl = config.yuque_access_url || "https://yuque.alibaba-inc.com/";
         this.client = axios.create({
-            baseURL: API_ENDPOINT,
+            baseURL: this.apiEndpoint,
             headers: { 'X-Auth-Token': this.authToken }
         });
+
         this.rerankImpl = globalContext.rerankImpl;
+        this.rewriteQueryer = globalContext.rewriteQueryer;
         console.debug(`YuqueIndexHandlerImpl loaded with pathPrefix: ${this.pathPrefix}`);
-        console.debug( `group_slug: ${this.group_slug}, user: ${this.user}, authToken: ${this.authToken} `);
+        console.debug(`group_slug: ${this.group_slug},rerankImpl: ${this.rerankImpl}, authToken: ${this.authToken}`);
     }
 
     async rewriteQuery(query) {
         console.debug(`Rewriting query: ${query}`);
-        return [query];
+        if (!this.rewriteQueryer) {
+            throw new Error("No query rewriter found");
+        }else
+        {
+            return await this.rewriteQueryer.rewriteQuery(query);
+        }
     }
 
     async rerank(documentPartList, queryString) {
@@ -37,6 +41,7 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
         if (!Array.isArray(documentPartList) || typeof queryString !== 'string') {
             throw new TypeError('Invalid input types for rerank method');
         }
+        console.debug(this.rerankImpl);
         return await this.rerankImpl.rerank(documentPartList, queryString);
     }
 
@@ -130,7 +135,7 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
                 id: item.id,
                 title: this.removeHtmlTags(item.title),
                 description: this.removeHtmlTags(item.summary),
-                url: `${YUQUE_ACCESS_URL}${item.url.slice(1)}`,
+                url: `${this.yuqueAccessUrl}${item.url.slice(1)}`,
               }));
             console.debug(`Search results: ${JSON.stringify(results)}`);
             return results;
@@ -138,21 +143,6 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
             console.error(`Error occurred during search: ${error}`);
         }
     }
-    /*
-        function buildSearchResultsString(searchResults) {
-        let sb = '';
-        let fileNumber = 1;
-        searchResults.forEach(result => {
-            sb += `## index ${fileNumber++} 标题 ： [${result.title}](${result.url})\n\n`;
-
-            sb += `${result.description}\n`;
-            if(result.date) {
-            sb += `${result.date}\n`;
-            }
-        });
-        return sb;
-        }
-    */
 
     async getDocumentDetail(prefix, docId) {
         const url = `repos/${prefix}/docs/${docId}`;
@@ -167,7 +157,7 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
                 content: data.body,
                 documentData: {
                     fileName: data.title,
-                    filePath: `${YUQUE_ACCESS_URL}${prefix}/${docId}`,
+                    filePath: `${this.yuqueAccessUrl}${prefix}/${docId}`,
                     user: this.user
                 }
             };
@@ -189,7 +179,7 @@ export class YuqueIndexHandlerImpl extends IndexHandlerInterface {
             const bookTokenFromUrl = urlParts[urlParts.length - 2];
 
             const docId = urlParts[urlParts.length - 1];
-            const detailUrl = `${API_ENDPOINT}repos/${this.group_slug}/${bookTokenFromUrl}/docs/${docId}`;
+            const detailUrl = `${this.apiEndpoint}repos/${this.group_slug}/${bookTokenFromUrl}/docs/${docId}`;
             console.debug(`Fetching document detail from URL: ${detailUrl}`);
             try {
                 const response = await this.client.get(detailUrl);

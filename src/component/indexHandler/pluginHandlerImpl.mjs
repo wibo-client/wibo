@@ -1,6 +1,7 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs';
 import XiaohongshuPuppeteerIndexHandlerImpl from '../../plugins/xiaohongshuPuppeteerIndexHandlerImpl.mjs';
+import CmbchinawmPuppeteerIndexHandlerImpl from '../../plugins/cmbchinawm.mjs';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
@@ -17,6 +18,7 @@ export class PluginHandlerImpl {
     }
 
     async init(globalContext) {
+        this.globalContext = globalContext;
         this.globalConfig = globalContext.globalConfig;
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
@@ -100,7 +102,7 @@ export class PluginHandlerImpl {
 
             // 调用加载的代码的 getInterfaceDescription 方法
             const pluginInstance = new PluginClass();
-            await pluginInstance.init(handlerConfig);
+            await pluginInstance.init(this.globalContext, handlerConfig);
             const description = pluginInstance.getInterfaceDescription();
             console.log(`Plugin description: ${description}`);
 
@@ -174,7 +176,7 @@ export class PluginHandlerImpl {
 
                 const evaluatedModule = this.evaluateModule(PluginClass);
                 const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
-                await pluginInstance.init(handlerConfig);
+                await pluginInstance.init(this.globalContext,handlerConfig);
                 const description = pluginInstance.getInterfaceDescription();
                 console.log(`Plugin description: ${description}`);
 
