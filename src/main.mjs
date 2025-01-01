@@ -1,16 +1,16 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
-import PluginHandlerImpl from './component/indexHandler/pluginHandlerImpl.mjs';
-import LLMCall from './component/llmCaller/LLMCall.mjs';
+import PluginHandlerImpl from './indexHandler/pluginHandlerImpl.mjs';
+import LLMCall from './llmCaller/LLMCall.mjs';
 import { fileURLToPath } from 'url';
 import MainWindow from './mainWindow.mjs';
-import FileHandler from './component/file/fileHandler.mjs';
+import FileHandler from './file/fileHandler.mjs';
 import ConfigHandler from './config/configHandler.mjs';
 import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
-import ContentAggregator from './component/contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
-import LLMBasedRerankImpl from './component/rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
+import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
+import LLMBasedRerankImpl from './rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
 
-import LLMBasedQueryRewriter from './component/requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
+import LLMBasedQueryRewriter from './requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
 const __filename = fileURLToPath(import.meta.url);
 let __dirname = path.dirname(__filename);
 if (__dirname.endsWith(path.join('src'))) {

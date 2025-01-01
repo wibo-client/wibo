@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PuppeteerIndexHandler } from './puppeteerIndexHandler.mjs';
-import ConfigKeys from '../../config/configKeys.mjs';
+import ConfigKeys from '../config/configKeys.mjs';
 
 puppeteer.use(StealthPlugin());
 

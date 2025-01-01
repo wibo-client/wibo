@@ -1,7 +1,7 @@
 import ContentCrawler from './contentCrawler.mjs';
 import MarkdownSplitUtil from '../spliter/markdownSpliter.mjs';
 import stringSimilarity from 'string-similarity';
-import ConfigKeys from '../../config/configKeys.mjs';
+import ConfigKeys from '../config/configKeys.mjs';
 
 class ContentAggregator {
   constructor() {

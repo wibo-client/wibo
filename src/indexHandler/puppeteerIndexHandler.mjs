@@ -1,5 +1,5 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
-import ConfigKeys from '../../config/configKeys.mjs';
+import ConfigKeys from '../config/configKeys.mjs';
 import path from 'path';
 import fs from 'fs';
 

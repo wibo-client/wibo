@@ -1,4 +1,4 @@
-import AuthClass from './component/auth/auth.mjs';
+import AuthClass from './auth/auth.mjs';
 import { marked } from 'marked'; // 从 npm 包中导入 marked
 import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
 

@@ -1,7 +1,5 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs';
-import XiaohongshuPuppeteerIndexHandlerImpl from '../../plugins/xiaohongshuPuppeteerIndexHandlerImpl.mjs';
-import CmbchinawmPuppeteerIndexHandlerImpl from '../../plugins/cmbchinawm.mjs';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
