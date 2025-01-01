@@ -21,7 +21,7 @@
 //     return null;
 //   }
 // }
-
+//
 // // 计算部分 MD5 并将结果发送回主线程
 // const result = calculatePartialMD5(workerData.filePath);
 // parentPort.postMessage(result);
