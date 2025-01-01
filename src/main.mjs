@@ -44,7 +44,15 @@ async function init(createWindow = true) {
     rerankImpl ,
     rewriteQueryer
   };
-  await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
+  let modelSK = globalConfig[ConfigKeys.MODEL_SK];
+  if (modelSK) {
+    console.log(`Using model SK: ${modelSK}`);
+    await llmCaller.init(modelSK);
+  }else
+  {
+    console.log(`No model SK is set`);
+  }
+ 
   await rewriteQueryer.init(llmCaller);
   await rerankImpl.init(globalContext); // 调用 init 方法
   await contentAggregator.init(globalContext); // 调用 init 方法
