@@ -31,7 +31,7 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
             for (let i = keywords.length; i > 0; i--) {
                 keywordLists.push(keywords.slice(0, i));
             }
-
+            console.info("Generated keyword lists:", keywordLists);
             return keywordLists;
         } catch (error) {
             console.error("Failed to rewrite query:", error);

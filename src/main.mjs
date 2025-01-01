@@ -27,27 +27,30 @@ const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRe
 
 const llmCaller = new LLMCall();
 
+let globalContext; // 声明全局变量
+
 async function init(createWindow = true) {
   console.log('Initializing application...');
  
   const globalConfig = await configHandler.getGlobalConfig(); // 获取全局配置
 
-  const globalContext = {
+  globalContext = { // 初始化全局变量
     pluginHandler,
     llmCaller,
     globalConfig,
     fileHandler,
     configHandler,
     contentAggregator,
-    rerankImpl ,// 添加到 globalContext
+    rerankImpl ,
     rewriteQueryer
   };
   await llmCaller.init(globalConfig[ConfigKeys.MODEL_SK]);
-  await rewriteQueryer.init(globalConfig[ConfigKeys.MODEL_SK]);
+  await rewriteQueryer.init(llmCaller);
   await rerankImpl.init(globalContext); // 调用 init 方法
   await contentAggregator.init(globalContext); // 调用 init 方法
   await pluginHandler.init(globalContext); // 传递 globalConfig
  
+
   if(createWindow) {
     mainWindow = new MainWindow(__dirname);
     mainWindow.create();
@@ -58,7 +61,7 @@ async function init(createWindow = true) {
 app.whenReady().then(async () => {
   console.log('App is ready.');
 
-  const globalContext = await init();
+  globalContext = await init(); // 初始化全局变量
 
   const { pluginHandler, fileHandler, configHandler } = globalContext;
 
@@ -155,7 +158,7 @@ app.whenReady().then(async () => {
 
     try {
       const selectedPlugin = await pluginHandler.select(path);
-      const pageFetchLimit = globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5;
+      const pageFetchLimit = globalContext.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5;
 
       if (type === 'search') {
         const searchResult = await selectedPlugin.search(message, path);
