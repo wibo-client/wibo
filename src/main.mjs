@@ -3,9 +3,9 @@ import path from 'path';
 import PluginHandlerImpl from './component/indexHandler/pluginHandlerImpl.mjs';
 import LLMCall from './component/llmCaller/LLMCall.mjs';
 import { fileURLToPath } from 'url';
-import MainWindow from './component/mainWindow.mjs';
+import MainWindow from './mainWindow.mjs';
 import FileHandler from './component/file/fileHandler.mjs';
-import ConfigHandler from './component/config/configHandler.mjs';
+import ConfigHandler from './config/configHandler.mjs';
 import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
 import ContentAggregator from './component/contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
 import LLMBasedRerankImpl from './component/rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
