@@ -7,7 +7,6 @@ import pluginStore from './pluginStore.mjs';
 export class PluginHandlerImpl {
     constructor() {
         this.pluginInstanceMap = new Map();
-        pluginStore.clearAllData();
     }
 
     async init(globalContext) {
@@ -16,7 +15,7 @@ export class PluginHandlerImpl {
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
         this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
-       
+        this.loadPlugins();
     }
 
     async storePlugin(pluginClass, pluginCode, handlerConfig) {
