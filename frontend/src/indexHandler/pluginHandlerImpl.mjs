@@ -176,10 +176,6 @@ export class PluginHandlerImpl {
 
     async select(pathPrefix = '') {
         console.debug(`Selecting plugin for pathPrefix: ${pathPrefix}`);
-        if (this.pluginInstanceMap.size === 0) {
-            await this.loadPlugins();
-        }
-
         // 根据 pathPrefix 选出最匹配的插件
         for (const [possiblePath, plugin] of this.pluginInstanceMap) {
             if (pathPrefix.startsWith(possiblePath)) {

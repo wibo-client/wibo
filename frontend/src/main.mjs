@@ -142,7 +142,6 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('get-plugin-instance-map', async () => {
-    await pluginHandler.loadPlugins();
     const pluginInstanceMap = {};
     for (const [pathPrefix, pluginInstance] of pluginHandler.pluginInstanceMap) {
       pluginInstanceMap[pathPrefix] = {
