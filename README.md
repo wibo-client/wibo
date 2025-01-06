@@ -27,8 +27,22 @@ It has already integrated existing search engines like Baidu and Bing.
 或
 
 下载源码 
+前端是一个Electron代码。
+
+进入frontend:
+
 npm install build 
 npm run 即可。
+
+
+后端是java代码。
+
+进入java-local-server
+mvn package 
+
+
+启动等我链接一下
+
 
 -- 
 Currently, this is a Node Electron client.
