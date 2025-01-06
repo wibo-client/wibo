@@ -269,6 +269,7 @@
 	</properties>
 
   <build>
+     <finalName>${jar.finalName}</finalName>
     <plugins>
     
         <plugin>
@@ -301,4 +302,16 @@
       </plugin>
     </plugins>
 </build>
+
+<profiles>
+    <profile>
+        <id>product</id>
+        <properties>
+            <!-- 这里设置了 spring.profiles.active 属性 -->
+            <spring.profiles.active>product</spring.profiles.active>
+            <jar.finalName>${project.artifactId}-${project.version}-product</jar.finalName>
+        </properties>
+    </profile>
+</profiles>
+
 </project>

@@ -35,6 +35,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +49,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.PrefixQuery;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 import org.slf4j.*;
@@ -56,7 +58,8 @@ import org.slf4j.*;
 @Primary
 public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalIndexBuilder {
     private final static Logger logger = LoggerFactory.getLogger(SimpleLocalLucenceIndex.class);
-    private String INDEX_DIR = "indexDir";
+    @Value("${app.lucene.index.path}")
+    private String indexDir;
     private Directory directory;
     private Analyzer analyzer;
     private IndexWriter indexWriter;
@@ -75,19 +78,35 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     private final List<Document> pendingDocuments = new ArrayList<>();
     private final Object commitLock = new Object();
 
-    public SimpleLocalLucenceIndex(String configStr) {
-        JSONObject configJson = new JSONObject(configStr);
-        String indexDir = configJson.getString("indexDir");
-        if (indexDir != null && !indexDir.isEmpty()) {
-            INDEX_DIR = indexDir;
-        }
-        String maxSearch = configJson.getString("maxSearch");
-        if (maxSearch != null && !maxSearch.isEmpty()) {
-            MAX_SEARCH = Integer.parseInt(maxSearch);
-        }
+    // public SimpleLocalLucenceIndex(String configStr) {
+    //     JSONObject configJson = new JSONObject(configStr);
+    //     String indexDir = configJson.getString("indexDir");
+    //     if (indexDir != null && !indexDir.isEmpty()) {
+    //         INDEX_DIR = indexDir;
+    //     }
+    //     String maxSearch = configJson.getString("maxSearch");
+    //     if (maxSearch != null && !maxSearch.isEmpty()) {
+    //         MAX_SEARCH = Integer.parseInt(maxSearch);
+    //     }
 
+    //     try {
+    //         directory = FSDirectory.open(Paths.get(INDEX_DIR));
+    //         analyzer = new StandardAnalyzer();
+    //         IndexWriterConfig config = new IndexWriterConfig(analyzer);
+    //         config.setRAMBufferSizeMB(256.0); // 增加内存缓冲区大小
+    //         config.setMaxBufferedDocs(1000); // 增加最大缓冲文档数
+    //         config.setMergeScheduler(new ConcurrentMergeScheduler()); // 使用并发合并调度器
+    //         indexWriter = new IndexWriter(directory, config);
+    //     } catch (IOException e) {
+    //         throw new RuntimeException("初始化索引失败", e);
+    //     }
+    //     startCommitScheduler();
+    // }
+
+    @PostConstruct
+    public void init(){
         try {
-            directory = FSDirectory.open(Paths.get(INDEX_DIR));
+            directory = FSDirectory.open(Paths.get(indexDir));
             analyzer = new StandardAnalyzer();
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setRAMBufferSizeMB(256.0); // 增加内存缓冲区大小
@@ -101,18 +120,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     }
 
     public SimpleLocalLucenceIndex() {
-        try {
-            directory = FSDirectory.open(Paths.get(INDEX_DIR));
-            analyzer = new StandardAnalyzer();
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            config.setRAMBufferSizeMB(256.0); // 增加内存缓冲区大小
-            config.setMaxBufferedDocs(1000); // 增加最大缓冲文档数
-            config.setMergeScheduler(new ConcurrentMergeScheduler()); // 使用并发合并调度器
-            indexWriter = new IndexWriter(directory, config);
-        } catch (IOException e) {
-            throw new RuntimeException("初始化索引失败", e);
-        }
-        startCommitScheduler();
+       
     }
 
     private void startCommitScheduler() {
