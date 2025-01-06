@@ -41,7 +41,7 @@ public class App {
         // 打印最大内存
         System.out.println("系统最大内存: " + maxMemoryMB + " MB");
 
-        SignalHandlerImpl.registerSignalHandlers();
+        //SignalHandlerImpl.registerSignalHandlers();
         ApplicationContext context = SpringApplication.run(App.class, args);
     }
 }
