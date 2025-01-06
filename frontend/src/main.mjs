@@ -9,8 +9,9 @@ import ConfigHandler from './config/configHandler.mjs';
 import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
 import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
 import LLMBasedRerankImpl from './rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
-
 import LLMBasedQueryRewriter from './requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
+import LocalServerManager from './server/LocalServerManager.mjs'; // 添加 LocalServerManager 的导入
+
 const __filename = fileURLToPath(import.meta.url);
 let __dirname = path.dirname(__filename);
 if (__dirname.endsWith(path.join('src'))) {
@@ -24,6 +25,7 @@ const fileHandler = new FileHandler(__dirname);
 const contentAggregator = new ContentAggregator();
 const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
 const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
+const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
 
 const llmCaller = new LLMCall();
 
@@ -65,6 +67,8 @@ async function init(createWindow = true) {
   }
   return globalContext;
 }
+
+let javaProcess = null; // 存储 Java 进程的引用
 
 app.whenReady().then(async () => {
   console.log('App is ready.');
@@ -294,16 +298,17 @@ app.whenReady().then(async () => {
     return null;
   });
 
+  // 重写 toggle-knowledge-base 处理
   ipcMain.handle('toggle-knowledge-base', async (event, enable) => {
     try {
+      const jarPath = path.join(__dirname, 'wibo-1.0.0-product.jar');
+      
       if (enable) {
-        // 启动 Java 程序
-        const result = await startJavaProcess();
-        return { success: true, message: '启动成功' };
+        const result = await localServerManager.startServer(jarPath);
+        return result;
       } else {
-        // 关闭 Java 程序
-        const result = await stopJavaProcess();
-        return { success: true, message: '关闭成功' };
+        const result = await localServerManager.stopServer();
+        return result;
       }
     } catch (error) {
       console.error('切换知识库服务失败:', error);
@@ -314,18 +319,14 @@ app.whenReady().then(async () => {
     }
   });
 
-  // 启动 Java 程序
-  async function startJavaProcess() {
-    // TODO: 实现启动 Java 程序的逻辑
-    // 例如：使用 child_process.spawn 启动 Java 程序
-    // 返回 Promise
-  }
-
-  // 停止 Java 程序
-  async function stopJavaProcess() {
-    // TODO: 实现停止 Java 程序的逻辑
-    // 返回 Promise
-  }
+  // 确保在应用退出时清理 Java 进程
+  app.on('before-quit', async () => {
+    try {
+      await localServerManager.stopServer();
+    } catch (error) {
+      console.error('停止 Java 进程失败:', error);
+    }
+  });
 
   function buildSearchResultsString(searchResults) {
     let sb = '';

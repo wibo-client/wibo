@@ -1,9 +1,9 @@
 import AuthClass from './auth/auth.mjs';
 import { marked } from 'marked'; // 从 npm 包中导入 marked
 import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
-import ChatHandler from './modules/chat/chatHandler.mjs';
-import KnowledgeBaseHandler from './modules/knowledge/knowledgeBaseHandler.mjs';
-import BrowserConfigHandler from './modules/browser/browserConfigHandler.mjs';
+import ChatHandler from './rendererModules/chat/chatHandler.mjs';
+import KnowledgeBaseHandler from './rendererModules/knowledge/knowledgeBaseHandler.mjs';
+import BrowserConfigHandler from './rendererModules/browser/browserConfigHandler.mjs';
 
 const BASE_URL = 'http://localhost:8080'; // 设置本地服务的 URL
 
@@ -15,6 +15,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const knowledgeBaseHandler = new KnowledgeBaseHandler(BASE_URL);
   const browserConfigHandler = new BrowserConfigHandler();
   setupTabSwitching();
+
+  // 添加定期检查服务状态
+  checkServerStatus();
+  setInterval(checkServerStatus, 5000);
 });
 
 // 只保留基础功能和模块初始化相关代码
@@ -31,4 +35,36 @@ function switchToTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
   document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
   document.getElementById(tabName).classList.add('active');
+}
+
+// 添加服务状态检查函数
+async function checkServerStatus() {
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const processPid = document.getElementById('processPid');
+  const processPort = document.getElementById('processPort');
+
+  try {
+    const response = await electron.getConfig('javaProcess');
+    const javaProcess = JSON.parse(response);
+
+    if (javaProcess) {
+      statusDot.classList.remove('offline');
+      statusDot.classList.add('online');
+      statusText.textContent = '在线';
+      processPid.textContent = javaProcess.pid;
+      processPort.textContent = javaProcess.port;
+    } else {
+      statusDot.classList.remove('online');
+      statusDot.classList.add('offline');
+      statusText.textContent = '离线';
+      processPid.textContent = '-';
+      processPort.textContent = '-';
+    }
+  } catch (error) {
+    console.error('服务状态检查失败:', error);
+    statusDot.classList.remove('online');
+    statusDot.classList.add('offline');
+    statusText.textContent = '检查失败';
+  }
 }

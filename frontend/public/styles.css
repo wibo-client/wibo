@@ -356,3 +356,40 @@ input:checked + .slider:before {
   border-radius: 4px;
   font-family: monospace;
 }
+
+/* 服务状态样式 */
+.service-status {
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 5px;
+  margin-bottom: 15px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online {
+  background-color: #4CAF50;
+  box-shadow: 0 0 5px #4CAF50;
+}
+
+.status-dot.offline {
+  background-color: #f44336;
+  box-shadow: 0 0 5px #f44336;
+}
+
+.service-details {
+  font-size: 0.9em;
+  color: #666;
+}

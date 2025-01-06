@@ -279,6 +279,7 @@
                 <mainClass>com.wibot.App</mainClass>
                 <jvmArguments>
                   --add-opens java.base/java.util=ALL-UNNAMED
+                  -Dspring.profiles.active=${spring.profiles.active}
                 </jvmArguments>
             </configuration>
         </plugin>
