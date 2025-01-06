@@ -123,6 +123,17 @@ function setupEventListeners() {
   if (preRecognizePPTsToggle) {
     preRecognizePPTsToggle.addEventListener('change', handleModelEnhancement);
   }
+
+  // 添加选择目录按钮事件监听
+  const selectDirectoryBtn = document.getElementById('selectDirectoryBtn');
+  if (selectDirectoryBtn) {
+    selectDirectoryBtn.addEventListener('click', async () => {
+      const result = await window.electron.showDirectoryPicker();
+      if (result && result.filePath) {
+        document.getElementById('localDirectory').value = result.filePath;
+      }
+    });
+  }
 }
 
 function setupTabSwitching() {
@@ -356,22 +367,85 @@ async function loadConfigValues() {
   const configJson = await window.electron.getConfig('appGlobalConfig');
   if (configJson) {
     const config = JSON.parse(configJson);
+    
+    // 特殊处理 MODEL_SK，因为需要显示遮罩后的值
     if (config[ConfigKeys.MODEL_SK]) {
       const maskedSK = maskSK(config[ConfigKeys.MODEL_SK]);
       document.getElementById('masked-ak').textContent = `当前AK: ${maskedSK}`;
     }
-    if (config[ConfigKeys.BROWSER_TIMEOUT]) document.getElementById(ConfigKeys.BROWSER_TIMEOUT).value = config[ConfigKeys.BROWSER_TIMEOUT];
-    if (config[ConfigKeys.BROWSER_CONCURRENCY]) document.getElementById(ConfigKeys.BROWSER_CONCURRENCY).value = config[ConfigKeys.BROWSER_CONCURRENCY];
-    if (config[ConfigKeys.HEADLESS]) document.getElementById(ConfigKeys.HEADLESS).value = config[ConfigKeys.HEADLESS];
-    if (config[ConfigKeys.PAGE_FETCH_LIMIT]) document.getElementById(ConfigKeys.PAGE_FETCH_LIMIT).value = config[ConfigKeys.PAGE_FETCH_LIMIT];
+
+    // 处理本地知识库开关状态
+    const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
+    const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
+    if (localKnowledgeBaseToggle && config[ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE] !== undefined) {
+      localKnowledgeBaseToggle.checked = config[ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE];
+      if (localKnowledgeBaseConfig) {
+        localKnowledgeBaseConfig.style.display = config[ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE] ? 'block' : 'none';
+      }
+    }
+
+    // 统一处理其他配置项
+    const configFields = [
+      ConfigKeys.BROWSER_TIMEOUT,
+      ConfigKeys.BROWSER_CONCURRENCY,
+      ConfigKeys.HEADLESS,
+      ConfigKeys.PAGE_FETCH_LIMIT
+    ];
+
+    configFields.forEach(key => {
+      const element = document.getElementById(key);
+      if (element && config[key] !== undefined) {
+        element.value = config[key];
+      }
+    });
   }
 }
 
 // 本地知识库相关函数
-function toggleLocalKnowledgeBase() {
+async function toggleLocalKnowledgeBase() {
   const configSection = document.getElementById('localKnowledgeBaseConfig');
-  if (configSection) {
-    configSection.style.display = this.checked ? 'block' : 'none';
+  const toggle = document.getElementById('localKnowledgeBaseToggle');
+  
+  if (!configSection || !toggle) return;
+  
+  // 禁用开关，防止重复操作
+  toggle.disabled = true;
+  
+  try {
+    // 获取当前状态
+    const enable = toggle.checked;
+    configSection.style.display = enable ? 'block' : 'none';
+
+    // 通过 electron 控制 Java 程序
+    const result = await window.electron.toggleKnowledgeBase(enable);
+    
+    if (result.success) {
+      // 保存配置
+      const config = {
+        [ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE]: enable
+      };
+      await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
+      
+      // 显示成功消息
+      if (enable) {
+        alert('本地知识库服务已启动');
+      } else {
+        alert('本地知识库服务已关闭');
+      }
+    } else {
+      // 操作失败，恢复状态
+      toggle.checked = !enable;
+      configSection.style.display = !enable ? 'block' : 'none';
+      alert(result.message || '操作失败');
+    }
+  } catch (error) {
+    // 发生错误，恢复状态
+    toggle.checked = !toggle.checked;
+    configSection.style.display = !toggle.checked ? 'block' : 'none';
+    alert('操作失败: ' + error.message);
+  } finally {
+    // 恢复开关可用状态
+    toggle.disabled = false;
   }
 }
 
@@ -380,7 +454,6 @@ function toggleRemoteUpload() {
   if (configSection) {
     configSection.style.display = this.checked ? 'block' : 'none';
     
-    // 发送状态到后端
     fetch(`${BASE_URL}/admin/toggle-remote-upload`, {
       method: 'POST',
       headers: {
@@ -390,7 +463,9 @@ function toggleRemoteUpload() {
     })
     .then(response => response.json())
     .then(data => {
-      if (!data.success) {
+      if (data.success) {
+        updateUploadConfig(); // 成功开启后更新上传配置
+      } else {
         alert(data.message);
         this.checked = !this.checked;
         configSection.style.display = !this.checked ? 'block' : 'none';
@@ -401,6 +476,21 @@ function toggleRemoteUpload() {
       this.checked = !this.checked;
       configSection.style.display = !this.checked ? 'block' : 'none';
     });
+  }
+}
+
+// 新增更新上传配置的函数
+async function updateUploadConfig() {
+  try {
+    const response = await fetch(`${BASE_URL}/admin/get-upload-config`);
+    const data = await response.json();
+    if (data.success) {
+      // 更新上传地址和默认目录
+      document.getElementById('uploadUrl').textContent = data.uploadUrl;
+      document.getElementById('uploadDir').value = data.uploadDir || 'remoteFile';
+    }
+  } catch (error) {
+    console.error('获取上传配置失败:', error);
   }
 }
 
@@ -478,29 +568,61 @@ function initLocalKnowledgeBase() {
   updateMonitoredDirs();
   setInterval(updateMonitoredDirs, 10000); // 每隔10秒刷新一次监控目录列表
 
-  // 获取模型增强状态
-  fetch(`${BASE_URL}/admin/get-model-enhancement-status`)
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        const preRecognizeImagesToggle = document.getElementById('preRecognizeImages');
-        const preRecognizePDFsToggle = document.getElementById('preRecognizePDFs');
-        const preRecognizePPTsToggle = document.getElementById('preRecognizePPTs');
+  // 获取模型增强状态和远程上传状态
+  Promise.all([
+    // 获取模型增强状态
+    fetch(`${BASE_URL}/admin/get-model-enhancement-status`)
+      .then(response => response.json()),
+    // 获取远程上传状态
+    fetch(`${BASE_URL}/admin/get-remote-upload-status`)
+      .then(response => response.json())
+  ])
+  .then(([enhancementData, uploadData]) => {
+    // 处理模型增强状态
+    if (enhancementData.success) {
+      const preRecognizeImagesToggle = document.getElementById('preRecognizeImages');
+      const preRecognizePDFsToggle = document.getElementById('preRecognizePDFs');
+      const preRecognizePPTsToggle = document.getElementById('preRecognizePPTs');
 
-        if (preRecognizeImagesToggle) preRecognizeImagesToggle.checked = data.imageRecognitionEnabled;
-        if (preRecognizePDFsToggle) preRecognizePDFsToggle.checked = data.pdfRecognitionEnabled;
-        if (preRecognizePPTsToggle) preRecognizePPTsToggle.checked = data.pptRecognitionEnabled;
+      if (preRecognizeImagesToggle) preRecognizeImagesToggle.checked = enhancementData.imageRecognitionEnabled;
+      if (preRecognizePDFsToggle) preRecognizePDFsToggle.checked = enhancementData.pdfRecognitionEnabled;
+      if (preRecognizePPTsToggle) preRecognizePPTsToggle.checked = enhancementData.pptRecognitionEnabled;
+    }
+
+    // 处理远程上传状态
+    if (uploadData.success) {
+      const remoteUploadToggle = document.getElementById('remoteUploadToggle');
+      const remoteUploadConfig = document.getElementById('remoteUploadConfig');
+      if (remoteUploadToggle) {
+        remoteUploadToggle.checked = uploadData.enabled;
+        if (uploadData.enabled) {
+          remoteUploadConfig.style.display = 'block';
+          updateUploadConfig(); // 如果已启用，则获取上传配置
+        }
       }
-    })
-    .catch(error => {
-      console.error('获取模型增强状态失败:', error);
-    });
+    }
+  })
+  .catch(error => {
+    console.error('初始化配置失败:', error);
+  });
 }
 
 function setupAutoResizeInput() {
   const userInput = document.getElementById('user-input');
+  if (!userInput) return;
+
   userInput.addEventListener('input', () => {
+    // 重置高度以获取正确的 scrollHeight
     userInput.style.height = 'auto';
-    userInput.style.height = `${Math.min(userInput.scrollHeight, 150)}px`;
+    
+    // 计算行数（每行大约20px）
+    const lineHeight = 20;
+    const lines = Math.min(6, Math.ceil(userInput.scrollHeight / lineHeight));
+    
+    // 设置新的高度
+    userInput.style.height = `${lines * lineHeight}px`;
+    
+    // 更新 rows 属性
+    userInput.rows = lines;
   });
 }

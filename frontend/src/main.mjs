@@ -294,6 +294,39 @@ app.whenReady().then(async () => {
     return null;
   });
 
+  ipcMain.handle('toggle-knowledge-base', async (event, enable) => {
+    try {
+      if (enable) {
+        // 启动 Java 程序
+        const result = await startJavaProcess();
+        return { success: true, message: '启动成功' };
+      } else {
+        // 关闭 Java 程序
+        const result = await stopJavaProcess();
+        return { success: true, message: '关闭成功' };
+      }
+    } catch (error) {
+      console.error('切换知识库服务失败:', error);
+      return { 
+        success: false, 
+        message: error.message || '操作失败'
+      };
+    }
+  });
+
+  // 启动 Java 程序
+  async function startJavaProcess() {
+    // TODO: 实现启动 Java 程序的逻辑
+    // 例如：使用 child_process.spawn 启动 Java 程序
+    // 返回 Promise
+  }
+
+  // 停止 Java 程序
+  async function stopJavaProcess() {
+    // TODO: 实现停止 Java 程序的逻辑
+    // 返回 Promise
+  }
+
   function buildSearchResultsString(searchResults) {
     let sb = '';
     let fileNumber = 1;

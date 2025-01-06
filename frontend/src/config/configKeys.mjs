@@ -4,7 +4,8 @@ const ConfigKeys = {
   BROWSER_TIMEOUT: 'browserTimeout',
   BROWSER_CONCURRENCY: 'browserConcurrency',
   PAGE_FETCH_LIMIT: 'pageFetchLimit', // 修改后的配置键
-  HEADLESS: 'headless' // 新增配置键
+  HEADLESS: 'headless', // 新增配置键
+  ENABLE_LOCAL_KNOWLEDGE_BASE: 'enableLocalKnowledgeBase', // 新增配置键
 };
 
 export default ConfigKeys;
