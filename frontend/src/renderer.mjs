@@ -78,31 +78,35 @@ function setupMessageHooks() {
   const chatInput = document.getElementById('chatInput');
   const typeSelect = document.getElementById('typeSelect');
 
-  sendButton.addEventListener('click', sendMessage);
-  chatInput.addEventListener('keydown', (event) => {
-    if (event.shiftKey && event.key === 'Enter') {
-      event.preventDefault();
-      if (typeSelect.value === 'searchAndChat' || typeSelect.value === 'search') {
+  if (sendButton && chatInput && typeSelect) {
+    sendButton.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (event) => {
+      if (event.shiftKey && event.key === 'Enter') {
+        event.preventDefault();
+        if (typeSelect.value === 'searchAndChat' || typeSelect.value === 'search') {
+          sendMessage();
+        }
+      } else if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault();
+        if (typeSelect.value === 'searchWithRerank' || typeSelect.value === 'chat') {
+          sendMessage();
+        }
+      } else if (event.shiftKey && event.key === '\\') {
+        event.preventDefault();
+        typeSelect.value = 'search';
+        sendMessage();
+      } else if (event.ctrlKey && event.key === '\\') {
+        event.preventDefault();
+        typeSelect.value = 'chat';
         sendMessage();
       }
-    } else if (event.ctrlKey && event.key === 'Enter') {
-      event.preventDefault();
-      if (typeSelect.value === 'searchWithRerank' || typeSelect.value === 'chat') {
-        sendMessage();
-      }
-    } else if (event.shiftKey && event.key === '\\') {
-      event.preventDefault();
-      typeSelect.value = 'search';
-      sendMessage();
-    } else if (event.ctrlKey && event.key === '\\') {
-      event.preventDefault();
-      typeSelect.value = 'chat';
-      sendMessage();
-    }
-  });
-  chatInput.addEventListener('focus', () => {
-    document.getElementById('pathDropdown').style.display = 'none';
-  });
+    });
+    chatInput.addEventListener('focus', () => {
+      document.getElementById('pathDropdown').style.display = 'none';
+    });
+  } else {
+    console.error('sendButton, chatInput, or typeSelect is null');
+  }
 }
 
 async function sendMessage() {
