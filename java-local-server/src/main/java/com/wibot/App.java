@@ -54,7 +54,7 @@ class BrowserOpener {
         this.environment = environment;
     }
 
-    @EventListener(ApplicationStartedEvent.class)
+   // @EventListener(ApplicationStartedEvent.class)
     public void openBrowser() {
         try {
             String port = environment.getProperty("server.port", "8080");
