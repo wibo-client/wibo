@@ -281,6 +281,20 @@ app.whenReady().then(async () => {
     await init(false);
   });
 
+  // 添加目录选择器处理
+  ipcMain.handle('show-directory-picker', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      return {
+        filePath: result.filePaths[0]
+      };
+    }
+    return null;
+  });
+
   function buildSearchResultsString(searchResults) {
     let sb = '';
     let fileNumber = 1;

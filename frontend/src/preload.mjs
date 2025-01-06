@@ -36,7 +36,9 @@ contextBridge.exposeInMainWorld('electron', {
   addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath),
   getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map'),
   deletePlugin: (pathPrefix) => ipcRenderer.invoke('delete-plugin', pathPrefix),
-  reinitialize: () => ipcRenderer.invoke('reinitialize') // 补全 reinitialize 实现
+  reinitialize: () => ipcRenderer.invoke('reinitialize'),
+  // 添加目录选择器 API
+  showDirectoryPicker: () => ipcRenderer.invoke('show-directory-picker')
 });
 
 contextBridge.exposeInMainWorld('auth', {

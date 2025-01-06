@@ -5,282 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>智融 WIBO</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      height: 90vh;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      background-color: #f0f2f5;
-    }
-
-    .tabs {
-      display: flex;
-      cursor: pointer;
-      border-bottom: 2px solid #ccc;
-    }
-
-    .tab {
-      padding: 10px 20px;
-      border: 1px solid #ccc;
-      border-bottom: none;
-      background-color: #e0e0e0;
-      border-radius: 5px 5px 0 0;
-      margin-right: 5px;
-    }
-
-    .tab.active {
-      background-color: #fff;
-      border-bottom: 2px solid #fff;
-      font-weight: bold;
-    }
-
-    .tab-content {
-      display: none;
-      border: 1px solid #ccc;
-      padding: 20px;
-      background-color: #fff;
-      border-radius: 0 0 5px 5px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      margin-top: -1px; /* 去掉tab页与下面交互区域的空隙 */
-    }
-
-    .tab-content.active {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .section {
-      margin-bottom: 30px;
-      padding: 20px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      background-color: #f9f9f9;
-    }
-
-    .section h3 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: #333;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 14px;
-    }
-
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      background-color: blue;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .plugin-list {
-      list-style-type: none;
-      padding: 0;
-    }
-
-    .plugin-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px;
-      border: 1px solid #ccc;
-      margin-bottom: 5px;
-      border-radius: 5px;
-      background-color: #fff;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .plugin-actions button {
-      margin-left: 5px;
-      padding: 5px 10px;
-      border: none;
-      border-radius: 5px;
-      background-color: #007BFF;
-      color: white;
-      cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .plugin-actions button:hover {
-      background-color: #0056b3;
-    }
-
-    .plugin-section {
-      margin-bottom: 20px;
-      width: 100%;
-    }
-
-    .plugin-column {
-      flex: 1;
-      padding: 0 10px;
-    }
-
-    .plugin-actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .local-plugins .import-button:hover {
-      background-color: #0056b3;
-    }
-
-    /* 新增样式 */
-    #chat-container {
-      width: 80%;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      background-color: #f9f9f9;
-    }
-
-    #messages {
-      height: 400px;
-      overflow-y: scroll;
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-bottom: 20px;
-      background-color: #fff;
-    }
-
-    .message {
-      margin-bottom: 10px;
-    }
-
-    .user {
-      text-align: right;
-      color: blue;
-    }
-
-    .wiba {
-      text-align: left;
-      color: green;
-    }
-
-    #input-container {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    #user-input {
-      flex: 1;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      resize: none;
-      overflow: hidden;
-    }
-
-    #input-container select,
-    #input-container input {
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-
-    #input-container button {
-      padding: 10px 20px;
-      border: none;
-      background-color: blue;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .bot pre {
-      background-color: #f4f4f4;
-      padding: 10px;
-      border-radius: 4px;
-      overflow-x: auto;
-    }
-
-    .bot code {
-      font-family: monospace;
-      background-color: #f4f4f4;
-      padding: 2px 4px;
-      border-radius: 3px;
-    }
-
-    /* 新增样式 */
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 48px; /* 减少20% */
-      height: 27px; /* 减少20% */
-      vertical-align: middle;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-      border-radius: 27px; /* 减少20% */
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 21px; /* 减少20% */
-      width: 21px; /* 减少20% */
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider {
-      background-color: #2196F3;
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(21px); /* 减少20% */
-    }
-
-    .input-group {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .input-group input[type="text"] {
-      flex: 1;
-    }
-  </style>
-  <!-- 添加 marked 库 -->
-  <script src="/js/marked.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -326,6 +51,7 @@
       <div class="form-group">
         <label for="accessKey">Access Key：</label>
         <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
+        <div id="masked-ak" class="small-text"></div>
       </div>
       <button id="saveConfigButton" class="btn">保存</button>
     </div>
@@ -344,6 +70,96 @@
         <input type="number" id="pageFetchLimit" class="form-control" placeholder="请输入单次查询页面抓取数量" />
       </div>
       <button id="saveBrowserConfigButton" class="btn">保存</button>
+    </div>
+
+    <!-- 新增本地知识库栏目 -->
+    <div class="section">
+      <div class="knowledge-base-header">
+        <h3>本地知识库</h3>
+        <div class="switch-label-group">
+          <label class="switch">
+            <input type="checkbox" id="localKnowledgeBaseToggle">
+            <span class="slider"></span>
+          </label>
+          <span>启用本地知识库</span>
+        </div>
+      </div>
+      
+      <div id="localKnowledgeBaseConfig" style="display: none;">
+        <hr>
+        <!-- 子栏目1：知识库管理 -->
+        <h4>知识库管理</h4>
+        <div class="form-group">
+          <div class="directory-input-group">
+            <input type="text" id="localDirectory" class="form-control" placeholder="输入或选择本地目录">
+            <button id="selectDirectoryBtn" class="btn btn-select-dir">选择目录</button>
+            <button id="submitLocalDirectory" class="btn btn-submit">提交</button>
+          </div>
+        </div>
+        <table class="monitored-dirs-table">
+          <thead>
+            <tr>
+              <th>已监控目录</th>
+              <th>监控文件数</th>
+              <th>已完成文件数</th>
+              <th>完成比率</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="directoryTableBody">
+            <!-- 动态生成的表格内容 -->
+          </tbody>
+        </table>
+        <hr>
+        
+        <!-- 子栏目2：远程上传文件 -->
+        <div class="form-group">
+          <div class="switch-label-group">
+            <label class="switch">
+              <input type="checkbox" id="remoteUploadToggle">
+              <span class="slider"></span>
+            </label>
+            <span>启用远程上传</span>
+          </div>
+          <div id="remoteUploadConfig" style="display: none;">
+            <div class="form-group">
+              <label>上传地址:</label>
+              <div id="uploadUrl" style="padding: 10px; background: #f5f5f5; border-radius: 5px;"></div>
+            </div>
+            <div class="form-group">
+              <label for="uploadDir">上传文件默认目录:</label>
+              <input type="text" id="uploadDir" class="form-control" value="remoteFile">
+            </div>
+          </div>
+        </div>
+        
+        <hr>
+        <!-- 子栏目3：模型增强 -->
+        <div class="form-group">
+          <h4>模型增强</h4>
+          <div class="switch-label-group">
+            <label class="switch">
+              <input type="checkbox" id="preRecognizeImages">
+              <span class="slider"></span>
+            </label>
+            <span>预识别图片</span>
+          </div>
+          <div class="switch-label-group">
+            <label class="switch">
+              <input type="checkbox" id="preRecognizePDFs">
+              <span class="slider"></span>
+            </label>
+            <span>预识别PDF</span>
+          </div>
+          <div class="switch-label-group">
+            <label class="switch">
+              <input type="checkbox" id="preRecognizePPTs">
+              <span class="slider"></span>
+            </label>
+            <span>预识别PPT</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -367,153 +183,5 @@
     </div>
   </div>
 
-  <script>
-    // JavaScript to handle tab switching
-    document.querySelectorAll('.tabs .tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const parent = tab.closest('.tab-content') || document;
-        parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        parent.querySelector(`#${tab.dataset.tab}`).classList.add('active');
-      });
-    });
-
-    // 删除动态生成插件列表的代码
-
-    const config = {
-      pageFetchLimit: 10 // 修改后的配置项
-    };
-
-    let currentBotMessageElement = null;
-
-    function sendMessage() {
-      const input = document.getElementById('user-input');
-      const message = input.value;
-      const type = document.getElementById('request-type').value;
-      const path = document.getElementById('pathInput').value;
-      const foregroundExecution = document.getElementById('foregroundExecution').checked;
-      if (!message) return;
-
-      addMessage('user', message);
-      input.value = '';
-      currentBotMessageElement = createBotMessageElement();
-
-      fetch('/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ input: message, type: type, path: path, foregroundExecution: foregroundExecution })
-      })
-      .then(response => {
-        if (!response.ok) {
-          if (response.status === 401) {
-            alert('Unauthorized: 请在右上角的 【管理界面】 中输入阿里云的大模型AK');
-          }
-          throw new Error('Network response was not ok');
-        }
-        return response.body.getReader();
-      })
-      .then(reader => {
-        const decoder = new TextDecoder();
-        let receiveBuffer = [];
-        let lastAvailableChunk = [];
-        function read() {
-          reader.read().then(({ done, value }) => {
-            if (done) {
-              if (receiveBuffer.length > 0) {
-                const finalText = processBuffer(receiveBuffer);
-                updateBotMessage(finalText);
-              }
-              currentBotMessageElement = null;
-              return;
-            }
-
-            const chunk = decoder.decode(value, { stream: false });
-            const lines = chunk.split('\n');
-            console.log('a chunk :\n' + chunk);
-            for (const line of lines) {
-              if (line.trim() === '') {
-                receiveBuffer = [];
-                continue;
-              } else {
-                lastAvailableChunk = receiveBuffer;
-              }
-              receiveBuffer.push(line);
-            }
-
-            const text = processBuffer(lastAvailableChunk);
-            if (text.trim()) {
-              updateBotMessage(text);
-            }
-
-            read();
-          });
-        }
-
-        read();
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        updateBotMessage('Error: ' + error.message);
-      });
-    }
-
-    function addMessage(role, text) {
-      const messages = document.getElementById('messages');
-      const messageElement = document.createElement('div');
-      messageElement.className = `message ${role}`;
-      const formattedText = text.replace(/\n/g, '<br>');
-      messageElement.innerHTML = formattedText;
-      messages.appendChild(messageElement);
-      messages.scrollTop = messages.scrollHeight;
-      return messageElement;
-    }
-
-    function createBotMessageElement() {
-      const messages = document.getElementById('messages');
-      const messageElement = document.createElement('div');
-      messageElement.className = 'message wiba';
-      messages.appendChild(messageElement);
-      messages.scrollTop = messages.scrollHeight;
-      return messageElement;
-    }
-
-    function processBuffer(buffer) {
-      const rawText = buffer
-        .map(line => line.replace('data:', '').trim())
-        .filter(line => line)
-        .join('\n\n');
-
-      try {
-        return marked.parse(rawText, {
-          breaks: false,
-          gfm: true,
-          sanitize: true
-        });
-      } catch (e) {
-        console.error('Markdown parsing error:', e);
-        return rawText;
-      }
-    }
-
-    function updateBotMessage(text) {
-      if (currentBotMessageElement) {
-        currentBotMessageElement.innerHTML = text;
-        currentBotMessageElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }
-    }
-
-    // 自动调整输入框高度
-    const userInput = document.getElementById('user-input');
-    userInput.addEventListener('input', () => {
-      userInput.style.height = 'auto';
-      userInput.style.height = `${Math.min(userInput.scrollHeight, 150)}px`;
-    });
-
-    // 绑定保存浏览器设置按钮事件
-    document.getElementById('saveBrowserConfigButton').addEventListener('click', handleSaveConfig);
-  </script>
 </body>
-
 </html>

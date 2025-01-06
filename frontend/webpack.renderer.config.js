@@ -40,7 +40,7 @@ module.exports = {
     }),
     new CopyWebpackPlugin({
       patterns: [
-        { from: 'public/marked.min.js', to: 'marked.min.js' } // 复制 marked.min.js 到输出目录
+        { from: 'public/styles.css', to: 'styles.css' } 
       ]
     })
   ],
