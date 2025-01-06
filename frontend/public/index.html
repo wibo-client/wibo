@@ -179,17 +179,21 @@
 
     #input-container {
       display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    #input-container input {
+    #user-input {
       flex: 1;
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 5px;
+      resize: none;
+      overflow: hidden;
     }
 
-    #input-container select {
-      margin-left: 10px;
+    #input-container select,
+    #input-container input {
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 5px;
@@ -201,7 +205,6 @@
       background-color: blue;
       color: white;
       border-radius: 5px;
-      margin-left: 10px;
       cursor: pointer;
     }
 
@@ -239,13 +242,16 @@
       <h2>围脖（WIBO）你自己的知识助手 </h2>
       <div id="messages"></div>
       <div id="input-container">
-        <input type="text" id="user-input" placeholder="输入你的问题">
-        <select id="request-type">
-          <option value="searchAndChat">检索增强回答</option>
-          <option value="search">本地文件检索</option>
-          <option value="chat">模型直答</option>
-          <option value="searchWithRerank">模型增强排序检索</option>
-        </select>
+        <textarea id="user-input" placeholder="输入你的问题" rows="1"></textarea>
+        <div style="display: flex; gap: 10px;">
+          <select id="request-type">
+            <option value="searchAndChat">检索增强回答</option>
+            <option value="search">本地文件检索</option>
+            <option value="chat">模型直答</option>
+            <option value="searchWithRerank">模型增强排序检索</option>
+          </select>
+          <input type="text" id="pathInput" placeholder="Path (optional)" />
+        </div>
         <button onclick="sendMessage()">Send</button>
       </div>
     </div>
@@ -328,6 +334,7 @@
       const input = document.getElementById('user-input');
       const message = input.value;
       const type = document.getElementById('request-type').value;
+      const path = document.getElementById('pathInput').value;
       if (!message) return;
 
       addMessage('user', message);
@@ -339,7 +346,7 @@
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ input: message, type: type, path: '' })
+        body: JSON.stringify({ input: message, type: type, path: path })
       })
       .then(response => {
         if (!response.ok) {
@@ -439,6 +446,13 @@
         currentBotMessageElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
     }
+
+    // 自动调整输入框高度
+    const userInput = document.getElementById('user-input');
+    userInput.addEventListener('input', () => {
+      userInput.style.height = 'auto';
+      userInput.style.height = `${Math.min(userInput.scrollHeight, 150)}px`;
+    });
   </script>
 </body>
 
