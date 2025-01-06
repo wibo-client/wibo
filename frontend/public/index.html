@@ -221,6 +221,63 @@
       padding: 2px 4px;
       border-radius: 3px;
     }
+
+    /* 新增样式 */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px; /* 减少20% */
+      height: 27px; /* 减少20% */
+      vertical-align: middle;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 27px; /* 减少20% */
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 21px; /* 减少20% */
+      width: 21px; /* 减少20% */
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(21px); /* 减少20% */
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .input-group input[type="text"] {
+      flex: 1;
+    }
   </style>
   <!-- 添加 marked 库 -->
   <script src="/js/marked.min.js"></script>
@@ -243,13 +300,18 @@
       <div id="messages"></div>
       <div id="input-container">
         <textarea id="user-input" placeholder="输入你的问题" rows="1"></textarea>
-        <div style="display: flex; gap: 10px;">
+        <div class="input-group">
           <select id="request-type">
             <option value="searchAndChat">检索增强回答</option>
             <option value="search">本地文件检索</option>
             <option value="chat">模型直答</option>
             <option value="searchWithRerank">模型增强排序检索</option>
           </select>
+          <label for="foregroundExecution">隐藏浏览器执行</label>
+          <label class="switch">
+            <input type="checkbox" id="foregroundExecution">
+            <span class="slider"></span>
+          </label>
           <input type="text" id="pathInput" placeholder="Path (optional)" />
         </div>
         <button onclick="sendMessage()">Send</button>
@@ -278,16 +340,10 @@
         <input type="number" id="browserConcurrency" class="form-control" placeholder="请输入并发启动浏览器个数" />
       </div>
       <div class="form-group">
-        <label for="headless">无头模式：</label>
-        <select id="headless" class="form-control">
-          <option value="true">是</option>
-          <option value="false">否</option>
-        </select>
-      </div>
-      <div class="form-group">
         <label for="pageFetchLimit">单次查询页面抓取数量：</label>
         <input type="number" id="pageFetchLimit" class="form-control" placeholder="请输入单次查询页面抓取数量" />
       </div>
+      <button id="saveBrowserConfigButton" class="btn">保存</button>
     </div>
   </div>
 
@@ -335,6 +391,7 @@
       const message = input.value;
       const type = document.getElementById('request-type').value;
       const path = document.getElementById('pathInput').value;
+      const foregroundExecution = document.getElementById('foregroundExecution').checked;
       if (!message) return;
 
       addMessage('user', message);
@@ -346,7 +403,7 @@
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ input: message, type: type, path: path })
+        body: JSON.stringify({ input: message, type: type, path: path, foregroundExecution: foregroundExecution })
       })
       .then(response => {
         if (!response.ok) {
@@ -453,6 +510,9 @@
       userInput.style.height = 'auto';
       userInput.style.height = `${Math.min(userInput.scrollHeight, 150)}px`;
     });
+
+    // 绑定保存浏览器设置按钮事件
+    document.getElementById('saveBrowserConfigButton').addEventListener('click', handleSaveConfig);
   </script>
 </body>
 

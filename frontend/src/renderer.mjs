@@ -63,6 +63,7 @@ function setupEventListeners() {
   });
 
   document.getElementById('saveConfigButton').addEventListener('click', handleSaveConfig);
+  document.getElementById('saveBrowserConfigButton').addEventListener('click', handleSaveConfig); // 新增事件监听器
 }
 
 function setupTabSwitching() {
@@ -113,6 +114,7 @@ async function sendMessage() {
   const message = document.getElementById('chatInput').value;
   const type = document.getElementById('typeSelect').value;
   const path = document.getElementById('pathInput').value;
+  const executeInForeground = document.getElementById('executeInForeground').checked;
 
   try {
     const feedbackBox = document.getElementById('feedbackBox');
@@ -141,7 +143,7 @@ async function sendMessage() {
         feedbackBox.scrollTop = feedbackBox.scrollHeight;
       }
     }
-    window.electron.sendMessage(message, type, path, requestContext);
+    window.electron.sendMessage(message, type, path, requestContext, executeInForeground);
   } catch (error) {
     console.error('发送消息错误:', error);
   }
