@@ -10,6 +10,18 @@ export default class KnowledgeBaseHandler {
     setInterval(() => this.updateMonitoredDirs(), 10000);
   }
 
+  async componentDidMount() {
+    // 获取初始状态
+    const serverDesiredState = await window.electron.getServerDesiredState();
+    const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
+    const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
+    
+    if (localKnowledgeBaseToggle && localKnowledgeBaseConfig) {
+      localKnowledgeBaseToggle.checked = serverDesiredState;
+      localKnowledgeBaseConfig.style.display = serverDesiredState ? 'block' : 'none';
+    }
+  }
+
   setupEventListeners() {
     const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
     const remoteUploadToggle = document.getElementById('remoteUploadToggle');
@@ -75,25 +87,19 @@ export default class KnowledgeBaseHandler {
   async toggleLocalKnowledgeBase() {
     const configSection = document.getElementById('localKnowledgeBaseConfig');
     const toggle = document.getElementById('localKnowledgeBaseToggle');
-    
     if (!configSection || !toggle) return;
-    
+
     // 禁用开关，防止重复操作
     toggle.disabled = true;
-    
+
     try {
       const enable = toggle.checked;
       configSection.style.display = enable ? 'block' : 'none';
 
-      // 通过 electron 控制 Java 程序
+      // 使用正确的方法名调用
       const result = await window.electron.toggleKnowledgeBase(enable);
-      
+
       if (result.success) {
-        const config = {
-          [ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE]: enable
-        };
-        await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
-        
         alert(enable ? '本地知识库服务已启动' : '本地知识库服务已关闭');
       } else {
         toggle.checked = !enable;

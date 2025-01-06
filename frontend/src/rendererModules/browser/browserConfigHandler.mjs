@@ -24,16 +24,6 @@ export default class BrowserConfigHandler {
         document.getElementById('masked-ak').textContent = `当前AK: ${maskedSK}`;
       }
 
-      // 处理本地知识库开关状态
-      const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
-      const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
-      if (localKnowledgeBaseToggle && config[ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE] !== undefined) {
-        localKnowledgeBaseToggle.checked = config[ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE];
-        if (localKnowledgeBaseConfig) {
-          localKnowledgeBaseConfig.style.display = config[ConfigKeys.ENABLE_LOCAL_KNOWLEDGE_BASE] ? 'block' : 'none';
-        }
-      }
-
       // 统一处理配置项
       const configFields = [
         ConfigKeys.BROWSER_TIMEOUT,
@@ -64,7 +54,7 @@ export default class BrowserConfigHandler {
 
     const config = {
       [ConfigKeys.BROWSER_TIMEOUT]: browserTimeout,
-      [ConfigKeys.BROWSER_CONCURRENCY]: browserConcurrency,
+      [ConfigKeys.BROWSER_CONCURRENCY]: browserConcurrency, 
       [ConfigKeys.HEADLESS]: headless,
       [ConfigKeys.PAGE_FETCH_LIMIT]: pageFetchLimit
     };

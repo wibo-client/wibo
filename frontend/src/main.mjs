@@ -298,13 +298,12 @@ app.whenReady().then(async () => {
     return null;
   });
 
-  // 重写 toggle-knowledge-base 处理
-  ipcMain.handle('toggle-knowledge-base', async (event, enable) => {
+  // 重写 toggle-knowledge-base 处理,修改handler名称与preload一致
+  ipcMain.handle('toggleKnowledgeBase', async (event, enable) => {
     try {
-      const jarPath = path.join(__dirname, 'wibo-1.0.0-product.jar');
-      
+  
       if (enable) {
-        const result = await localServerManager.startServer(jarPath);
+        const result = await localServerManager.startServer();
         return result;
       } else {
         const result = await localServerManager.stopServer();
@@ -317,6 +316,11 @@ app.whenReady().then(async () => {
         message: error.message || '操作失败'
       };
     }
+  });
+
+  // 添加 IPC 事件处理器
+  ipcMain.handle('get-server-desired-state', async () => {
+    return localServerManager.desiredState;
   });
 
   // 确保在应用退出时清理 Java 进程

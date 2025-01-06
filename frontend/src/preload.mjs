@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('electron', {
     });
   },
 
-  // 知识库相关方法
+  // 知识库相关方法 - 确保命名一致
   toggleKnowledgeBase: (enable) => ipcRenderer.invoke('toggleKnowledgeBase', enable),
 
   // 文件系统相关方法
@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electron', {
   calculateMD5: (path) => ipcRenderer.invoke('calculate-md5', path),
   selectFile: () => ipcRenderer.invoke('select-file'),
   showDirectoryPicker: () => ipcRenderer.invoke('show-directory-picker'),
+
+  // 获取服务器期望状态
+  getServerDesiredState: () => ipcRenderer.invoke('get-server-desired-state'),
 
   // Shell 相关方法
   shell: {

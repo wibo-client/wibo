@@ -1,7 +1,9 @@
 import { spawn } from 'child_process';
 import PortManager from './PortManager.mjs';
 import Store from 'electron-store';
-import fetch from 'node-fetch';  // 添加 fetch 导入
+import fetch from 'node-fetch';
+import path from 'path';
+import fs from 'fs/promises';  // 添加 fs/promises 导入
 
 class LocalServerManager {
     constructor() {
@@ -142,8 +144,31 @@ class LocalServerManager {
         return this.isRunning;
     }
 
+    // 查找 jar 文件的辅助方法
+    async findJarFile() {
+        const javaLocalServerPath = path.join(__dirname, 'java-local-server');
+        try {
+            const files = await fs.readdir(javaLocalServerPath);
+            const jarFile = files.find(file => file.endsWith('.jar'));
+            return jarFile ? path.join(javaLocalServerPath, jarFile) : null;
+        } catch (error) {
+            console.error('[LocalServer] Error finding jar file:', error);
+            return null;
+        }
+    }
+
     // 对外的启动接口 - 立即返回
-    async startServer(jarPath) {
+    async startServer() {
+        const jarPath = await this.findJarFile();
+        if (!jarPath) {
+            this.desiredState = false;
+            this.store.set('serverDesiredState', false);
+            return { 
+                success: false, 
+                message: '未找到可执行的 jar 文件' 
+            };
+        }
+        
         this.jarPath = jarPath; // 保存 jarPath 供内部使用
         this.desiredState = true;
         this.store.set('serverDesiredState', true);
