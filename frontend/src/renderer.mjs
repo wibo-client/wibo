@@ -10,29 +10,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderPlugins(); // 初始化插件列表
 });
 
-async function handleLogin() {
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  const apiEndpoint = await window.electron.getConfig('apiEndpoint') || API_ENDING_POINT_DEFAULT;
-  const auth = new AuthClass(apiEndpoint);
+// 删除与登录和注册相关的函数
+// async function handleLogin() {
+//   const username = document.getElementById('username').value;
+//   const password = document.getElementById('password').value;
+//   const apiEndpoint = await window.electron.getConfig('apiEndpoint') || API_ENDING_POINT_DEFAULT;
+//   const auth = new AuthClass(apiEndpoint);
 
-  const success = await auth.login(username, password);
-  if (success) {
-    document.querySelector('.tab[data-tab="interaction"]').click();
-  }
-}
+//   const success = await auth.login(username, password);
+//   if (success) {
+//     document.querySelector('.tab[data-tab="interaction"]').click();
+//   }
+// }
 
-async function handleRegister() {
-  const username = document.getElementById('regUsername').value;
-  const password = document.getElementById('regPassword').value;
-  const apiEndpoint = await window.electron.getConfig('apiEndpoint') || API_ENDING_POINT_DEFAULT;
-  const auth = new AuthClass(apiEndpoint);
+// async function handleRegister() {
+//   const username = document.getElementById('regUsername').value;
+//   const password = document.getElementById('regPassword').value;
+//   const apiEndpoint = await window.electron.getConfig('apiEndpoint') || API_ENDING_POINT_DEFAULT;
+//   const auth = new AuthClass(apiEndpoint);
 
-  const success = await auth.register(username, password);
-  if (success) {
-    switchToTab('login');
-  }
-}
+//   const success = await auth.register(username, password);
+//   if (success) {
+//     switchToTab('login');
+//   }
+// }
 
 function switchToTab(tabName) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -42,10 +43,11 @@ function switchToTab(tabName) {
 }
 
 function setupEventListeners() {
-  document.getElementById('loginButton').addEventListener('click', handleLogin);
-  document.getElementById('submitRegisterButton').addEventListener('click', handleRegister);
-  document.getElementById('registerButton').addEventListener('click', () => switchToTab('register'));
-  document.getElementById('cancelRegisterButton').addEventListener('click', () => switchToTab('login'));
+  // 删除与登录和注册相关的事件监听器
+  // document.getElementById('loginButton').addEventListener('click', handleLogin);
+  // document.getElementById('submitRegisterButton').addEventListener('click', handleRegister);
+  // document.getElementById('registerButton').addEventListener('click', () => switchToTab('register'));
+  // document.getElementById('cancelRegisterButton').addEventListener('click', () => switchToTab('login'));
 
   setupTabSwitching();
   setupMessageHooks();

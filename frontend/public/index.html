@@ -19,7 +19,6 @@
     .tabs {
       display: flex;
       cursor: pointer;
-      margin-bottom: 10px;
       border-bottom: 2px solid #ccc;
     }
 
@@ -45,6 +44,7 @@
       background-color: #fff;
       border-radius: 0 0 5px 5px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      margin-top: -1px; /* 去掉tab页与下面交互区域的空隙 */
     }
 
     .tab-content.active {
@@ -52,198 +52,45 @@
       flex-direction: column;
     }
 
-    #chatBox {
-      width: 100%;
-      height: 300px;
-      border: 1px solid #ccc;
-      overflow-y: scroll;
-      padding: 10px;
-      background-color: #fff;
-      border-radius: 5px;
-      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    #feedbackBox {
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      margin: 10px 0;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      background-color: #fff;
-      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .message {
-      margin: 5px 0;
-    }
-
-    .user {
-      color: blue;
-    }
-
-    .wiba {
-      color: green;
-    }
-
-    #interaction {
-      flex: 1;
-      flex-direction: column;
-      gap: 10px;
-      min-height: 0;
-      padding: 10px;
-    }
-
-    #chatInput {
-      min-height: 40px;
-      max-height: 100px;
-      resize: none;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      margin-bottom: 10px;
-      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .bottom-toolbar {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      position: relative;
-    }
-
-    #typeSelect {
-      flex: 1;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      background-color: #fff;
-    }
-
-    #pathInput {
-      flex: 2;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      background-color: #fff;
-    }
-
-    #pathDropdown {
-      display: none;
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background-color: #fff;
-      border: 1px solid #ccc;
-      max-height: 150px;
-      overflow-y: auto;
-      z-index: 1000;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    #pathDropdown div {
-      padding: 8px;
-      cursor: pointer;
-    }
-
-    #pathDropdown div:hover {
-      background-color: #f1f1f1;
-    }
-
-    #sendButton {
-      width: 80px;
-      height: 40px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    #sendButton:hover {
-      background-color: #45a049;
-    }
-
-    .login-form {
-      max-width: 300px;
-      margin: 0 auto;
+    .section {
+      margin-bottom: 30px;
       padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      background-color: #fff;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .login-form input {
-      width: 100%;
-      padding: 10px;
-      margin: 5px 0;
-      box-sizing: border-box;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      background-color: #fff;
-      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .login-form button {
-      width: 100%;
-      padding: 10px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .login-form button:hover {
-      background-color: #45a049;
-    }
-
-    .status-bar {
-      padding: 10px;
-      background: #f5f5f5;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .task-list {
-      margin-bottom: 10px;
-    }
-
-    .task-item {
-      padding: 10px;
-      margin: 5px 0;
       border: 1px solid #ddd;
       border-radius: 5px;
-      background-color: #fff;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      background-color: #f9f9f9;
     }
 
-    .progress {
-      height: 20px;
-      background: #ddd;
-      border-radius: 10px;
-      overflow: hidden;
+    .section h3 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #333;
     }
 
-    .progress-bar {
-      height: 100%;
-      background: #4CAF50;
-      transition: width 0.3s ease;
+    .form-group {
+      margin-bottom: 20px;
     }
 
-    .sync-stats {
-      font-family: monospace;
-      font-size: 14px;
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    .form-control {
+      width: 100%;
       padding: 10px;
-      background-color: #f5f5f5;
+      border: 1px solid #ccc;
       border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      font-size: 14px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      background-color: blue;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
     }
 
     .plugin-list {
@@ -267,14 +114,14 @@
       padding: 5px 10px;
       border: none;
       border-radius: 5px;
-      background-color: #4CAF50;
+      background-color: #007BFF;
       color: white;
       cursor: pointer;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
 
     .plugin-actions button:hover {
-      background-color: #45a049;
+      background-color: #0056b3;
     }
 
     .plugin-section {
@@ -293,7 +140,7 @@
     }
 
     .local-plugins .import-button:hover {
-      background-color: #45a049;
+      background-color: #0056b3;
     }
   </style>
 
@@ -304,33 +151,9 @@
 
   <h1>围脖 WIBO</h1>
   <div class="tabs">
-    <div class="tab" data-tab="login">登录</div>
     <div class="tab active" data-tab="interaction">交互界面</div>
     <div class="tab" data-tab="config">配置</div>
-    <div class="tab" data-tab="register">注册</div> <!-- 注册标签 -->
     <div class="tab" data-tab="plugins">插件</div>
-  </div>
-
-  <!-- 登录内容区域 -->
-  <div id="login" class="tab-content">
-    <div class="login-form">
-      <h2>用户登录</h2>
-      <input type="text" id="username" placeholder="用户名" required />
-      <input type="password" id="password" placeholder="密码" required />
-      <button id="loginButton">登录</button>
-      <button id="registerButton">注册</button> <!-- 注册按钮 -->
-    </div>
-  </div>
-
-  <!-- 注册内容区域（隐藏默认） -->
-  <div id="register" class="tab-content">
-    <div class="register-form">
-      <h2>用户注册</h2>
-      <input type="text" id="regUsername" placeholder="用户名" required />
-      <input type="password" id="regPassword" placeholder="密码" required />
-      <button id="submitRegisterButton">提交注册</button>
-      <button id="cancelRegisterButton">取消</button>
-    </div>
   </div>
 
   <!-- 交互界面内容区域 -->
@@ -346,52 +169,61 @@
       </select>
       <input type="text" id="pathInput" placeholder="Path (optional)" />
       <div id="pathDropdown"></div>
-      <button id="sendButton">Send</button>
+      <button id="sendButton" class="button">Send</button>
     </div>
   </div>
 
   <!-- 配置内容区域 -->
   <div id="config" class="tab-content">
-    <div class="config-group">
-      <h3>配置项组1：大模型SK</h3>
-      <input type="text" id="modelSK" placeholder="请输入大模型SK" />
+    <div class="section">
+      <h3>AK设置</h3>
+      <div class="form-group">
+        <label for="accessKey">Access Key：</label>
+        <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
+      </div>
+      <button id="saveConfigButton" class="btn">保存</button>
     </div>
-    <div class="config-group">
-      <h3>配置项组2：浏览器</h3>
-      <label for="browserTimeout">浏览器超时时间：</label>
-      <input type="number" id="browserTimeout" placeholder="请输入浏览器超时时间" />
-      <label for="browserConcurrency">并发启动浏览器个数：</label>
-      <input type="number" id="browserConcurrency" placeholder="请输入并发启动浏览器个数" />
-      <label for="headless">无头模式：</label>
-      <select id="headless">
-        <option value="true">是</option>
-        <option value="false">否</option>
-      </select>
-      <label for="pageFetchLimit">页面抓取限制：</label>
-      <input type="number" id="pageFetchLimit" placeholder="请输入页面抓取限制" />
+    <div class="section">
+      <h3>浏览器设置</h3>
+      <div class="form-group">
+        <label for="browserTimeout">浏览器超时时间：</label>
+        <input type="number" id="browserTimeout" class="form-control" placeholder="请输入浏览器超时时间" />
+      </div>
+      <div class="form-group">
+        <label for="browserConcurrency">并发启动浏览器个数：</label>
+        <input type="number" id="browserConcurrency" class="form-control" placeholder="请输入并发启动浏览器个数" />
+      </div>
+      <div class="form-group">
+        <label for="headless">无头模式：</label>
+        <select id="headless" class="form-control">
+          <option value="true">是</option>
+          <option value="false">否</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="pageFetchLimit">单次查询页面抓取数量：</label>
+        <input type="number" id="pageFetchLimit" class="form-control" placeholder="请输入单次查询页面抓取数量" />
+      </div>
     </div>
-    <button id="saveConfigButton">保存</button>
   </div>
 
   <!-- 插件内容区域 -->
   <div id="plugins" class="tab-content">
-    <div class="plugin-section">
-      <div>
-        <h3>当前我所有的插件</h3>
-        <ul class="plugin-list" id="currentPluginsList">
-          <!-- 插件列表将在这里动态显示 -->
-        </ul>
-      </div>
-      <div>
-        <h3>插件市场</h3>
-        <ul class="plugin-list" id="marketPluginsList">
-          <!-- 插件市场列表将在这里动态显示 -->
-        </ul>
-      </div>
-      <div class="local-plugins">
-        <h3>本地插件新增</h3>
-        <button class="import-button" id="importLocalPluginButton">从本地导入</button>
-      </div>
+    <div class="section">
+      <h3>当前我所有的插件</h3>
+      <ul class="plugin-list" id="currentPluginsList">
+        <!-- 插件列表将在这里动态显示 -->
+      </ul>
+    </div>
+    <div class="section">
+      <h3>插件市场</h3>
+      <ul class="plugin-list" id="marketPluginsList">
+        <!-- 插件市场列表将在这里动态显示 -->
+      </ul>
+    </div>
+    <div class="section">
+      <h3>本地插件新增</h3>
+      <button class="import-button btn" id="importLocalPluginButton">从本地导入</button>
     </div>
   </div>
 
