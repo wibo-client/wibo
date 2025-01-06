@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理界面</title> 
+  
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        #admin-container {
+            width: 80%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            background-color: blue;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+
+        .nav-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            text-decoration: none;
+            color: blue;
+        }
+
+        /* 新增样式 */
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .section h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f5f5f5;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .small-text {
+            font-size: smaller;
+            margin-left: 30px;
+        }
+    </style>
+</head>
+<body>
+    <a href="/chatClient" class="nav-link">← 返回聊天界面</a>
+    <div id="admin-container">
+        <h2>管理界面</h2>
+        <p class="small-text">wibo local server的 内容完全本地存储和处理，只有跟大模型交互时才对外发送信息 ，保障信息安全</p>
+
+        <!-- AK设置栏目 -->
+        <div class="section">
+            <h3>AK设置</h3>
+            <div class="form-group">
+                <label for="ak">Access Key:</label>
+                <input type="text" id="ak" class="form-control" placeholder="请输入Access Key">
+                <div id="masked-ak"></div>
+            </div>
+            <button onclick="saveAK()" class="btn">保存</button>
+        </div>
+
+        <!-- 文件管理栏目 -->
+        <div class="section">
+            <h3>本地知识文件管理</h3>
+            <p class="small-text">可以用本地文件回答问题(200G内容建索引大概需要6g磁盘空间)</p>
+
+            <div class="form-group">
+                <label for="path">监控本地文件目录:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="path" class="form-control" placeholder="请输入文件路径">
+                    <button onclick="submitPath()" class="btn">提交</button>
+                </div>
+            </div>
+            <table id="monitored-dirs">
+                <thead>
+                    <tr>
+                        <th>已监控目录</th>
+                        <th>监控文件数</th>
+                        <th>已完成文件数</th>
+                        <th>完成比率</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 远程上传文件栏目 -->
+        <div class="section">
+            <h3>远程上传文件</h3>
+            <p class="small-text">将手机等文件传递到本机，用来回答问题</p>
+            <div class="form-group">
+                <label class="switch">
+                    <input type="checkbox" id="remote-upload-switch" onchange="toggleRemoteUpload()">
+                    <span class="slider"></span>
+                </label>
+                <div id="remote-upload-config" class="hidden">
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label>上传地址:</label>
+                        <div id="upload-url" style="padding: 10px; background: #f5f5f5; border-radius: 5px;"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="upload-dir">上传文件默认目录:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="upload-dir" class="form-control" value="remoteFile">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型增强栏目 -->
+        <div class="section">
+            <h3>模型增强</h3>
+            <p class="small-text">利用大模型解析图片，更好的理解文档内容，需要消耗模型tokens</p>
+            <div class="form-group">
+                <label for="image-recognition-switch">预识别图片 : </label>
+                <label class="switch">
+                    <input type="checkbox" id="image-recognition-switch" onchange="toggleModelEnhancement()">
+                    <span class="slider"></span>
+                </label>
+                
+            </div>
+            <div class="form-group">
+                <label for="pdf-recognition-switch">预识别PDF : </label>
+                <label class="switch">
+                    <input type="checkbox" id="pdf-recognition-switch" onchange="toggleModelEnhancement()">
+                    <span class="slider"></span>
+                </label>
+               
+            </div>
+            <div class="form-group">
+                <label for="ppt-recognition-switch">预识别PPT : </label>
+                <label class="switch">
+                    <input type="checkbox" id="ppt-recognition-switch" onchange="toggleModelEnhancement()">
+                    <span class="slider"></span>
+                </label>
+               
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // AK相关函数
+        function saveAK() {
+            const ak = document.getElementById('ak').value;
+            if (ak) {
+                const maskedAk = maskAK(ak);
+                document.getElementById('masked-ak').textContent = `当前AK: ${maskedAk}`;
+                localStorage.setItem('accessKey', ak);
+                document.getElementById('ak').value = '';
+
+                // 通过AdminController写入SystemConfigService
+                fetch('/admin/save-ak', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ak: ak })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert('保存AK失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('保存AK失败: ' + error.message);
+                });
+            }
+        }
+
+        function maskAK(ak) {
+            if (ak.length <= 10) return ak;
+            return ak.substring(0, 5) + '*'.repeat(ak.length - 10) + ak.slice(-5);
+        }
+
+        // 初始化函数
+        function init() {
+            // 获取当前AK
+            fetch('/admin/get-ak')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.ak) {
+                    document.getElementById('masked-ak').textContent = `当前AK: ${maskAK(data.ak)}`;
+                }
+            })
+            .catch(error => {
+                console.error('获取AK失败: ' + error.message);
+            });
+
+            // 更新监控目录列表
+            updateMonitoredDirs();
+
+            // 获取远程上传开关状态
+            fetch('/admin/get-remote-upload-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('remote-upload-switch').checked = data.enabled;
+                    document.getElementById('remote-upload-config').classList.toggle('hidden', !data.enabled);
+                    if (data.enabled) {
+                        updateUploadUrl();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('获取远程上传状态失败: ' + error.message);
+            });
+
+            // 获取上传地址和上传文件默认目录
+            fetch('/admin/get-upload-config')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('upload-url').textContent = data.uploadUrl;
+                    document.getElementById('upload-dir').value = data.uploadDir;
+                }
+            })
+            .catch(error => {
+                console.error('获取上传配置失败: ' + error.message);
+            });
+
+            // 获取模型增强开关状态
+            fetch('/admin/get-model-enhancement-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('image-recognition-switch').checked = data.imageRecognitionEnabled;
+                    document.getElementById('pdf-recognition-switch').checked = data.pdfRecognitionEnabled;
+                    document.getElementById('ppt-recognition-switch').checked = data.pptRecognitionEnabled;
+                }
+            })
+            .catch(error => {
+                console.error('获取模型增强状态失败: ' + error.message);
+            });
+        }
+
+        // 文件监控相关函数
+        function submitPath() {
+            const pathInput = document.getElementById('path');
+            const path = pathInput.value;
+            if (!path) {
+                alert('请输入文件路径');
+                return;
+            }
+
+            fetch('/admin/submit/path', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ path: path })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    pathInput.value = '';
+                    updateMonitoredDirs();
+                }
+                alert(data.message);
+            })
+            .catch(error => {
+                alert('提交失败: ' + error.message);
+            });
+        }
+
+        function updateMonitoredDirs() {
+            fetch('/admin/list/monitored-dirs')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.querySelector('#monitored-dirs tbody');
+                tbody.innerHTML = '';
+                data.forEach(dir => {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = dir.path;
+                    row.insertCell(1).textContent = dir.fileCount;
+                    row.insertCell(2).textContent = dir.completedCount;
+                    row.insertCell(3).textContent = dir.completionRate;
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = '删除';
+                    deleteButton.onclick = () => deleteMonitoredDir(dir.path);
+                    row.insertCell(4).appendChild(deleteButton);
+                });
+            });
+        }
+
+        // 每隔10秒刷新一次监控目录列表
+        setInterval(updateMonitoredDirs, 10000);
+
+        function deleteMonitoredDir(path) {
+            if (confirm('确定要删除该监控目录吗？')) {
+                fetch('/admin/delete/monitored-dir', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ path: path })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateMonitoredDirs(); // 刷新列表
+                    }
+                    alert(data.message);
+                })
+                .catch(error => {
+                    alert('删除失败: ' + error.message);
+                });
+            }
+        }
+
+        // 远程上传相关函数
+        function toggleRemoteUpload() {
+            const isEnabled = document.getElementById('remote-upload-switch').checked;
+            const config = document.getElementById('remote-upload-config');
+            config.classList.toggle('hidden', !isEnabled);
+            
+            fetch('/admin/toggle-remote-upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enable: isEnabled })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (isEnabled) {
+                        updateUploadUrl();
+                    }
+                } else {
+                    alert(data.message);
+                    document.getElementById('remote-upload-switch').checked = !isEnabled;
+                    config.classList.toggle('hidden', isEnabled);
+                }
+            })
+            .catch(error => {
+                alert('操作失败: ' + error.message);
+                document.getElementById('remote-upload-switch').checked = !isEnabled;
+                config.classList.toggle('hidden', isEnabled);
+            });
+        }
+
+        function updateUploadUrl() {
+            fetch('/admin/get-upload-config')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('upload-url').textContent = data.uploadUrl;
+                }
+            })
+            .catch(error => {
+                console.error('获取配置失败: ' + error.message);
+            });
+        }
+
+        // 模型增强相关函数
+        function toggleModelEnhancement() {
+            const enableImageRecognition = document.getElementById('image-recognition-switch').checked;
+            const enablePdfRecognition = document.getElementById('pdf-recognition-switch').checked;
+            const enablePptRecognition = document.getElementById('ppt-recognition-switch').checked;
+
+            fetch('/admin/toggle-model-enhancement', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    enableImageRecognition: enableImageRecognition,
+                    enablePdfRecognition: enablePdfRecognition,
+                    enablePptRecognition: enablePptRecognition
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                alert('操作失败: ' + error.message);
+            });
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        #upload-container {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #f9f9f9;
+        }
+
+        #upload-container.drag-over {
+            border-color: #4CAF50;
+            background-color: #e8f5e9;
+        }
+
+        #file-list {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .file-item {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-item .path {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        #upload-btn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        #upload-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .progress {
+            margin-top: 5px;
+            height: 5px;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>文件上传</h1>
+    <div id="upload-container">
+        <div>拖拽文件或文件夹到此处，或</div>
+        <input type="file" id="file-input" webkitdirectory directory multiple style="display: none">
+        <button onclick="document.getElementById('file-input').click()">选择文件夹</button>
+    </div>
+    <div id="file-list"></div>
+    <button id="upload-btn" onclick="uploadFiles()" disabled>开始上传</button>
+
+    <script>
+        let filesToUpload = new Map();
+
+        // 拖拽处理
+        const container = document.getElementById('upload-container');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            container.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            container.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            container.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            container.classList.add('drag-over');
+        }
+
+        function unhighlight(e) {
+            container.classList.remove('drag-over');
+        }
+
+        container.addEventListener('drop', handleDrop, false);
+        document.getElementById('file-input').addEventListener('change', handleFileSelect, false);
+
+        function handleDrop(e) {
+            const items = e.dataTransfer.items;
+            handleItems(items);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            for (let file of files) {
+                addFileToUploadList(file);
+            }
+        }
+
+        function handleItems(items) {
+            for (let item of items) {
+                if (item.kind === 'file') {
+                    const entry = item.webkitGetAsEntry();
+                    if (entry) {
+                        traverseFileTree(entry);
+                    }
+                }
+            }
+        }
+
+        function traverseFileTree(item, path = '') {
+            if (item.isFile) {
+                item.file(file => {
+                    // 创建一个新的File对象，保留相对路径信息
+                    const fileWithPath = new File([file], file.name, {
+                        type: file.type,
+                        lastModified: file.lastModified
+                    });
+                    fileWithPath.relativePath = path + file.name;
+                    addFileToUploadList(fileWithPath);
+                });
+            } else if (item.isDirectory) {
+                let dirReader = item.createReader();
+                dirReader.readEntries(entries => {
+                    for (let entry of entries) {
+                        traverseFileTree(entry, path + item.name + '/');
+                    }
+                });
+            }
+        }
+
+        function addFileToUploadList(file) {
+            filesToUpload.set(file.relativePath || file.name, file);
+            updateFileList();
+            document.getElementById('upload-btn').disabled = filesToUpload.size === 0;
+        }
+
+        function updateFileList() {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+            for (let [path, file] of filesToUpload) {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `
+                    <div>${file.name}</div>
+                    <div class="path">${path}</div>
+                    <div class="progress"><div class="progress-bar"></div></div>
+                `;
+                fileList.appendChild(div);
+            }
+        }
+
+        async function uploadFiles() {
+            const uploadBtn = document.getElementById('upload-btn');
+            uploadBtn.disabled = true;
+
+            for (let [path, file] of filesToUpload) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('path', path);
+
+                    const response = await fetch('/admin/uploadFile', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`上传失败: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    updateProgress(path, 100);
+                } catch (error) {
+                    console.error(`文件 ${path} 上传失败:`, error);
+                    alert(`文件 ${path} 上传失败: ${error.message}`);
+                }
+            }
+
+            filesToUpload.clear();
+            updateFileList();
+            uploadBtn.disabled = true;
+            alert('所有文件上传完成');
+        }
+
+        function updateProgress(path, percent) {
+            const fileItems = document.querySelectorAll('.file-item');
+            for (let item of fileItems) {
+                if (item.querySelector('.path').textContent === path) {
+                    item.querySelector('.progress-bar').style.width = percent + '%';
+                    break;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

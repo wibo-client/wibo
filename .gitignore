@@ -6,3 +6,4 @@ dist
 .vscode
 user_data
 src/plugins
+java-local-server/target
