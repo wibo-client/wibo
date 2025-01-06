@@ -92,6 +92,7 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
         case "dtd":
         case "xsd":
         case "csv":
+        case "log":
             return textDocumentParser;
 
         case "key":

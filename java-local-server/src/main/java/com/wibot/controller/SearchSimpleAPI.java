@@ -5,6 +5,8 @@ import com.wibot.controller.vo.AggregatedContentVO;
 import com.wibot.index.DocumentIndexInterface;
 import com.wibot.index.SearchDocumentResult;
 import com.wibot.pathHandler.PathBasedIndexHandlerSelector;
+import com.wibot.persistence.DocumentDataRepository;
+import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 @RestController
 public class SearchSimpleAPI {
@@ -21,6 +24,8 @@ public class SearchSimpleAPI {
     @Autowired
     private PathBasedIndexHandlerSelector pathBasedIndexHandlerSelector;
 
+    @Autowired
+    private DocumentDataRepository documentDataRepository;
     /**
      * 完整的搜索方法，支持所有搜索参数
      * 
@@ -35,9 +40,11 @@ public class SearchSimpleAPI {
         DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(pathPrefix);
         List<SearchDocumentResult> results = documentIndexInterface.search(queryStr, pathPrefix, TopN);
 
-        return results.stream().map(item -> new SearchResultVO(item.getId(), item.getTitle(),
-                item.getHighLightContentPart(), LocalDateTime.now(), generateUrl(item.getId())))
-                .collect(Collectors.toList());
+        return results.stream().map(item -> {
+            Optional<DocumentDataPO> docData = documentDataRepository.findById(item.getMarkdownParagraph().getDocumentDataId());
+            String url = docData.map(DocumentDataPO::getFilePath).orElse("URL not found");
+            return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(), LocalDateTime.now(), url);
+        }).collect(Collectors.toList());
     }
 
     /**
