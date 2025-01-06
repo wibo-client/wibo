@@ -18,7 +18,7 @@
     <logger name="org.hibernate" level="WARN"/>
 
     <!-- root配置需要同时引用两个appender -->
-    <root level="warn">
+    <root level="debug">
         <appender-ref ref="CONSOLE" />
         <appender-ref ref="FILE" />
     </root>
