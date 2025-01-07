@@ -21,18 +21,18 @@
   <!-- 交互界面内容区域 -->
   <div id="interaction" class="tab-content active">
     <div id="chat-container">
-      <h2>围脖（WIBO）你自己的知识助手 </h2>
+      <h2>围脖（WIBO） 你的个人知识助手 </h2>
       <div id="messages"></div>
       <div id="input-container">
         <textarea id="user-input" placeholder="输入你的问题" rows="1"></textarea>
         <div class="input-group">
           <select id="request-type">
-            <option value="searchAndChat">检索增强回答</option>
-            <option value="search">本地文件检索</option>
+            <option value="searchAndChat">WIBO捡问</option>
+            <option value="searchWithRerank">搜索增强</option>
+            <option value="search">搜索直出</option>
             <option value="chat">模型直答</option>
-            <option value="searchWithRerank">模型增强排序检索</option>
           </select>
-          <label for="foregroundExecution">隐藏浏览器执行</label>
+          <label for="foregroundExecution">后台执行</label>
           <label class="switch">
             <input type="checkbox" id="foregroundExecution">
             <span class="slider"></span>

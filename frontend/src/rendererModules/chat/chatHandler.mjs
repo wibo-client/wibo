@@ -27,25 +27,22 @@ export default class ChatHandler {
 
   setupKeyboardShortcuts(chatInput, typeSelect) {
     chatInput.addEventListener('keydown', (event) => {
-      if (event.shiftKey && event.key === 'Enter') {
-        event.preventDefault();
-        if (typeSelect.value === 'searchAndChat' || typeSelect.value === 'search') {
+      if (event.key === 'Enter') {
+        if (event.shiftKey) {
+          // Shift + Enter: 插入换行
+          return;
+        } else {
+          // 仅Enter: 发送消息
+          event.preventDefault();
           this.sendMessage();
         }
-      } else if (event.ctrlKey && event.key === 'Enter') {
-        event.preventDefault();
-        if (typeSelect.value === 'searchWithRerank' || typeSelect.value === 'chat') {
-          this.sendMessage();
-        }
-      } else if (event.shiftKey && event.key === '\\') {
-        event.preventDefault();
-        typeSelect.value = 'search';
-        this.sendMessage();
-      } else if (event.ctrlKey && event.key === '\\') {
-        event.preventDefault();
-        typeSelect.value = 'chat';
-        this.sendMessage();
       }
+    });
+
+    // 自动调整输入框高度
+    chatInput.addEventListener('input', () => {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = chatInput.scrollHeight + 'px';
     });
 
     chatInput.addEventListener('focus', () => {

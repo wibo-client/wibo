@@ -185,6 +185,8 @@ body {
   border-radius: 5px;
   resize: none;
   overflow: hidden;
+  white-space: pre-wrap; /* 保留换行符 */
+  overflow-y: auto;      /* 允许垂直滚动 */
 }
 
 #input-container select,

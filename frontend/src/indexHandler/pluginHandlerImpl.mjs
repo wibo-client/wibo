@@ -3,10 +3,12 @@ import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs
 import fs from 'fs';
 import vm from 'vm';
 import pluginStore from './pluginStore.mjs';
+import { PathSuggestionService } from '../pathSuggestion/PathSuggestionService.mjs';
 
 export class PluginHandlerImpl {
     constructor() {
         this.pluginInstanceMap = new Map();
+        this.pathSuggestionService = new PathSuggestionService();
     }
 
     async init(globalContext) {
@@ -16,6 +18,11 @@ export class PluginHandlerImpl {
         await this.defaultHandler.init(globalContext, null);
         this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
         this.loadPlugins();
+        await this.updatePathSuggestions();
+    }
+
+    async updatePathSuggestions() {
+        await this.pathSuggestionService.initWithPlugins(this.pluginInstanceMap);
     }
 
     async storePlugin(pluginClass, pluginCode, handlerConfig) {
@@ -88,6 +95,7 @@ export class PluginHandlerImpl {
                     console.warn(`Plugin ${handlerConfig.indexHandlerInterface} does not implement all methods from IndexHandlerInterface and will be ignored.`);
                 }
             }
+            await this.updatePathSuggestions();
         } catch (error) {
             console.error("Failed to load plugins:", error);
             throw new Error("Failed to load plugins");
@@ -175,26 +183,12 @@ export class PluginHandlerImpl {
     }
 
     async select(pathPrefix = '') {
-        console.debug(`Selecting plugin for pathPrefix: ${pathPrefix}`);
-        // 根据 pathPrefix 选出最匹配的插件
-        for (const [possiblePath, plugin] of this.pluginInstanceMap) {
-            if (pathPrefix.startsWith(possiblePath)) {
-                return plugin;
-            }
-        }
-
-        return this.defaultHandler;
+        const selectedPlugin = this.pathSuggestionService.selectPluginForPath(pathPrefix);
+        return selectedPlugin || this.defaultHandler;
     }
 
     async fetchPathSuggestions(input) {
-        console.debug(`Fetching path suggestions for input: ${input}`);
-        const suggestions = new Set();
-        for (const pluginInstance of this.pluginInstanceMap.values()) {
-            const pluginSuggestions = await pluginInstance.getPossiblePath(input);
-            pluginSuggestions.forEach(suggestion => suggestions.add(suggestion));
-        }
-        console.debug(`Path suggestions: ${Array.from(suggestions)}`);
-        return Array.from(suggestions);
+        return await this.pathSuggestionService.getAllPathSuggestions(input);
     }
 }
 
