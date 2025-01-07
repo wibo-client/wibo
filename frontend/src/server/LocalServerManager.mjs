@@ -197,7 +197,7 @@ class LocalServerManager {
         for (let i = 0; i < 15; i++) { // 最多等待30秒
             try {
                 process.kill(pid, 0);
-                await new Promise(resolve => setTimeout(resolve, 6000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
             } catch (e) {
                 return; // 进程已经不存在，返回
             }
@@ -313,43 +313,31 @@ class LocalServerManager {
 
     // 修改清理进程方法
     async cleanupExistingProcesses() {
-        if (process.platform === 'win32') {
-            const { execSync } = require('child_process');
-            try {
-                const output = execSync('wmic process where "name=\'java.exe\'" get commandline,processid').toString();
-                const lines = output.split('\n');
-                for (const line of lines) {
-                    if (line.includes(this.jarPath)) {
-                        const pid = line.match(/(\d+)$/)?.[1];
-                        if (pid) {
-                            await new Promise(resolve => {
-                                spawn('taskkill', ['/F', '/PID', pid]).on('exit', resolve);
-                            });
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                        }
-                    }
+        const savedProcess = this.store.get('javaProcess');
+        if (!savedProcess || !savedProcess.pid) return;
+
+        try {
+            if (process.platform === 'win32') {
+                await new Promise(resolve => {
+                    spawn('taskkill', ['/F', '/PID', savedProcess.pid]).on('exit', resolve);
+                });
+            } else {
+                try {
+                    process.kill(savedProcess.pid, 'SIGTERM');
+                    await this.waitForProcessStop(savedProcess.pid);
+                } catch (e) {
+                    // 如果进程已经不存在，忽略错误
+                    console.log('[LocalServer] Process already terminated:', e.message);
                 }
-            } catch (e) {
-                // 忽略错误
             }
-        } else {
-            try {
-                const { execSync } = require('child_process');
-                const output = execSync(`ps -ef | grep "${this.jarPath}" | grep -v grep`).toString();
-                const lines = output.split('\n');
-                for (const line of lines) {
-                    const pid = line.split(/\s+/)[1];
-                    if (pid) {
-                        process.kill(pid, 'SIGTERM');
-                        await this.waitForProcessStop(pid);
-                    }
-                }
-            } catch (e) {
-                // 忽略错误
-            }
+            
+            // 清理存储的进程信息
+            this.store.delete('javaProcess');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+        } catch (e) {
+            console.error('[LocalServer] Error cleaning up process:', e);
         }
-        // 额外等待确保进程完全清理
-        await new Promise(resolve => setTimeout(resolve, 5000));
     }
 
     // 修改停止方法

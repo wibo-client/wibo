@@ -8,6 +8,7 @@ export default class KnowledgeBaseHandler {
     
     // 不再直接启动定时更新，而是通过状态检查来控制
     this.setupPortCheck();
+    this.componentDidMount(); // 在构造函数中调用
   }
 
   // 添加定时器控制方法
@@ -59,19 +60,23 @@ export default class KnowledgeBaseHandler {
   }
 
   async componentDidMount() {
-    // 获取初始状态
-    const serverStatus = await window.electron.getServerDesiredState();
-    const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
-    const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
-    
-    if (localKnowledgeBaseToggle && localKnowledgeBaseConfig) {
-      localKnowledgeBaseToggle.checked = serverStatus.desiredState;
-      localKnowledgeBaseConfig.style.display = serverStatus.desiredState ? 'block' : 'none';
-    }
-
-    // 更新状态信息
-    if (serverStatus.isHealthy) {
-      this.BASE_URL = `http://localhost:${serverStatus.port}`;
+    try {
+      const serverStatus = await window.electron.getServerDesiredState();
+      const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
+      const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
+      
+      if (localKnowledgeBaseToggle && localKnowledgeBaseConfig) {
+        // 保持开关状态与期望状态一致
+        localKnowledgeBaseToggle.checked = serverStatus.desiredState;
+        localKnowledgeBaseConfig.style.display = serverStatus.desiredState ? 'block' : 'none';
+        
+        // 如果期望状态是开启，但实际状态是关闭，显示提示
+        if (serverStatus.desiredState && !serverStatus.isHealthy) {
+          console.log('[KnowledgeBase] Service is starting...');
+        }
+      }
+    } catch (error) {
+      console.error('[KnowledgeBase] Failed to initialize state:', error);
     }
   }
 

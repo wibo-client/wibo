@@ -335,7 +335,24 @@ app.whenReady().then(async () => {
   // 确保在应用退出时清理 Java 进程
   app.on('before-quit', async () => {
     try {
+      // 先设置期望状态为关闭
       await localServerManager.stopServer();
+      // 直接调用内部停止方法，强制关闭进程
+      await localServerManager._stopServer();
+      
+      // 额外确保进程被清理
+      const savedProcess = localServerManager.store.get('javaProcess');
+      if (savedProcess && savedProcess.pid) {
+        try {
+          if (process.platform === 'win32') {
+            spawn('taskkill', ['/F', '/PID', savedProcess.pid]);
+          } else {
+            process.kill(savedProcess.pid, 'SIGKILL');
+          }
+        } catch (e) {
+          // 忽略错误，进程可能已经不存在
+        }
+      }
     } catch (error) {
       console.error('停止 Java 进程失败:', error);
     }
