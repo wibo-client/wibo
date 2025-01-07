@@ -271,11 +271,11 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('fetch-path-suggestions', async (event, input) => {
     try {
-      const suggestions = await pluginHandler.fetchPathSuggestions(input);
-      event.sender.send('path-suggestions', suggestions);
+        const suggestions = await pluginHandler.fetchPathSuggestions(input);
+        return suggestions; // 直接返回结果，不使用event.sender.send
     } catch (error) {
-      console.error('获取路径建议错误:', error);
-      event.sender.send('error', { message: error.message });
+        console.error('获取路径建议错误:', error);
+        throw error; // 让错误传播到preload层
     }
   });
 

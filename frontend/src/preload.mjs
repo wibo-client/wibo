@@ -31,7 +31,15 @@ contextBridge.exposeInMainWorld('electron', {
   toggleKnowledgeBase: (enable) => ipcRenderer.invoke('toggleKnowledgeBase', enable),
 
   // 文件系统相关方法
-  fetchPathSuggestions: (input) => ipcRenderer.invoke('fetch-path-suggestions', input),
+  fetchPathSuggestions: async (input) => {
+    try {
+      console.debug('Fetching path suggestions for:', input);
+      return await ipcRenderer.invoke('fetch-path-suggestions', input);
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      return []; // 出错时返回空数组
+    }
+  },
   readFile: (path) => ipcRenderer.invoke('read-file', path),
   calculateMD5: (path) => ipcRenderer.invoke('calculate-md5', path),
   selectFile: () => ipcRenderer.invoke('select-file'),
@@ -57,25 +65,6 @@ contextBridge.exposeInMainWorld('auth', {
   getToken: () => ipcRenderer.invoke('get-token'),
   setToken: (token) => ipcRenderer.invoke('set-token', token),
   removeToken: () => ipcRenderer.invoke('remove-token')
-});
-
-// 路径建议处理
-ipcRenderer.on('path-suggestions', (event, suggestions) => {
-  const pathDropdown = document.getElementById('pathDropdown');
-  if (!pathDropdown) return;
-
-  pathDropdown.innerHTML = '';
-
-  if (suggestions.length > 0) {
-    suggestions.forEach(suggestion => {
-      const div = document.createElement('div');
-      div.textContent = suggestion;
-      pathDropdown.appendChild(div);
-    });
-    pathDropdown.style.display = 'block';
-  } else {
-    pathDropdown.style.display = 'none';
-  }
 });
 
 // 错误处理

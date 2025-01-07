@@ -2,8 +2,16 @@ import { marked } from 'marked';
 
 export default class ChatHandler {
   constructor() {
-    this.setupMessageHooks();
-    this.setupAutoResizeInput();
+    this.bindEvents();
+    this.setupPathInput(); // 添加新方法
+  }
+
+  bindEvents() {
+    // 等待DOM加载完成
+    document.addEventListener('DOMContentLoaded', () => {
+      this.setupMessageHooks();
+      this.setupAutoResizeInput();
+    });
   }
 
   setupMessageHooks() {
@@ -127,6 +135,107 @@ export default class ChatHandler {
     const chatInput = document.getElementById('chatInput');
     if (chatInput) {
       chatInput.value = '';
+    }
+  }
+
+  setupPathInput() {
+    const pathInput = document.getElementById('pathInput');
+    const dropdown = document.getElementById('pathDropdown');
+    let selectedIndex = -1;
+    let suggestions = [];
+
+    if (!pathInput || !dropdown) return;
+
+    // 键盘导航处理
+    pathInput.addEventListener('keydown', (event) => {
+        if (!dropdown.children.length) return;
+
+        switch(event.key) {
+            case 'ArrowUp':
+                event.preventDefault();
+                selectedIndex = Math.max(0, selectedIndex - 1);
+                updateSelection();
+                break;
+            case 'ArrowDown':
+                event.preventDefault();
+                selectedIndex = Math.min(dropdown.children.length - 1, selectedIndex + 1);
+                updateSelection();
+                break;
+            case 'Enter':
+                event.preventDefault();
+                if (selectedIndex >= 0) {
+                    pathInput.value = suggestions[selectedIndex];
+                    dropdown.style.display = 'none';
+                }
+                break;
+            case 'Escape':
+                dropdown.style.display = 'none';
+                break;
+        }
+    });
+
+
+    // 更新选中状态
+    function updateSelection() {
+        Array.from(dropdown.children).forEach((item, index) => {
+            item.classList.toggle('selected', index === selectedIndex);
+            if (index === selectedIndex) {
+                item.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
+    pathInput.addEventListener('input', async () => {
+        const input = pathInput.value;
+        
+        try {
+            // 直接使用返回值
+            suggestions = await window.electron.fetchPathSuggestions(input) || [];
+            console.debug('Received suggestions:', suggestions); // 添加调试日志
+
+            selectedIndex = -1;
+            this.updateDropdown(dropdown, suggestions, selectedIndex);
+        } catch (error) {
+            console.error('Error fetching path suggestions:', error);
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // 点击外部关闭下拉框
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.path-input-container')) {
+            dropdown.style.display = 'none';
+        }
+    });
+  }
+
+  // 新增辅助方法来更新下拉列表
+  updateDropdown(dropdown, suggestions, selectedIndex) {
+    if (suggestions && suggestions.length > 0) {
+        dropdown.innerHTML = suggestions.map(suggestion => `
+            <div class="path-suggestion-item">
+                <span class="path-suggestion-icon">📁</span>
+                ${suggestion}
+            </div>
+        `).join('');
+        
+        dropdown.style.display = 'block';
+
+        // 添加鼠标事件
+        Array.from(dropdown.children).forEach((item, index) => {
+            item.addEventListener('mouseenter', () => {
+                selectedIndex = index;
+                // 修复：使用外部的updateSelection函数
+                updateSelection(dropdown, selectedIndex);
+            });
+            item.addEventListener('click', () => {
+                const pathInput = document.getElementById('pathInput');
+                pathInput.value = suggestions[index];
+                dropdown.style.display = 'none';
+            });
+        });
+    } else {
+        dropdown.style.display = 'none';
     }
   }
 }
