@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 初始化各个模块
   const chatHandler = new ChatHandler();
-  const knowledgeBaseHandler = new KnowledgeBaseHandler(BASE_URL);
+  const knowledgeBaseHandler = new KnowledgeBaseHandler();
   const browserConfigHandler = new BrowserConfigHandler();
   setupTabSwitching();
 
@@ -45,26 +45,29 @@ async function checkServerStatus() {
   const processPort = document.getElementById('processPort');
 
   try {
-    const response = await electron.getConfig('javaProcess');
-    const javaProcess = JSON.parse(response);
+    const serverStatus = await electron.getServerDesiredState();
+    //console.log('Server status:', serverStatus); // 添加调试日志
 
-    if (javaProcess) {
+    if (serverStatus.isHealthy && serverStatus.pid && serverStatus.port) {
       statusDot.classList.remove('offline');
       statusDot.classList.add('online');
       statusText.textContent = '在线';
-      processPid.textContent = javaProcess.pid;
-      processPort.textContent = javaProcess.port;
+      processPid.textContent = serverStatus.pid;
+      processPort.textContent = serverStatus.port;
     } else {
       statusDot.classList.remove('online');
       statusDot.classList.add('offline');
       statusText.textContent = '离线';
       processPid.textContent = '-';
       processPort.textContent = '-';
+     // console.log('Server not healthy:', serverStatus); // 添加调试日志
     }
   } catch (error) {
     console.error('服务状态检查失败:', error);
     statusDot.classList.remove('online');
     statusDot.classList.add('offline');
     statusText.textContent = '检查失败';
+    processPid.textContent = '-';
+    processPort.textContent = '-';
   }
 }

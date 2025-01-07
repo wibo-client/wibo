@@ -1,24 +1,77 @@
 import ConfigKeys from '../../config/configKeys.mjs';
 
 export default class KnowledgeBaseHandler {
-  constructor(baseUrl) {
-    this.BASE_URL = baseUrl;
+  constructor() {
+    this.BASE_URL = null;
+    this.updateTimer = null;  // 添加定时器引用
     this.setupEventListeners();
+    
+    // 不再直接启动定时更新，而是通过状态检查来控制
+    this.setupPortCheck();
+  }
 
-    // 启动定时更新
-    this.updateMonitoredDirs();
-    setInterval(() => this.updateMonitoredDirs(), 10000);
+  // 添加定时器控制方法
+  startUpdateTimer() {
+    if (!this.updateTimer) {
+      this.updateMonitoredDirs(); // 立即执行一次
+      this.updateTimer = setInterval(() => this.updateMonitoredDirs(), 10000);
+      console.log('[KnowledgeBase] Started update timer');
+    }
+  }
+
+  stopUpdateTimer() {
+    if (this.updateTimer) {
+      clearInterval(this.updateTimer);
+      this.updateTimer = null;
+      console.log('[KnowledgeBase] Stopped update timer');
+    }
+  }
+
+  // 添加端口检查和BASE_URL更新方法
+  async setupPortCheck() {
+    const updateBaseUrl = async () => {
+      try {
+        const serverStatus = await window.electron.getServerDesiredState();
+        if (serverStatus.isHealthy && serverStatus.port) {
+          this.BASE_URL = `http://localhost:${serverStatus.port}`;
+          this.startUpdateTimer(); // 服务在线时启动定时器
+          return true;
+        } else {
+          this.BASE_URL = null;
+          this.stopUpdateTimer();  // 服务离线时停止定时器
+          return false;
+        }
+      } catch (error) {
+        console.error('Failed to get server status:', error);
+        this.BASE_URL = null;
+        this.stopUpdateTimer();  // 出错时停止定时器
+        return false;
+      }
+    };
+
+    // 初始检查
+    await updateBaseUrl();
+    
+    // 定期检查
+    setInterval(async () => {
+      await updateBaseUrl();
+    }, 5000);
   }
 
   async componentDidMount() {
     // 获取初始状态
-    const serverDesiredState = await window.electron.getServerDesiredState();
+    const serverStatus = await window.electron.getServerDesiredState();
     const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
     const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
     
     if (localKnowledgeBaseToggle && localKnowledgeBaseConfig) {
-      localKnowledgeBaseToggle.checked = serverDesiredState;
-      localKnowledgeBaseConfig.style.display = serverDesiredState ? 'block' : 'none';
+      localKnowledgeBaseToggle.checked = serverStatus.desiredState;
+      localKnowledgeBaseConfig.style.display = serverStatus.desiredState ? 'block' : 'none';
+    }
+
+    // 更新状态信息
+    if (serverStatus.isHealthy) {
+      this.BASE_URL = `http://localhost:${serverStatus.port}`;
     }
   }
 
@@ -100,7 +153,7 @@ export default class KnowledgeBaseHandler {
       const result = await window.electron.toggleKnowledgeBase(enable);
 
       if (result.success) {
-        alert(enable ? '本地知识库服务已启动' : '本地知识库服务已关闭');
+        alert(enable ? '本地知识库服务启动，启动需要时间，等到服务状态为在线时就可用了' : '本地知识库服务已关闭');
       } else {
         toggle.checked = !enable;
         configSection.style.display = !enable ? 'block' : 'none';
@@ -207,6 +260,11 @@ export default class KnowledgeBaseHandler {
   }
 
   async updateMonitoredDirs() {
+    if (!this.BASE_URL) {
+      console.log('[KnowledgeBase] Skipping update - service not available');
+      return;
+    }
+    
     try {
       const response = await fetch(`${this.BASE_URL}/admin/list/monitored-dirs`);
       const data = await response.json();
@@ -226,7 +284,8 @@ export default class KnowledgeBaseHandler {
         row.insertCell(4).appendChild(deleteButton);
       });
     } catch (error) {
-      console.error('获取监控目录列表失败:', error);
+      console.warn('[KnowledgeBase] Failed to update monitored dirs:', error.message);
+      // 不再记录详细错误，因为服务离线时这是预期的行为
     }
   }
 }

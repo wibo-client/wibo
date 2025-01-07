@@ -11,3 +11,4 @@ java-local-server/WIBO_H2DB.mv.db
 java-local-server/indexDir
 java-local-server/logs/spring-boot-logger.log
 java-local-server/WIBO_H2DB.trace.db
+frontend/logs/spring-boot-logger.log

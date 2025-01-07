@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld('electron', {
   selectFile: () => ipcRenderer.invoke('select-file'),
   showDirectoryPicker: () => ipcRenderer.invoke('show-directory-picker'),
 
-  // 获取服务器期望状态
+  // 获取服务器状态
   getServerDesiredState: () => ipcRenderer.invoke('get-server-desired-state'),
 
   // Shell 相关方法

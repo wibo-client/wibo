@@ -320,7 +320,16 @@ app.whenReady().then(async () => {
 
   // 添加 IPC 事件处理器
   ipcMain.handle('get-server-desired-state', async () => {
-    return localServerManager.desiredState;
+    const desiredState = localServerManager.desiredState;
+    const savedProcess = localServerManager.store.get('javaProcess');
+    const isHealthy = savedProcess ? await localServerManager.checkHealth(savedProcess.port) : false;
+    
+    return {
+      desiredState,
+      isHealthy,
+      pid: savedProcess?.pid || null,
+      port: savedProcess?.port || null
+    };
   });
 
   // 确保在应用退出时清理 Java 进程

@@ -19,6 +19,10 @@ class LocalServerManager {
         // 启动状态同步任务
         this.startStateSyncTask();
         this.MAX_HEALTH_RETRIES = 5;  // 添加最大重试次数
+        this.startLock = false;  // 添加启动锁
+        this.startTimeout = 180000;  // 启动超时时间改为3分钟
+        this.stopTimeout = 30000;    // 停止超时时间设为30秒
+        this.healthCheckInterval = 2000; // 健康检查间隔2秒
     }
 
     // 获取状态同步锁
@@ -47,7 +51,10 @@ class LocalServerManager {
             await this.acquireLock();
             
             const actualState = await this.checkProcessStatus();
-            console.log(`[StateSync] Desired: ${this.desiredState}, Actual: ${actualState}`);
+            // 添加10%概率的日志输出
+            if (Math.random() < 0.1) {
+                console.log(`[StateSync] Desired: ${this.desiredState}, Actual: ${actualState}`);
+            }
 
             if (this.desiredState && !actualState) {
                 await this._startServer();
@@ -62,7 +69,9 @@ class LocalServerManager {
     // 健康检查方法
     async checkHealth(port, retryCount = 0) {
         try {
+            //console.log(`[HealthCheck] Checking health on port ${port}`);
             const response = await fetch(`http://localhost:${port}/health`);
+            //console.log(`[HealthCheck] Response status:`, response.status);
             return response.ok;
         } catch (error) {
             console.warn(`[HealthCheck] Failed attempt ${retryCount + 1}:`, error.message);
@@ -116,7 +125,8 @@ class LocalServerManager {
                     this.store.delete('javaProcess');
                     return false;
                 }
-
+                this.savedProcess = savedProcess;
+                
                 // 进程正常且健康
                 this.currentPort = savedProcess.port;
                 this.isRunning = true;
@@ -142,7 +152,7 @@ class LocalServerManager {
         }
 
         return this.isRunning;
-    }
+    } 
 
     // 查找 jar 文件的辅助方法
     async findJarFile() {
@@ -182,68 +192,186 @@ class LocalServerManager {
         return { success: true, message: '已设置停止指令' };
     }
 
-    // 内部启动实现
+    // 等待进程完全停止的方法
+    async waitForProcessStop(pid) {
+        for (let i = 0; i < 15; i++) { // 最多等待30秒
+            try {
+                process.kill(pid, 0);
+                await new Promise(resolve => setTimeout(resolve, 6000));
+            } catch (e) {
+                return; // 进程已经不存在，返回
+            }
+        }
+        // 如果进程还在，强制结束
+        try {
+            if (process.platform === 'win32') {
+                spawn('taskkill', ['/F', '/PID', pid]);
+            } else {
+                process.kill(pid, 'SIGKILL');
+            }
+        } catch (e) {
+            // 忽略错误
+        }
+    }
+
+    // 修改启动方法
     async _startServer() {
         if (this.isRunning) return;
-
+        if (this.startLock) {
+            console.log('[LocalServer] Server is starting, please wait...');
+            return;
+        }
         try {
+            this.startLock = true;
+            
+            // 确保没有遗留进程
+            await this.cleanupExistingProcesses();
+            
             this.currentPort = await this.portManager.findAvailablePort();
             const args = [
                 '-jar',
                 this.jarPath,
-                `--server.port=${this.currentPort}`
+                `--server.port=${this.currentPort}`,
+                '--spring.profiles.active=product'
             ];
 
             this.javaProcess = spawn('java', args, {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 
-            this.javaProcess.stdout.on('data', (data) => {
-                console.log(`[LocalServer] ${data}`);
-                if (data.includes('Server started successfully')) {
-                    this.store.set('javaProcess', { 
-                        pid: this.javaProcess.pid, 
-                        port: this.currentPort 
-                    });
-                    this.isRunning = true;
-                }
-            });
+            // 等待进程启动
+            await new Promise((resolve, reject) => {
+                const startTime = Date.now();
+                const checkHealth = async () => {
+                    try {
+                        const isHealthy = await this.checkHealth(this.currentPort);
+                        if (isHealthy) {
+                            console.log('[LocalServer] Server is healthy on port:', this.currentPort);
+                            // 立即保存进程信息
+                            this.store.set('javaProcess', {
+                                pid: this.javaProcess.pid,
+                                port: this.currentPort
+                            });
+                            this.isRunning = true;
+                            resolve();
+                            return;
+                        } else {
+                            console.log('[LocalServer] Health check failed, retrying...');
+                        }
+                    } catch (e) {
+                        console.log('[LocalServer] Health check error:', e.message);
+                    }
 
-            this.javaProcess.stderr.on('data', (data) => {
-                console.error(`[LocalServer Error] ${data}`);
-            });
+                    if (Date.now() - startTime > this.startTimeout) {
+                        reject(new Error('Server start timeout'));
+                        return;
+                    }
 
-            this.javaProcess.on('exit', (code, signal) => {
-                console.log(`[LocalServer] Process exited with code ${code} and signal ${signal}`);
-                this.isRunning = false;
-                this.javaProcess = null;
-                this.store.delete('javaProcess');
+                    setTimeout(checkHealth, this.healthCheckInterval);
+                };
+
+                this.javaProcess.stdout.on('data', (data) => {
+                    const output = data.toString();
+                    console.log(`[LocalServer] ${output}`);
+                    // 不再依赖输出判断启动状态，完全依赖健康检查
+                });
+
+                this.javaProcess.stderr.on('data', (data) => {
+                    console.error(`[LocalServer Error] ${data}`);
+                });
+
+                this.javaProcess.on('error', (error) => {
+                    reject(error);
+                });
+
+                this.javaProcess.on('exit', (code, signal) => {
+                    if (!this.isRunning) {
+                        reject(new Error(`Process exited with code ${code}`));
+                    }
+                });
+                console.log('[LocalServer] Server starting ');
+                // 开始健康检查
+                checkHealth();
+              
             });
 
         } catch (error) {
             console.error('[LocalServer] Start error:', error);
             this.isRunning = false;
+            if (this.javaProcess) {
+                try {
+                    this.javaProcess.kill('SIGKILL');
+                } catch (e) {
+                    // 忽略关闭错误
+                }
+            }
+            throw error; // 向上传递错误
+        } finally {
+            this.startLock = false;
         }
     }
 
-    // 内部停止实现
+    // 修改清理进程方法
+    async cleanupExistingProcesses() {
+        if (process.platform === 'win32') {
+            const { execSync } = require('child_process');
+            try {
+                const output = execSync('wmic process where "name=\'java.exe\'" get commandline,processid').toString();
+                const lines = output.split('\n');
+                for (const line of lines) {
+                    if (line.includes(this.jarPath)) {
+                        const pid = line.match(/(\d+)$/)?.[1];
+                        if (pid) {
+                            await new Promise(resolve => {
+                                spawn('taskkill', ['/F', '/PID', pid]).on('exit', resolve);
+                            });
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+                    }
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+        } else {
+            try {
+                const { execSync } = require('child_process');
+                const output = execSync(`ps -ef | grep "${this.jarPath}" | grep -v grep`).toString();
+                const lines = output.split('\n');
+                for (const line of lines) {
+                    const pid = line.split(/\s+/)[1];
+                    if (pid) {
+                        process.kill(pid, 'SIGTERM');
+                        await this.waitForProcessStop(pid);
+                    }
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+        }
+        // 额外等待确保进程完全清理
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+
+    // 修改停止方法
     async _stopServer() {
         if (!this.isRunning || !this.javaProcess) return;
 
         try {
+            const pid = this.javaProcess.pid;
+            console.log('[LocalServer] Stopping server...');
             if (process.platform === 'win32') {
-                spawn('taskkill', ['/pid', this.javaProcess.pid, '/f', '/t']);
+                spawn('taskkill', ['/pid', pid, '/f', '/t']);
             } else {
                 this.javaProcess.kill('SIGTERM');
             }
 
-            // 强制结束超时
-            setTimeout(() => {
-                if (this.javaProcess) {
-                    this.javaProcess.kill('SIGKILL');
-                }
-            }, 5000);
-
+            // 等待进程完全停止
+            await this.waitForProcessStop(pid);
+            
+            this.isRunning = false;
+            this.javaProcess = null;
+            this.store.delete('javaProcess');
+            console.log('[LocalServer] Server stopped');
         } catch (error) {
             console.error('[LocalServer] Stop error:', error);
         }
