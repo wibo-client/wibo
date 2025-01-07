@@ -207,7 +207,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         }
     }
 
-    async getAllPossiblePath() {
+    async getAllPossiblePaths() {  // 修改方法名，添加's'
         // 返回百度搜索的根路径
         return ['/baidu.com/'];
     }

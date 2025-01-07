@@ -8,6 +8,13 @@ export class PathSuggestionService {
         this.updateInterval = 5 * 60 * 1000; // 5分钟更新一次
         this.lastUpdateTime = 0;
         this.plugins = null; // 存储插件引用
+        this.pathTrie = {
+            addPaths: (paths) => {
+                if (Array.isArray(paths)) {
+                    paths.forEach(path => this.addPathToTree(path));
+                }
+            }
+        };
     }
 
     init(pathConfigs) {
@@ -17,23 +24,28 @@ export class PathSuggestionService {
         }
     }
 
-    async initWithPlugins(plugins) {
-        this.plugins = plugins; // 保存插件引用
-        this.pluginPathMap.clear();
-        this.pathTree.clear();
-        this.keywordPathMap.clear();
-
-        // 收集所有插件的路径信息
-        for (const [pathPrefix, plugin] of plugins) {
-            try {
-                const paths = await plugin.getAllPossiblePath();
-                paths.forEach(path => {
-                    this.pluginPathMap.set(path, plugin);
-                    this.addPathToTree(path);
-                });
-            } catch (error) {
-                console.error(`Failed to get paths from plugin ${pathPrefix}:`, error);
+    async initWithPlugins(pluginInstanceMap) {
+        try {
+            this.pluginInstanceMap = pluginInstanceMap;
+            for (const [pathPrefix, plugin] of pluginInstanceMap) {
+                try {
+                    if (plugin.getAllPossiblePaths) {
+                        const paths = await plugin.getAllPossiblePaths();
+                        if (Array.isArray(paths)) {
+                            paths.forEach(path => {
+                                this.addPathToTree(path);
+                                this.pluginPathMap.set(path, plugin);
+                            });
+                        }
+                    } else {
+                        console.warn(`Plugin at ${pathPrefix} does not implement getAllPossiblePaths`);
+                    }
+                } catch (error) {
+                    console.error(`Failed to get paths from plugin ${pathPrefix}:`, error);
+                }
             }
+        } catch (error) {
+            console.error('Failed to initialize with plugins:', error);
         }
     }
 
@@ -86,7 +98,9 @@ export class PathSuggestionService {
             if (searchTerm && !key.toLowerCase().includes(searchTerm.toLowerCase())) {
                 continue;
             }
-            suggestions.push(key + '/');
+            // 添加前导斜杠，确保返回格式一致
+            const suggestion = parts.length === 0 ? `/${key}/` : `${key}/`;
+            suggestions.push(suggestion);
         }
 
         return suggestions;

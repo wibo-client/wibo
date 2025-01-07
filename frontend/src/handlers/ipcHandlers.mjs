@@ -52,6 +52,59 @@ export function setupIpcHandlers(globalContext) {
     }
   });
 
+  // 本地服务器相关处理器
+  ipcMain.handle('get-server-desired-state', async () => {
+    const desiredState = localServerManager.desiredState;
+    const savedProcess = localServerManager.store.get('javaProcess');
+    const isHealthy = savedProcess ? await localServerManager.checkHealth(savedProcess.port) : false;
+    
+    return {
+      desiredState,
+      isHealthy,
+      pid: savedProcess?.pid || null,
+      port: savedProcess?.port || null
+    };
+  });
+
+  ipcMain.handle('toggleKnowledgeBase', async (event, enable) => {
+    try {
+      if (enable) {
+        const result = await localServerManager.startServer();
+        return result;
+      } else {
+        const result = await localServerManager.stopServer();
+        return result;
+      }
+    } catch (error) {
+      console.error('切换知识库服务失败:', error);
+      return { 
+        success: false, 
+        message: error.message || '操作失败'
+      };
+    }
+  });
+
+  // 插件相关处理器
+  ipcMain.handle('get-plugin-instance-map', async () => {
+    try {
+      return await pluginHandler.getPluginInstanceMapInfo();
+    } catch (error) {
+      console.error('Error getting plugin instance map:', error);
+      throw error;
+    }
+  });
+
+  // 路径建议相关
+  ipcMain.handle('fetch-path-suggestions', async (event, input) => {
+    try {
+      const suggestions = await pluginHandler.fetchPathSuggestions(input);
+      return suggestions;
+    } catch (error) {
+      console.error('获取路径建议错误:', error);
+      throw error;
+    }
+  });
+
   // 其他现有的 IPC 处理器...
   // ...existing code...
 }

@@ -110,6 +110,10 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
     async fetchAggregatedContent(summaryList) {    
          return await this.contentAggregator.aggregateContent(summaryList.slice(0, this.pageFetchLimit));
     }
+
+    async getAllPossiblePaths() {  // 确保使用正确的方法名
+        return [];
+    }
 }
 
 export default PuppeteerIndexHandler;

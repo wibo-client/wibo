@@ -8,6 +8,10 @@ export class IndexHandlerInterface {
     }
    
 
+    getAllPossiblePaths(){
+        throw new Error('Method not implemented.');
+    }
+    
     getHandlerName() {
         throw new Error('Method not implemented.');
     }

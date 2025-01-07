@@ -31,7 +31,7 @@ export class PluginHandlerImpl {
             this.pluginInstanceMap.set('/local/', localServerIndexHandler);
         }
 
-        this.pluginInstanceMap.set('/baidu.com/', BaiduPuppeteerIndexHandlerImpl);
+        this.pluginInstanceMap.set('/baidu.com/', this.defaultHandler);
         await this.updatePathSuggestions();
     }
 
