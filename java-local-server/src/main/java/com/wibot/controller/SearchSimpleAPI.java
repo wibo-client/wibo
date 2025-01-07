@@ -17,6 +17,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.HashSet;
 
 @RestController
 public class SearchSimpleAPI {
@@ -64,15 +68,54 @@ public class SearchSimpleAPI {
     }
 
     /**
-     * 获取可能的路径
+     * 获取所有可能路径
      * 
-     * @param path 路径前缀
      * @return 可能的路径列表
      */
-    @GetMapping("/getPossiblePath")
-    public List<String> getPossiblePath(@RequestParam String path) {
-        DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(path);
-        return documentIndexInterface.getPossiblePath(path);
+    @GetMapping("/getAllPaths")
+    public List<String> getAllPaths() {
+        List<DocumentDataPO> allDocuments = documentDataRepository.findAll();
+        
+        // 首先计算每个层级的目录数量
+        Map<Integer, Set<String>> levelPaths = new HashMap<>();
+        
+        for (DocumentDataPO doc : allDocuments) {
+            String[] parts = doc.getFilePath().split("/");
+            StringBuilder currentPath = new StringBuilder();
+            
+            for (int i = 0; i < parts.length; i++) {
+                if (!parts[i].isEmpty()) {
+                    currentPath.append("/").append(parts[i]);
+                    levelPaths.computeIfAbsent(i + 1, k -> new HashSet<>())
+                             .add(currentPath.toString());
+                }
+            }
+        }
+
+        // 找到最适合的目录层级（接近5000个子目录的最小层级）
+        int targetLevel = 1;
+        for (Map.Entry<Integer, Set<String>> entry : levelPaths.entrySet()) {
+            if (entry.getValue().size() > 5000) {
+                break;
+            }
+            targetLevel = entry.getKey();
+        }
+
+        // 使用确定的层级重新生成路径列表
+        return allDocuments.stream()
+            .map(doc -> {
+                String[] parts = doc.getFilePath().split("/");
+                StringBuilder processedPath = new StringBuilder();
+                for (int i = 0; i < Math.min(targetLevel, parts.length); i++) {
+                    if (!parts[i].isEmpty()) {
+                        processedPath.append("/").append(parts[i]);
+                    }
+                }
+                return processedPath.toString();
+            })
+            .filter(path -> !path.isEmpty())
+            .distinct()
+            .collect(Collectors.toList());
     }
 
     private String generateUrl(Long id) {

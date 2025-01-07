@@ -64,46 +64,82 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
     async retryOperation(operation, maxRetries = 3, delayMs = 1000) {
         let lastError;
-        for (let i = 0; i < maxRetries; i++) {
+        let attempt = 0;
+        
+        while (attempt < maxRetries) {
             try {
                 return await operation();
             } catch (error) {
                 lastError = error;
-                console.warn(`重试操作失败 (${i + 1}/${maxRetries}):`, error.message);
-                if (i < maxRetries - 1) {
+                console.warn(`重试操作失败 (${attempt + 1}/${maxRetries}):`, error.message);
+                
+                if (attempt < maxRetries - 1) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 }
+                attempt++;
             }
         }
         throw lastError;
     }
 
     async navigateToPage(page, url, waitForSelector) {
+        if (!page) {
+            throw new Error('Page object is null or undefined');
+        }
+
         return this.retryOperation(async () => {
-            await page.goto(url);
-            if (waitForSelector) {
-                await page.waitForSelector(waitForSelector, { timeout: this.browserTimeout * 1000 });
+            try {
+                // 设置导航超时
+                const response = await page.goto(url, {
+                    timeout: this.browserTimeout * 1000,
+                    waitUntil: 'networkidle0'
+                });
+                
+                if (!response || !response.ok()) {
+                    throw new Error(`Navigation failed: ${response ? response.status() : 'no response'}`);
+                }
+
+                if (waitForSelector) {
+                    await page.waitForSelector(waitForSelector, { 
+                        timeout: this.browserTimeout * 1000 
+                    });
+                }
+                
+                console.info(`成功导航到页面: ${url} 并等待元素: ${waitForSelector}`);
+            } catch (error) {
+                // 如果导航失败，确保页面处于可用状态
+                try {
+                    await page.reload({ waitUntil: 'networkidle0' });
+                } catch (reloadError) {
+                    console.error('页面重载失败:', reloadError);
+                    throw error; // 抛出原始错误
+                }
+                throw error;
             }
-            console.info(`成功导航到页面: ${url} 并等待元素: ${waitForSelector}`);
         });
     }
 
-    // async waitAndType(page, selector, text) {
-    //     return this.retryOperation(async () => {
-    //         await page.waitForSelector(selector);
-    //         await page.type(selector, text);
-    //         console.info(`成功在 ${selector} 输入文本`);
-    //     });
-    // }
-
     async search(query, pathPrefix = '', recordDescription = true) {
         console.info("开始处理任务");
-        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? 
-            this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
-        let browser;
+        let browser = null;
+        let page = null;
+
         try {
+            const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? 
+                this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
+            
             browser = await puppeteer.launch(await this.getBrowserConfig(headless));
-            const page = await browser.newPage();
+            page = await browser.newPage();
+            
+            // 设置页面错误处理
+            page.on('error', err => {
+                console.error('页面崩溃:', err);
+            });
+
+            page.on('pageerror', err => {
+                console.error('页面JavaScript错误:', err);
+            });
+
             await this.configurePageSettings(page);
 
             // 修改后的调用方式
@@ -146,8 +182,15 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
             console.error("处理任务时出错:", error);
             throw error;
         } finally {
-            if (browser) {
-                await browser.close();
+            try {
+                if (page && !page.isClosed()) {
+                    await page.close();
+                }
+                if (browser) {
+                    await browser.close();
+                }
+            } catch (closeError) {
+                console.error("关闭资源时出错:", closeError);
             }
         }
     }
@@ -162,6 +205,11 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         } catch (error) {
             console.error(`Error in hoverAndClick: ${error}`);
         }
+    }
+
+    async getAllPossiblePath() {
+        // 返回百度搜索的根路径
+        return ['/baidu.com/'];
     }
 
     getHandlerName() {

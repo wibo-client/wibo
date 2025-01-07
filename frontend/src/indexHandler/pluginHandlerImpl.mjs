@@ -188,7 +188,13 @@ export class PluginHandlerImpl {
     }
 
     async fetchPathSuggestions(input) {
-        return await this.pathSuggestionService.getAllPathSuggestions(input);
+        if (input.endsWith('/')) {
+            // 如果输入以/结尾，返回下一级路径建议
+            return await this.pathSuggestionService.getPossibleChildPaths(input);
+        } else {
+            // 否则返回全局搜索结果
+            return await this.pathSuggestionService.getAllPathSuggestions(input);
+        }
     }
 
     /**

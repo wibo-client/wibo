@@ -5,6 +5,8 @@ export class PathSuggestionService {
         // 路径树结构
         this.pathTree = new Map();
         this.pluginPathMap = new Map(); // 存储路径与插件的映射关系
+        this.updateInterval = 5 * 60 * 1000; // 5分钟更新一次
+        this.lastUpdateTime = 0;
     }
 
     init(pathConfigs) {
@@ -21,11 +23,15 @@ export class PathSuggestionService {
 
         // 收集所有插件的路径信息
         for (const [pathPrefix, plugin] of plugins) {
-            const paths = await plugin.getPossiblePath('');
-            paths.forEach(path => {
-                this.pluginPathMap.set(path, plugin);
-                this.addPathToTree(path);
-            });
+            try {
+                const paths = await plugin.getAllPossiblePath();
+                paths.forEach(path => {
+                    this.pluginPathMap.set(path, plugin);
+                    this.addPathToTree(path);
+                });
+            } catch (error) {
+                console.error(`Failed to get paths from plugin ${pathPrefix}:`, error);
+            }
         }
     }
 
@@ -115,7 +121,16 @@ export class PathSuggestionService {
         return results;
     }
 
+    async ensureUpdated() {
+        const now = Date.now();
+        if (now - this.lastUpdateTime > this.updateInterval) {
+            await this.updatePathSuggestions();
+            this.lastUpdateTime = now;
+        }
+    }
+
     async getAllPathSuggestions(searchTerm) {
+        await this.ensureUpdated();
         const suggestions = new Set();
         
         // 从路径树中获取建议
@@ -132,6 +147,12 @@ export class PathSuggestionService {
         keywordResults.forEach(path => suggestions.add(path));
 
         return Array.from(suggestions);
+    }
+
+    // 提供类似原getPossiblePath的功能
+    async getPossibleChildPaths(currentPath, searchTerm = '') {
+        await this.ensureUpdated();
+        return this.getNextLevelPath(currentPath, searchTerm);
     }
 }
 

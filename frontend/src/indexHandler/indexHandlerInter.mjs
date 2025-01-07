@@ -18,16 +18,24 @@ export class IndexHandlerInterface {
         return [query];
     }
     
-    async getPossiblePath(path) {
-        throw new Error('Method not implemented.');
-    }
+    // 删除 getPossiblePath 方法
+    // async getPossiblePath(path) {
+    //     throw new Error('Method not implemented.');
+    // }
 
-    
     async rerank(documentPartList, queryString) {
         throw new Error('Method not implemented.');
     }
 
     async fetchAggregatedContent(summaryList) {
+        throw new Error('Method not implemented.');
+    }
+
+    /**
+     * 获取所有可能的路径
+     * @returns {Promise<string[]>} 返回所有可能的路径列表
+     */
+    async getAllPossiblePath() {
         throw new Error('Method not implemented.');
     }
 
