@@ -19,6 +19,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 添加定期检查服务状态
   checkServerStatus();
   setInterval(checkServerStatus, 5000);
+
+  // 添加快捷导航点击处理
+  document.querySelectorAll('.quick-link-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const path = item.dataset.path;
+      const pathInput = document.getElementById('pathInput');
+      const userInput = document.getElementById('user-input');
+      
+      // 设置路径并切换到对话标签页
+      pathInput.value = path;
+      switchToTab('interaction');
+      userInput.focus();
+    });
+  });
+
+  // 添加快捷导航内容加载
+  setupQuickNavigation();
 });
 
 // 只保留基础功能和模块初始化相关代码
@@ -69,5 +86,45 @@ async function checkServerStatus() {
     statusText.textContent = '检查失败';
     processPid.textContent = '-';
     processPort.textContent = '-';
+  }
+}
+
+// 添加快捷导航内容加载函数
+async function setupQuickNavigation() {
+  try {
+    // 获取插件实例映射
+    const pluginMap = await electron.getPluginInstanceMap();
+    const container = document.getElementById('quickLinksContainer');
+    
+    if (!container) return;
+    
+    // 清空现有内容
+    container.innerHTML = '';
+    
+    // 为每个插件创建快捷导航项
+    for (const [pathPrefix, plugin] of Object.entries(pluginMap)) {
+      const linkItem = document.createElement('div');
+      linkItem.className = 'quick-link-item';
+      linkItem.dataset.path = pathPrefix;
+      
+      const textSpan = document.createElement('span');
+      textSpan.className = 'quick-link-text';
+      textSpan.textContent = plugin.name || pathPrefix;
+      
+      linkItem.appendChild(textSpan);
+      container.appendChild(linkItem);
+      
+      // 添加点击事件
+      linkItem.addEventListener('click', () => {
+        const pathInput = document.getElementById('pathInput');
+        const userInput = document.getElementById('user-input');
+        
+        pathInput.value = pathPrefix;
+        switchToTab('interaction');
+        userInput.focus();
+      });
+    }
+  } catch (error) {
+    console.error('Failed to load quick navigation:', error);
   }
 }

@@ -190,6 +190,61 @@ export class PluginHandlerImpl {
     async fetchPathSuggestions(input) {
         return await this.pathSuggestionService.getAllPathSuggestions(input);
     }
+
+    /**
+     * 获取所有插件实例的映射信息
+     * @returns {Object} 包含插件路径前缀和插件信息的映射对象
+     * @throws {Error} 如果获取插件信息失败
+     */
+    async getPluginInstanceMapInfo() {
+        try {
+            const pluginInstanceMap = {};
+            
+            // 遍历所有插件实例
+            for (const [pathPrefix, pluginInstance] of this.pluginInstanceMap) {
+                try {
+                    // 确保插件实例正确实现了必要的方法
+                    if (!pluginInstance.getHandlerName || !pluginInstance.getInterfaceDescription) {
+                        console.warn(`Plugin at ${pathPrefix} missing required methods`);
+                        continue;
+                    }
+
+                    // 获取插件信息
+                    const name = await Promise.resolve(pluginInstance.getHandlerName());
+                    const description = await Promise.resolve(pluginInstance.getInterfaceDescription());
+
+                    if (!name) {
+                        console.warn(`Plugin at ${pathPrefix} returned empty name`);
+                        continue;
+                    }
+
+                    pluginInstanceMap[pathPrefix] = {
+                        name,
+                        description: description || '',
+                        isDefault: pluginInstance === this.defaultHandler
+                    };
+                } catch (instanceError) {
+                    console.error(`Error getting info for plugin at ${pathPrefix}:`, instanceError);
+                    // 继续处理其他插件，不中断整个过程
+                    continue;
+                }
+            }
+
+            // 如果没有找到任何有效的插件，至少包含默认处理器
+            if (Object.keys(pluginInstanceMap).length === 0 && this.defaultHandler) {
+                pluginInstanceMap['/'] = {
+                    name: await this.defaultHandler.getHandlerName(),
+                    description: await this.defaultHandler.getInterfaceDescription(),
+                    isDefault: true
+                };
+            }
+
+            return pluginInstanceMap;
+        } catch (error) {
+            console.error('Failed to get plugin instance map:', error);
+            throw new Error('Failed to get plugin information');
+        }
+    }
 }
 
 export default PluginHandlerImpl;

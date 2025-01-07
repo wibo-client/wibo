@@ -15,7 +15,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="interaction">对话</div>
     <div class="tab" data-tab="config">配置</div>
-    <div class="tab" data-tab="plugins">插件</div>
+    <div class="tab" data-tab="navigation">快捷导航</div>
   </div>
 
   <!-- 交互界面内容区域 -->
@@ -177,23 +177,13 @@
     </div>
   </div>
 
-  <!-- 插件内容区域 -->
-  <div id="plugins" class="tab-content">
+  <!-- 将原插件内容区域改为快捷导航内容 -->
+  <div id="navigation" class="tab-content">
     <div class="section">
-      <h3>当前我所有的插件</h3>
-      <ul class="plugin-list" id="currentPluginsList">
-        <!-- 插件列表将在这里动态显示 -->
-      </ul>
-    </div>
-    <div class="section">
-      <h3>插件市场</h3>
-      <ul class="plugin-list" id="marketPluginsList">
-        <!-- 插件市场列表将在这里动态显示 -->
-      </ul>
-    </div>
-    <div class="section">
-      <h3>本地插件新增</h3>
-      <button class="import-button btn" id="importLocalPluginButton">从本地导入</button>
+        <h3>常用路径</h3>
+        <div id="quickLinksContainer" class="quick-links">
+            <!-- 动态内容将在这里生成 -->
+        </div>
     </div>
   </div>
 

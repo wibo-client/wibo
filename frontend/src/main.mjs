@@ -146,13 +146,12 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('get-plugin-instance-map', async () => {
-    const pluginInstanceMap = {};
-    for (const [pathPrefix, pluginInstance] of pluginHandler.pluginInstanceMap) {
-      pluginInstanceMap[pathPrefix] = {
-        getHandlerName: pluginInstance.handlerConfig
-      };
+    try {
+        return await pluginHandler.getPluginInstanceMapInfo();
+    } catch (error) {
+        console.error('Error getting plugin instance map:', error);
+        throw error;
     }
-    return pluginInstanceMap;
   });
 
   ipcMain.handle('delete-plugin', async (event, pathPrefix) => {
