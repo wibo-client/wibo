@@ -4,6 +4,7 @@ import fs from 'fs';
 import vm from 'vm';
 import pluginStore from './pluginStore.mjs';
 import { PathSuggestionService } from '../pathSuggestion/PathSuggestionService.mjs';
+import LocalServerIndexHandlerImpl from './localServerIndexHandlerImpl.mjs';
 
 export class PluginHandlerImpl {
     constructor() {
@@ -14,10 +15,23 @@ export class PluginHandlerImpl {
     async init(globalContext) {
         this.globalContext = globalContext;
         this.globalConfig = globalContext.globalConfig;
-        this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
-        await this.defaultHandler.init(globalContext, null);
+        this.localServerManager = globalContext.localServerManager; // 从 globalContext 获取
+        
         this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
         this.loadPlugins();
+        this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
+        await this.defaultHandler.init(globalContext, null);
+        
+        // 检查本地服务器状态再决定是否添加本地服务器处理器
+        if (await this.localServerManager.isServerAvailable()) {
+            const localServerIndexHandler = new LocalServerIndexHandlerImpl();
+            await localServerIndexHandler.init(globalContext, {
+                baseUrl: this.localServerManager.getBaseUrl()
+            });
+            this.pluginInstanceMap.set('/local/', localServerIndexHandler);
+        }
+
+        this.pluginInstanceMap.set('/baidu.com/', BaiduPuppeteerIndexHandlerImpl);
         await this.updatePathSuggestions();
     }
 
@@ -49,8 +63,6 @@ export class PluginHandlerImpl {
         const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
         
         await pluginInstance.init(this.globalContext, handlerConfig);
-        const description = pluginInstance.getInterfaceDescription();
-        console.log(`Plugin description: ${description}`);
 
         if (pluginCode) {  // 仅在添加新插件时检查
             const handlerName = pluginInstance.getHandlerName();
@@ -210,15 +222,14 @@ export class PluginHandlerImpl {
             for (const [pathPrefix, pluginInstance] of this.pluginInstanceMap) {
                 try {
                     // 确保插件实例正确实现了必要的方法
-                    if (!pluginInstance.getHandlerName || !pluginInstance.getInterfaceDescription) {
+                    if (!pluginInstance.getHandlerName ) {
                         console.warn(`Plugin at ${pathPrefix} missing required methods`);
                         continue;
                     }
 
                     // 获取插件信息
                     const name = await Promise.resolve(pluginInstance.getHandlerName());
-                    const description = await Promise.resolve(pluginInstance.getInterfaceDescription());
-
+                    
                     if (!name) {
                         console.warn(`Plugin at ${pathPrefix} returned empty name`);
                         continue;
@@ -226,7 +237,6 @@ export class PluginHandlerImpl {
 
                     pluginInstanceMap[pathPrefix] = {
                         name,
-                        description: description || '',
                         isDefault: pluginInstance === this.defaultHandler
                     };
                 } catch (instanceError) {
@@ -240,7 +250,6 @@ export class PluginHandlerImpl {
             if (Object.keys(pluginInstanceMap).length === 0 && this.defaultHandler) {
                 pluginInstanceMap['/'] = {
                     name: await this.defaultHandler.getHandlerName(),
-                    description: await this.defaultHandler.getInterfaceDescription(),
                     isDefault: true
                 };
             }

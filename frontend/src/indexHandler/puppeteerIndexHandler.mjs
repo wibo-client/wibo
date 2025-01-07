@@ -18,6 +18,7 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         this.userDataDir = path.resolve(this.globalConfig.userDataDir || './user_data');
   
     }
+  
 
     /**
      * 
@@ -49,9 +50,7 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         return possiblePaths;
     }
 
-    getInterfaceDescription() {
-        throw new Error('Method not implemented.');
-    }
+
 
     async rerank(documentPartList, queryString) {
         if (!Array.isArray(documentPartList) || typeof queryString !== 'string') {

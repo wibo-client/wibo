@@ -6,9 +6,7 @@ export class IndexHandlerInterface {
     async init(globalContext, config) {
         throw new Error('Method not implemented.');
     }
-    getInterfaceDescription() {
-        throw new Error('Method not implemented.');
-    }
+   
 
     getHandlerName() {
         throw new Error('Method not implemented.');

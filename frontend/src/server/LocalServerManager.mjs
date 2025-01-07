@@ -364,6 +364,23 @@ class LocalServerManager {
             console.error('[LocalServer] Stop error:', error);
         }
     }
+
+    async isServerAvailable() {
+        try {
+            const response = await fetch('http://localhost:8080/health');
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    getCurrentPort() {
+        return this.currentPort;
+    }
+
+    getBaseUrl() {
+        return this.currentPort ? `http://localhost:${this.currentPort}` : null;
+    }
 }
 
 export default LocalServerManager;

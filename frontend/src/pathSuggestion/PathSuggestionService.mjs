@@ -7,6 +7,7 @@ export class PathSuggestionService {
         this.pluginPathMap = new Map(); // 存储路径与插件的映射关系
         this.updateInterval = 5 * 60 * 1000; // 5分钟更新一次
         this.lastUpdateTime = 0;
+        this.plugins = null; // 存储插件引用
     }
 
     init(pathConfigs) {
@@ -17,6 +18,7 @@ export class PathSuggestionService {
     }
 
     async initWithPlugins(plugins) {
+        this.plugins = plugins; // 保存插件引用
         this.pluginPathMap.clear();
         this.pathTree.clear();
         this.keywordPathMap.clear();
@@ -153,6 +155,14 @@ export class PathSuggestionService {
     async getPossibleChildPaths(currentPath, searchTerm = '') {
         await this.ensureUpdated();
         return this.getNextLevelPath(currentPath, searchTerm);
+    }
+
+    async updatePathSuggestions() {
+        if (!this.plugins) {
+            return;
+        }
+        // 重新获取所有插件的路径
+        await this.initWithPlugins(this.plugins);
     }
 }
 

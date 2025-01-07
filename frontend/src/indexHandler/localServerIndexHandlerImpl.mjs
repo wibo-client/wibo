@@ -8,16 +8,14 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
 
     async init(globalContext, handlerConfig) {
         this.globalConfig = globalContext.globalConfig;
-        await this.setupPortCheck();
+        this.BASE_URL = handlerConfig.baseUrl;
+        if (!this.BASE_URL) {
+            throw new Error('Base URL is required for LocalServerIndexHandlerImpl');
+        }
     }
-
 
     getHandlerName() {
         return 'LocalServerIndexHandlerImpl';
-    }
-
-    getInterfaceDescription() {
-        return '本地搜索服务';
     }
 
     async search(queryStr, pathPrefix = '', topN = 20) {
@@ -64,19 +62,15 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     }
 
     async getAllPossiblePath() {
-        if (!this.BASE_URL) {
-            throw new Error('Local server is not available');
-        }
-
         try {
             const response = await fetch(`${this.BASE_URL}/getAllPaths`);
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                return [];
             }
             return await response.json();
         } catch (error) {
-            console.error('Get all paths failed:', error);
-            throw error;
+            console.debug('Get all paths failed:', error);
+            return [];
         }
     }
 
