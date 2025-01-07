@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -93,12 +94,12 @@ public class SearchSimpleAPI {
         }
 
         // 找到最适合的目录层级（接近5000个子目录的最小层级）
-        int targetLevel = 1;
+        AtomicInteger targetLevel = new AtomicInteger(1);
         for (Map.Entry<Integer, Set<String>> entry : levelPaths.entrySet()) {
             if (entry.getValue().size() > 5000) {
                 break;
             }
-            targetLevel = entry.getKey();
+            targetLevel.set(entry.getKey());
         }
 
         // 使用确定的层级重新生成路径列表
@@ -106,7 +107,7 @@ public class SearchSimpleAPI {
             .map(doc -> {
                 String[] parts = doc.getFilePath().split("/");
                 StringBuilder processedPath = new StringBuilder();
-                for (int i = 0; i < Math.min(targetLevel, parts.length); i++) {
+                for (int i = 0; i < Math.min(targetLevel.get(), parts.length); i++) {
                     if (!parts[i].isEmpty()) {
                         processedPath.append("/").append(parts[i]);
                     }

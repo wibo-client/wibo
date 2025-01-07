@@ -49,8 +49,8 @@ export class PluginHandlerImpl {
         const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
         
         await pluginInstance.init(this.globalContext, handlerConfig);
-        const description = pluginInstance.getInterfaceDescription();
-        console.log(`Plugin description: ${description}`);
+        // const description = pluginInstance.getInterfaceDescription();
+        // console.log(`Plugin description: ${description}`);
 
         if (pluginCode) {  // 仅在添加新插件时检查
             const handlerName = pluginInstance.getHandlerName();
