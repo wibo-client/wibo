@@ -62,19 +62,53 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         });
     }
 
+    async retryOperation(operation, maxRetries = 3, delayMs = 1000) {
+        let lastError;
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                return await operation();
+            } catch (error) {
+                lastError = error;
+                console.warn(`重试操作失败 (${i + 1}/${maxRetries}):`, error.message);
+                if (i < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+        }
+        throw lastError;
+    }
+
+    async navigateToPage(page, url, waitForSelector) {
+        return this.retryOperation(async () => {
+            await page.goto(url);
+            if (waitForSelector) {
+                await page.waitForSelector(waitForSelector, { timeout: this.browserTimeout * 1000 });
+            }
+            console.info(`成功导航到页面: ${url} 并等待元素: ${waitForSelector}`);
+        });
+    }
+
+    // async waitAndType(page, selector, text) {
+    //     return this.retryOperation(async () => {
+    //         await page.waitForSelector(selector);
+    //         await page.type(selector, text);
+    //         console.info(`成功在 ${selector} 输入文本`);
+    //     });
+    // }
+
     async search(query, pathPrefix = '', recordDescription = true) {
         console.info("开始处理任务");
-        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
+        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? 
+            this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
         let browser;
         try {
             browser = await puppeteer.launch(await this.getBrowserConfig(headless));
             const page = await browser.newPage();
             await this.configurePageSettings(page);
 
-            await page.goto('https://www.baidu.com');
-            const inputSelector = 'input[name="wd"]';
-            await page.waitForSelector(inputSelector);
-            await page.type(inputSelector, query);
+            // 修改后的调用方式
+            await this.navigateToPage(page, 'https://www.baidu.com', 'input[name="wd"]');
+            await page.type('input[name="wd"]', query);
             await page.keyboard.press('Enter');
             await page.waitForSelector('h3', { timeout: this.browserTimeout * 1000 });
 
