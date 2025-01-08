@@ -9,6 +9,8 @@ export class PluginHandlerImpl {
     constructor() {
         this.pluginInstanceMap = new Map();
         this.pathSuggestionService = new PathSuggestionService();
+        this.updateInterval = 5 * 60 * 1000; // 5分钟更新一次
+        this.lastUpdateTime = 0;
     }
 
     async init(globalContext) {
@@ -21,6 +23,7 @@ export class PluginHandlerImpl {
         // 初始化默认处理器
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
+        this.pluginInstanceMap.set('/baidu/', this.defaultHandler);
 
         // 从配置中获取市场URL，如果未配置则使用默认值
         this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'https://wibo.cc/mktplace';
@@ -193,12 +196,20 @@ export class PluginHandlerImpl {
         return selectedPlugin || this.defaultHandler;
     }
 
+    async ensurePathSuggestionsUpdated() {
+        const now = Date.now();
+        if (now - this.lastUpdateTime > this.updateInterval) {
+            await this.updatePathSuggestions();
+            this.lastUpdateTime = now;
+        }
+    }
+
     async fetchPathSuggestions(input) {
+        await this.ensurePathSuggestionsUpdated();
+
         if (input.endsWith('/')) {
-            // 如果输入以/结尾，返回下一级路径建议
             return await this.pathSuggestionService.getPossibleChildPaths(input);
         } else {
-            // 否则返回全局搜索结果
             return await this.pathSuggestionService.getAllPathSuggestions(input);
         }
     }

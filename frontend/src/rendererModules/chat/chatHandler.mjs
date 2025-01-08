@@ -4,6 +4,7 @@ export default class ChatHandler {
   constructor() {
     this.setupMessageHooks();
     this.setupAutoResizeInput();
+    this.setupPathInput();
   }
 
   async setupMessageHooks() {
@@ -89,6 +90,109 @@ export default class ChatHandler {
 
       // 更新 rows 属性
       userInput.rows = lines;
+    });
+  }
+
+  setupPathInput() {
+    const pathInput = document.getElementById('pathInput');
+    const suggestionsContainer = document.createElement('div');
+    suggestionsContainer.className = 'path-suggestions';
+    suggestionsContainer.style.display = 'none';
+    pathInput.parentElement.style.position = 'relative';
+    pathInput.parentElement.appendChild(suggestionsContainer);
+
+    let debounceTimeout;
+
+    // 输入处理
+    pathInput.addEventListener('input', () => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(async () => {
+        const input = pathInput.value;
+        try {
+          await window.electron.fetchPathSuggestions(input);
+        } catch (error) {
+          console.error('获取路径建议失败:', error);
+        }
+      }, 200);
+    });
+
+    // 监听后端返回的建议
+    window.electron.onPathSuggestions((suggestions) => {
+      suggestionsContainer.innerHTML = '';
+
+      if (suggestions.length > 0) {
+        suggestions.forEach(suggestion => {
+          const div = document.createElement('div');
+          div.className = 'path-suggestion-item';
+          div.textContent = suggestion;
+          div.addEventListener('click', () => {
+            pathInput.value = suggestion;
+            suggestionsContainer.style.display = 'none';
+          });
+          suggestionsContainer.appendChild(div);
+        });
+        suggestionsContainer.style.display = 'block';
+      } else {
+        suggestionsContainer.style.display = 'none';
+      }
+    });
+
+    // 处理建议框的显示隐藏
+    document.addEventListener('click', (e) => {
+      if (!pathInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+        suggestionsContainer.style.display = 'none';
+      }
+    });
+
+    // 添加快捷键支持
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        pathInput.focus();
+      }
+    });
+
+    // 处理建议项的键盘导航
+    pathInput.addEventListener('keydown', (e) => {
+      const items = suggestionsContainer.getElementsByClassName('path-suggestion-item');
+      const activeItem = suggestionsContainer.querySelector('.path-suggestion-item:hover');
+      let activeIndex = Array.from(items).indexOf(activeItem);
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          if (suggestionsContainer.style.display === 'none') {
+            suggestionsContainer.style.display = 'block';
+            activeIndex = -1;
+          }
+          activeIndex = (activeIndex + 1) % items.length;
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+          items[activeIndex].classList.add('hover');
+          break;
+
+        case 'ArrowUp':
+          e.preventDefault();
+          if (suggestionsContainer.style.display === 'none') {
+            suggestionsContainer.style.display = 'block';
+            activeIndex = items.length;
+          }
+          activeIndex = (activeIndex - 1 + items.length) % items.length;
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+          items[activeIndex].classList.add('hover');
+          break;
+
+        case 'Enter':
+          if (activeItem) {
+            e.preventDefault();
+            pathInput.value = activeItem.textContent;
+            suggestionsContainer.style.display = 'none';
+          }
+          break;
+
+        case 'Escape':
+          suggestionsContainer.style.display = 'none';
+          break;
+      }
     });
   }
 

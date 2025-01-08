@@ -5,15 +5,6 @@ export class PathSuggestionService {
         // 路径树结构
         this.pathTree = new Map();
         this.pluginPathMap = new Map(); // 存储路径与插件的映射关系
-        this.updateInterval = 5 * 60 * 1000; // 5分钟更新一次
-        this.lastUpdateTime = 0;
-    }
-
-    init(pathConfigs) {
-        // 初始化关键词映射和路径树
-        for (const config of pathConfigs) {
-            this.addPathConfig(config);
-        }
     }
 
     async initWithPlugins(plugins) {
@@ -69,7 +60,7 @@ export class PathSuggestionService {
         // 获取当前路径的下一级可能路径
         const parts = currentPath.split('/').filter(Boolean);
         let currentNode = this.pathTree;
-        
+
         // 导航到当前路径所在节点
         for (const part of parts) {
             if (!currentNode.has(part)) {
@@ -84,7 +75,7 @@ export class PathSuggestionService {
             if (searchTerm && !key.toLowerCase().includes(searchTerm.toLowerCase())) {
                 continue;
             }
-            suggestions.push(key + '/');
+            suggestions.push("/" + key + '/');
         }
 
         return suggestions;
@@ -121,19 +112,9 @@ export class PathSuggestionService {
         return results;
     }
 
-    async ensureUpdated() {
-        const now = Date.now();
-        if (now - this.lastUpdateTime > this.updateInterval) {
-            await this.updatePathSuggestions();
-            this.lastUpdateTime = now;
-        }
-    }
-
     async getAllPathSuggestions(searchTerm) {
-        await this.ensureUpdated();
         const suggestions = new Set();
-        
-        // 从路径树中获取建议
+
         if (searchTerm) {
             for (const [path, plugin] of this.pluginPathMap) {
                 if (path.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -142,8 +123,7 @@ export class PathSuggestionService {
             }
         }
 
-        // 从关键词映射中获取建议
-        const keywordResults = await this.getFullPathByKeyword(searchTerm);
+        const keywordResults = this.getFullPathByKeyword(searchTerm);
         keywordResults.forEach(path => suggestions.add(path));
 
         return Array.from(suggestions);
@@ -151,7 +131,6 @@ export class PathSuggestionService {
 
     // 提供类似原getPossiblePath的功能
     async getPossibleChildPaths(currentPath, searchTerm = '') {
-        await this.ensureUpdated();
         return this.getNextLevelPath(currentPath, searchTerm);
     }
 }
