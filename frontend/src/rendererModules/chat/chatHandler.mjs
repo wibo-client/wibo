@@ -7,10 +7,9 @@ export default class ChatHandler {
   }
 
   setupMessageHooks() {
-    // 修正元素ID以匹配HTML文件中的ID
-    const sendButton = document.querySelector('#input-container button');  // 按钮没有id，用选择器
-    const chatInput = document.getElementById('user-input');              // 改为 user-input
-    const typeSelect = document.getElementById('request-type');          // 改为 request-type
+    const sendButton = document.getElementById('send-message');
+    const chatInput = document.getElementById('user-input');
+    const typeSelect = document.getElementById('request-type');
 
     if (!sendButton || !chatInput || !typeSelect) {
       console.error('Required chat elements not found:', {
