@@ -18,10 +18,8 @@ export default class BrowserConfigHandler {
   }
 
   async loadConfigValues() {
-    const configJson = await window.electron.getConfig('appGlobalConfig');
-    if (configJson) {
-      const config = JSON.parse(configJson);
-
+    const config = await window.electron.getGlobalConfig();
+    if (config) {
       // 处理 modelSK 的特殊显示
       if (config.modelSK) {
         const maskedSK = this.maskSK(config.modelSK);
@@ -31,8 +29,7 @@ export default class BrowserConfigHandler {
       // 加载基础配置项
       const configFields = [
         'browserTimeout',
-        'browserConcurrency',
-        'headless',
+        'searchItemNumbers',
         'pageFetchLimit'
       ];
 
@@ -51,14 +48,12 @@ export default class BrowserConfigHandler {
   }
 
   async handleSaveConfig() {
-    const config = {
-      browserTimeout: document.getElementById('browserTimeout')?.value,
-      browserConcurrency: document.getElementById('browserConcurrency')?.value,
-      headless: document.getElementById('headless')?.value,
-      pageFetchLimit: document.getElementById('pageFetchLimit')?.value
-    };
+    const config = await window.electron.getGlobalConfig();
+    config.browserTimeout = document.getElementById('browserTimeout')?.value;
+    config.searchItemNumbers = document.getElementById('searchItemNumbers')?.value;
+    config.pageFetchLimit = document.getElementById('pageFetchLimit')?.value;
 
-    await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
+    await window.electron.setGlobalConfig(config);
 
     alert('配置已保存');
     await this.loadConfigValues();
@@ -72,10 +67,10 @@ export default class BrowserConfigHandler {
       return;
     }
 
-    const config = JSON.parse(await window.electron.getConfig('appGlobalConfig') || '{}');
+    const config = await window.electron.getGlobalConfig();
     config.modelSK = accessKey;
 
-    await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
+    await window.electron.setGlobalConfig(config);
     alert('Access Key已保存在客户端');
     await this.loadConfigValues();
   }

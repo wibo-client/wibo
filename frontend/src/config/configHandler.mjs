@@ -1,26 +1,43 @@
 import Store from 'electron-store'; // 确保导入 electron-store
-class ConfigHandler {
+export default class ConfigHandler {
   constructor() {
     this.store = new Store({ name: 'globalConfigStore' }); // 在这里实例化 Store
+
+    // 统一的默认配置
+    this.defaultConfig = {
+      pageFetchLimit: 5,
+      browserTimeout: 30,
+      browserConcurrency: 5,
+      headless: true,
+      userDataDir: './userData',
+      searchItemNumbers: 20,
+      mktPlace: 'https://wibo.cc/mktplace',
+      modelSK: null,
+      modelBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      modelName: 'qwen-plus',
+      authToken: null
+    };
   }
 
-  async getConfig(key) {
-    let ret = this.store.get(key, {});
-    return ret;
-  }
   async getGlobalConfig() {
-    return this.store.get('appGlobalConfig', {});
-  }
-  async setGlobalConfig(value) {
-    this.store.set('appGlobalConfig', value);
+    const userConfig = this.store.get('appGlobalConfig', {});
+    return {
+      ...this.defaultConfig,  // 先展开默认配置
+      ...userConfig          // 再展开用户配置，这样用户配置会覆盖默认配置
+    };
   }
 
-  async setConfig(key, value) {
-    this.store.set(key, value);
+  async setGlobalConfig(value) {
+    // 合并默认配置和新的配置值
+    const newConfig = {
+      ...this.defaultConfig,
+      ...value
+    };
+    this.store.set('appGlobalConfig', newConfig);
   }
 
   getToken() {
-    return this.store.get('authToken');
+    return this.store.get('authToken', this.defaultConfig.authToken);
   }
 
   setToken(token) {
@@ -31,6 +48,53 @@ class ConfigHandler {
     this.store.delete('authToken');
   }
 
-}
+  async getPageFetchLimit() {
+    const config = await this.getGlobalConfig();
+    return config.pageFetchLimit || this.defaultConfig.pageFetchLimit;
+  }
 
-export default ConfigHandler;
+  async getBrowserTimeout() {
+    const config = await this.getGlobalConfig();
+    return config.browserTimeout || this.defaultConfig.browserTimeout;
+  }
+
+  async getBrowserConcurrency() {
+    const config = await this.getGlobalConfig();
+    return config.browserConcurrency || this.defaultConfig.browserConcurrency;
+  }
+
+  async getHeadless() {
+    const config = await this.getGlobalConfig();
+    return config.headless === undefined ? this.defaultConfig.headless : config.headless;
+  }
+
+  async getUserDataDir() {
+    const config = await this.getGlobalConfig();
+    return config.userDataDir || this.defaultConfig.userDataDir;
+  }
+
+  async getSearchItemNumbers() {
+    const config = await this.getGlobalConfig();
+    return config.searchItemNumbers || this.defaultConfig.searchItemNumbers;
+  }
+
+  async getMktPlace() {
+    const config = await this.getGlobalConfig();
+    return config.mktPlace || this.defaultConfig.mktPlace;
+  }
+
+  async getModelSK() {
+    const config = await this.getGlobalConfig();
+    return config.modelSK || this.defaultConfig.modelSK;
+  }
+
+  async getModelBaseUrl() {
+    const config = await this.getGlobalConfig();
+    return config.modelBaseUrl || this.defaultConfig.modelBaseUrl;
+  }
+
+  async getModelName() {
+    const config = await this.getGlobalConfig();
+    return config.modelName || this.defaultConfig.modelName;
+  }
+}

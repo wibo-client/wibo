@@ -26,13 +26,12 @@ export default class ChatHandler {
     // 添加对 foregroundExecution 的监听
     foregroundExecution.addEventListener('change', async (event) => {
       try {
-        const globalConfigStr = await window.electron.getConfig('appGlobalConfig');
-        const globalConfig = globalConfigStr ? JSON.parse(globalConfigStr) : {};
+        const globalConfig = await window.electron.getGlobalConfig();
 
         // 直接设置 headless 属性
         globalConfig.headless = event.target.checked;
 
-        await window.electron.setConfig('appGlobalConfig', JSON.stringify(globalConfig));
+        await window.electron.setGlobalConfig(globalConfig);
       } catch (error) {
         console.error('设置 headless 配置失败:', error);
       }
@@ -40,9 +39,8 @@ export default class ChatHandler {
 
     // 初始化复选框状态
     try {
-      const globalConfigStr = await window.electron.getConfig('appGlobalConfig');
-      const globalConfig = globalConfigStr ? JSON.parse(globalConfigStr) : {};
-      foregroundExecution.checked = !globalConfig.headless;
+      const globalConfig = await window.electron.getGlobalConfig();
+      foregroundExecution.checked = globalConfig.headless;
     } catch (error) {
       console.error('获取 headless 配置失败:', error);
     }

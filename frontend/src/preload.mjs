@@ -4,8 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 // 暴露 electron API 到渲染进程
 contextBridge.exposeInMainWorld('electron', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
-  getConfig: (key) => ipcRenderer.invoke('get-config', key),
-  setConfig: (key, value) => ipcRenderer.invoke('set-config', { key, value }),
 
   sendMessage: (message, type, path, context) => {
     const requestId = uuidv4();
@@ -30,7 +28,6 @@ contextBridge.exposeInMainWorld('electron', {
   toggleKnowledgeBase: (enable) => ipcRenderer.invoke('toggleKnowledgeBase', enable),
   showDirectoryPicker: () => ipcRenderer.invoke('show-directory-picker'),
 
-
   // 路径建议相关方法
   fetchPathSuggestions: (input) => ipcRenderer.invoke('fetch-path-suggestions', input),
 
@@ -52,7 +49,11 @@ contextBridge.exposeInMainWorld('electron', {
   addPluginFromFile: (filePath) => ipcRenderer.invoke('add-plugin-from-file', filePath),
   getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map'),
   deletePlugin: (pathPrefix) => ipcRenderer.invoke('delete-plugin', pathPrefix),
-  reinitialize: () => ipcRenderer.invoke('reinitialize')
+  reinitialize: () => ipcRenderer.invoke('reinitialize'),
+
+  // 全局配置相关方法
+  getGlobalConfig: () => ipcRenderer.invoke('get-global-config'),
+  setGlobalConfig: (value) => ipcRenderer.invoke('set-global-config', value)
 });
 
 // 认证相关 API

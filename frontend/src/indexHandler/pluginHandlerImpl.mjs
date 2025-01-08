@@ -16,7 +16,6 @@ export class PluginHandlerImpl {
     async init(globalContext) {
         this.globalContext = globalContext;
         const configHandler = this.globalContext.configHandler;
-        this.globalConfig = await configHandler.getGlobalConfig();
 
         this.loadPlugins();
 
@@ -26,7 +25,7 @@ export class PluginHandlerImpl {
         this.pluginInstanceMap.set('/baidu/', this.defaultHandler);
 
         // 从配置中获取市场URL，如果未配置则使用默认值
-        this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'https://wibo.cc/mktplace';
+        this.mktplaceUrl = await configHandler.getMktPlace();
         await this.updatePathSuggestions();
     }
 

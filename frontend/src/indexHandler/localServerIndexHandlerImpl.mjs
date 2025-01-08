@@ -26,8 +26,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
 
         try {
             const configHandler = this.globalContext.configHandler;
-            const globalConfig = await configHandler.getGlobalConfig();
-            const searchItemNumbers = globalConfig.searchItemNumbers || 20;
+            const searchItemNumbers = await configHandler.getSearchItemNumbers();
 
             const response = await fetch(`${this.BASE_URL}/search?queryStr=${encodeURIComponent(queryStr)}&pathPrefix=${encodeURIComponent(pathPrefix)}&TopN=${searchItemNumbers}`);
             if (!response.ok) {
@@ -48,8 +47,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
 
         try {
             const configHandler = this.globalContext.configHandler;
-            const globalConfig = await configHandler.getGlobalConfig();
-            const pageFetchLimit = globalConfig.pageFetchLimit || 5;
+            const pageFetchLimit = await configHandler.getPageFetchLimit();
 
             const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
             const response = await fetch(`${this.BASE_URL}/fetchAggregatedContent`, {

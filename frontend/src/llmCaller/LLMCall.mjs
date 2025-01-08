@@ -13,14 +13,17 @@ export class LLMCall {
 
   async updateClientIfNeeded() {
     const configHandler = this.globalContext.configHandler;
-    const globalConfig = await configHandler.getGlobalConfig();
-    const apiKey = globalConfig.modelSK;
+    const apiKey = await configHandler.getModelSK();
+    const model = await configHandler.getModelName();
+    const modelBaseURL = await configHandler.getModelBaseUrl();
 
-    if (apiKey !== this.currentApiKey) {
+    if (apiKey !== this.currentApiKey || model !== this.currentModel || modelBaseURL !== this.currentModelBaseURL) {
       this.currentApiKey = apiKey;
+      this.currentModel = model;
+      this.currentModelBaseURL = modelBaseURL;
       this.openai = new OpenAI({
         apiKey: this.currentApiKey,
-        baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        baseURL: this.currentModelBaseURL
       });
     }
   }
@@ -30,9 +33,9 @@ export class LLMCall {
       await this.updateClientIfNeeded();
       const messages = userPrompts.map(prompt => ({ role: prompt.role, content: prompt.content }));
       const completion = await this.openai.chat.completions.create({
-        model: "qwen-plus",
         messages: messages,
-        stream: stream
+        stream: stream,
+        model: this.currentModel
       });
 
       if (stream && onStreamChunk) {
@@ -55,8 +58,8 @@ export class LLMCall {
       await this.updateClientIfNeeded();
       const messages = userPrompts.map(prompt => ({ role: prompt.role, content: prompt.content }));
       const completion = this.openai.chat.completions.create({
-        model: "qwen-plus",
-        messages: messages
+        messages: messages,
+        model: this.currentModel
       });
 
       return completion.choices.map(choice => choice.message.content);

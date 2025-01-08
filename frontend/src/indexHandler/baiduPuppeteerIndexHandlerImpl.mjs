@@ -91,9 +91,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
         return this.retryOperation(async () => {
             try {
-                const configHandler = this.globalContext.configHandler;
-                const globalConfig = await configHandler.getGlobalConfig();
-                const browserTimeout = globalConfig.browserTimeout || 30;
+                const browserTimeout = await this.globalContext.configHandler.getBrowserTimeout();
 
                 const response = await page.goto(url, {
                     timeout: browserTimeout * 1000,
@@ -131,10 +129,9 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
         try {
             const configHandler = this.globalContext.configHandler;
-            const globalConfig = await configHandler.getGlobalConfig();
-            const headless = globalConfig.headless === undefined ? true : globalConfig.headless;
-            const browserTimeout = globalConfig.browserTimeout || 30;
-            const searchItemNumbers = globalConfig.searchItemNumbers || 20;
+            const headless = await configHandler.getHeadless();
+            const browserTimeout = await configHandler.getBrowserTimeout();
+            const searchItemNumbers = await configHandler.getSearchItemNumbers();
 
             browser = await puppeteer.launch(await this.getBrowserConfig(headless));
             page = await browser.newPage();

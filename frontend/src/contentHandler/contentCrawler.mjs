@@ -15,14 +15,12 @@ export class ContentCrawler {
 
 
     async fetchPageContent(url) {
-        let globalConfig = await this.globalContext.configHandler.getGlobalConfig();
-
-        const userDataDirString = globalConfig.userDataDir;
+        const userDataDirString = await this.globalContext.configHandler.getUserDataDir();
         const userDataDir = path.resolve(userDataDirString || './user_data');
         const cookieUtils = new CookieUtils(userDataDir);
 
         console.info("开始处理任务");
-        const headless = globalConfig.headless === undefined ? true : globalConfig.headless;
+        const headless = await this.globalContext.configHandler.getHeadless();
 
         for (let attempt = 1; attempt <= 2; attempt++) { // 修改尝试次数为2次
             let browser;

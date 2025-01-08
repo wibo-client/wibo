@@ -12,9 +12,8 @@ class ContentAggregator {
 
   async aggregateContent(summaryList) {
     const configHandler = this.globalContext.configHandler;
-    const globalConfig = await configHandler.getGlobalConfig();
-    const pageFetchLimit = globalConfig.pageFetchLimit || 5;
-    const browserConcurrency = globalConfig.browserConcurrency || pageFetchLimit;
+    const pageFetchLimit = await configHandler.getPageFetchLimit();
+    const browserConcurrency = await configHandler.getBrowserConcurrency();
 
     const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
     const promises = limitedSummaryList.map(async (summary, index) => {

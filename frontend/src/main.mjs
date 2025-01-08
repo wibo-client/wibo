@@ -95,16 +95,6 @@ app.whenReady().then(async () => {
     await globalContext.pluginHandler.addPluginTemplateFromFile(filePath);
   });
 
-  ipcMain.handle('get-config', async (event, key) => {
-    const config = await globalContext.configHandler.getConfig(key);
-    return JSON.stringify(config); // 返回 JSON 字符串
-  });
-
-  ipcMain.handle('set-config', (event, { key, value }) => {
-    const configValue = JSON.parse(value); // 将 JSON 字符串解析为对象
-    globalContext.configHandler.setConfig(key, configValue);
-  });
-
   ipcMain.handle('get-token', () => {
     return globalContext.configHandler.getToken();
   });
@@ -141,8 +131,7 @@ app.whenReady().then(async () => {
     try {
       const selectedPlugin = await globalContext.pluginHandler.select(path);
 
-      let globalConfig = await globalContext.configHandler.getGlobalConfig();
-      let pageFetchLimit = globalConfig.pageFetchLimit; // 从全局配置中获取模型 SK
+      let pageFetchLimit = await globalContext.configHandler.getPageFetchLimit();
 
       if (type === 'search') {
         const searchResult = await selectedPlugin.search(message, path);
@@ -303,6 +292,15 @@ app.whenReady().then(async () => {
       pid: savedProcess?.pid || null,
       port: savedProcess?.port || null
     };
+  });
+
+  // 添加新的 IPC 处理器
+  ipcMain.handle('get-global-config', async () => {
+    return await globalContext.configHandler.getGlobalConfig();
+  });
+
+  ipcMain.handle('set-global-config', async (event, value) => {
+    await globalContext.configHandler.setGlobalConfig(value);
   });
 
   // 确保在应用退出时清理 Java 进程
