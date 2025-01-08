@@ -13,13 +13,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Text Document Parser for MD, HTML, and XML files
+ * Web Document Parser for MD, HTML, and XML files
  * 
- * 1）读取文本文件（MD, HTML, XML） 2）将内容转换为Markdown格式
+ * 1）读取文本文件（ HTML, XML） 2）将内容转换为Markdown格式
  */
 
 @Service
-public class TextDocumentParser extends AbstractDocumentParser {
+public class SourceCodeParser extends AbstractDocumentParser {
 
     private final Logger logger = LoggerFactory.getLogger(TextDocumentParser.class);
 
@@ -40,6 +40,6 @@ public class TextDocumentParser extends AbstractDocumentParser {
 
     @Override
     protected String getFileType() {
-        return "text";
+        return "web";
     }
 }

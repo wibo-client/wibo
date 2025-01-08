@@ -108,4 +108,9 @@ public class OCRBasedPDFDocumentParser extends AbstractDocumentParser {
         return result;
     }
 
+    @Override
+    protected String getFileType() {
+      return "pdf";  
+    }
+
 }

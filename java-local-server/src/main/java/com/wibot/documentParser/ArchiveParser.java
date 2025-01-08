@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 import com.wibot.persistence.entity.DocumentDataPO;;
 
 @Service
-public class DefaultParser extends AbstractDocumentParser {
+public class ArchiveParser extends AbstractDocumentParser {
     private static final Logger logger = LoggerFactory.getLogger(DefaultParser.class);
 
     @Override
@@ -18,6 +18,6 @@ public class DefaultParser extends AbstractDocumentParser {
 
     @Override
     protected String getFileType() {
-      return "other";
+      return "archive";
     }
 }

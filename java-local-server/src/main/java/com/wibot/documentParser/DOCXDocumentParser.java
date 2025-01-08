@@ -69,4 +69,9 @@ public class DOCXDocumentParser extends AbstractDocumentParser {
         WordExtractor extractor = new WordExtractor(document);
         return String.join("\n\n", extractor.getParagraphText());
     }
+
+    @Override
+    protected String getFileType() {
+        return "text";
+    }
 }

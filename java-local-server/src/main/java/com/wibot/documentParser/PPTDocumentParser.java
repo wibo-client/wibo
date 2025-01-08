@@ -179,4 +179,9 @@ public class PPTDocumentParser extends AbstractDocumentParser {
         return img;
     }
 
+    @Override
+    protected String getFileType() {
+        return "presentation";
+    }
+
 }

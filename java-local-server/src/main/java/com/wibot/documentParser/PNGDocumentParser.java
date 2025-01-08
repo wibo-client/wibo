@@ -115,4 +115,9 @@ public class PNGDocumentParser extends AbstractDocumentParser {
         logger.info("Finished parsing document: {}", documentData.getFileName());
         return result;
     }
+
+    @Override
+    protected String getFileType() {
+        return "image";
+    }
 }

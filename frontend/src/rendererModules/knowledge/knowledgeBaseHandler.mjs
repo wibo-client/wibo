@@ -1,4 +1,3 @@
-
 export default class KnowledgeBaseHandler {
   constructor() {
     this.BASE_URL = null;
@@ -83,10 +82,8 @@ export default class KnowledgeBaseHandler {
     const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
     const remoteUploadToggle = document.getElementById('remoteUploadToggle');
     const submitLocalDirectoryBtn = document.getElementById('submitLocalDirectory');
-    const preRecognizeImagesToggle = document.getElementById('preRecognizeImages');
-    const preRecognizePDFsToggle = document.getElementById('preRecognizePDFs');
-    const preRecognizePPTsToggle = document.getElementById('preRecognizePPTs');
     const selectDirectoryBtn = document.getElementById('selectDirectoryBtn');
+    const saveIndexSettingsBtn = document.getElementById('saveIndexSettings');
 
     if (localKnowledgeBaseToggle) {
       localKnowledgeBaseToggle.addEventListener('change', () => this.toggleLocalKnowledgeBase());
@@ -105,39 +102,63 @@ export default class KnowledgeBaseHandler {
         }
       });
     }
+    if (saveIndexSettingsBtn) {
+      saveIndexSettingsBtn.addEventListener('click', () => this.syncIndexSettings());
+    }
 
-    // 设置模型增强开关的事件监听
-    const handleModelEnhancement = () => {
-      const config = {
-        enableImageRecognition: preRecognizeImagesToggle?.checked || false,
-        enablePdfRecognition: preRecognizePDFsToggle?.checked || false,
-        enablePptRecognition: preRecognizePPTsToggle?.checked || false
-      };
 
-      fetch(`${this.BASE_URL}/admin/toggle-model-enhancement`, {
+  }
+
+  async syncIndexSettings() {
+    if (!this.BASE_URL) {
+      console.warn('Service not available, cannot sync settings');
+      return;
+    }
+
+    // 收集所有文件类型的状态，简化配置结构
+    const config = {
+      fileTypes: {
+        text: document.getElementById('textFilesToggle')?.checked || false,
+        spreadsheet: document.getElementById('spreadsheetFilesToggle')?.checked || false,
+        presentation: {
+          enabled: document.getElementById('presentationFilesToggle')?.checked || false,
+          enhanced: document.getElementById('presentationEnhanceToggle')?.checked || false
+        },
+        web: document.getElementById('webFilesToggle')?.checked || false,
+        pdf: {
+          enabled: document.getElementById('pdfFilesToggle')?.checked || false,
+          enhanced: document.getElementById('pdfEnhanceToggle')?.checked || false
+        },
+        code: document.getElementById('codeFilesToggle')?.checked || false,
+        config: document.getElementById('configFilesToggle')?.checked || false,
+        image: {
+          enabled: document.getElementById('imageFilesToggle')?.checked || false,
+          enhanced: document.getElementById('imageEnhanceToggle')?.checked || false
+        },
+        archive: document.getElementById('archiveFilesToggle')?.checked || false
+      },
+      ignoredDirectories: document.getElementById('ignoredDirectories')?.value
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+    };
+
+    try {
+      const response = await fetch(`${this.BASE_URL}/admin/update-index-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
-      })
-        .then(response => response.json())
-        .then(data => {
-          if (!data.success) {
-            alert(data.message);
-          }
-        })
-        .catch(error => {
-          alert('操作失败: ' + error.message);
-        });
-    };
+      });
 
-    if (preRecognizeImagesToggle) {
-      preRecognizeImagesToggle.addEventListener('change', handleModelEnhancement);
-    }
-    if (preRecognizePDFsToggle) {
-      preRecognizePDFsToggle.addEventListener('change', handleModelEnhancement);
-    }
-    if (preRecognizePPTsToggle) {
-      preRecognizePPTsToggle.addEventListener('change', handleModelEnhancement);
+      const result = await response.json();
+      if (!result.success) {
+        alert(result.message || '更新配置失败');
+      } else {
+        alert('索引设置已保存');
+      }
+    } catch (error) {
+      console.error('Failed to sync index settings:', error);
+      alert('同步配置失败: ' + error.message);
     }
   }
 

@@ -3,6 +3,8 @@ package com.wibot.documentParserSelector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.wibot.documentParser.ArchiveParser;
+import com.wibot.documentParser.ConfigCodeParser;
 import com.wibot.documentParser.DOCXDocumentParser;
 import com.wibot.documentParser.DefaultParser;
 import com.wibot.documentParser.DocumentParserInterface;
@@ -11,7 +13,9 @@ import com.wibot.documentParser.JPGDocumentParser;
 import com.wibot.documentParser.OCRBasedPDFDocumentParser;
 import com.wibot.documentParser.PNGDocumentParser;
 import com.wibot.documentParser.PPTDocumentParser;
+import com.wibot.documentParser.SourceCodeParser;
 import com.wibot.documentParser.TextDocumentParser;
+import com.wibot.documentParser.WebtDocumentParser;
 import com.wibot.documentParser.XlsxDocumentParser;
 
 @Service
@@ -41,6 +45,17 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
     @Autowired
     private TextDocumentParser textDocumentParser;
 
+    @Autowired
+    private WebtDocumentParser webtDocumentParser;
+
+    @Autowired
+    private SourceCodeParser sourceCodeParser;
+
+    @Autowired
+    private ConfigCodeParser configCodeParser;
+
+    @Autowired
+    private ArchiveParser archiveParser;
     @Override
     public DocumentParserInterface select(String extension) {
         extension = extension.toLowerCase();
@@ -70,32 +85,36 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
         case "ppt":
             return pptDocumentParser;
 
-        case "txt":
-        case "md":
+        
         case "html":
         case "mhtml":
         case "htm":
+            return webtDocumentParser;
         case "json":
         case "yaml":
         case "yml":
         case "toml":
         case "ini":
         case "properties":
+            return configCodeParser;
         case "java":
         case "js":
         case "ts":
         case "py":
         case "sh":
         case "bash":
-        case "sql":
-        case "xml":
+        case "sql":    
         case "dtd":
         case "xsd":
+        case "xml":
+            return sourceCodeParser;
         case "csv":
         case "log":
+        case "txt":
+        case "md":
             return textDocumentParser;
 
-        case "key":
+    
         case "zip":
         case "tar":
         case "gz":
@@ -118,6 +137,7 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
         case "msi":
         case "dmg":
         case "iso":
+            return archiveParser;
         case "img":
         case "vmdk":
         case "ova":
@@ -126,6 +146,7 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
         case "vhd":
         case "vhdx":
         case "qcow2":
+        case "key":
             return defaultParser;
         default:
             logger.info("No parser found for extension: {}", extension);

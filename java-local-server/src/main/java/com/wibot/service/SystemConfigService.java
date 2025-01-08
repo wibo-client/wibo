@@ -34,6 +34,12 @@ public class SystemConfigService {
     public static final String CONFIG_PDF_RECOGNITION = "model.enhancement.pdfRecognition";
     public static final String CONFIG_PPT_RECOGNITION = "model.enhancement.pptRecognition";
 
+    // 文件类型索引配置前缀
+    public static final String CONFIG_FILE_TYPE_PREFIX = "index.filetype.";
+    
+    // 忽略目录配置
+    public static final String CONFIG_IGNORED_DIRECTORIES = "index.ignored.directories";
+
     private static final Logger logger = LoggerFactory.getLogger(SystemConfigService.class);
 
     @Autowired
@@ -159,5 +165,16 @@ public class SystemConfigService {
             }
         });
         return configs;
+    }
+
+    /**
+     * 检查配置是否存在
+     * 
+     * @param key 配置键
+     * @return 如果配置存在返回true，否则返回false
+     */
+    public boolean hasConfig(String key) {
+        Optional<SystemConfigPO> config = configRepository.findByConfigKey(key);
+        return config.isPresent() && config.get().getConfigValue() != null;
     }
 }

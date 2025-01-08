@@ -148,29 +148,144 @@
         </div>
 
         <hr>
-        <!-- 子栏目3：模型增强 -->
-        <div class="form-group">
-          <h4>模型增强</h4>
-          <div class="switch-label-group">
-            <label class="switch">
-              <input type="checkbox" id="preRecognizeImages">
-              <span class="slider"></span>
-            </label>
-            <span>预识别图片</span>
+        <!-- 子栏目3：索引设置 -->
+        <div class="form-group index-settings-section">
+          <h4>索引设置</h4>
+
+          <!-- 文件类型索引设置 -->
+          <div class="file-types-container">
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="textFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">文本文件</span>
+              </div>
+              <div class="file-type-details">包含: .doc, .docx, .txt, .md</div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="spreadsheetFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">表格文件</span>
+              </div>
+              <div class="file-type-details">包含: .xls, .xlsx, .csv</div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="presentationFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">演示文稿</span>
+              </div>
+              <div class="file-type-details">包含: .ppt, .pptx</div>
+              <div class="model-enhancement">
+                <label class="switch">
+                  <input type="checkbox" id="presentationEnhanceToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="enhancement-label">启用模型增强（需要耗费token）</span>
+              </div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="webFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">网页文件</span>
+              </div>
+              <div class="file-type-details">包含: .html, .mhtml, .htm</div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="pdfFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">PDF文件</span>
+              </div>
+              <div class="file-type-details">包含: .pdf, .pdfa</div>
+              <div class="model-enhancement">
+                <label class="switch">
+                  <input type="checkbox" id="pdfEnhanceToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="enhancement-label">启用模型增强（需要耗费token）</span>
+              </div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="codeFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">代码文件</span>
+              </div>
+              <div class="file-type-details">包含: .java, .js, .mjs, .ts, .py, .sh, .bash, .sql</div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="configFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">配置文件</span>
+              </div>
+              <div class="file-type-details">包含: .json, .ini, .properties, .xml, .yaml, .yml, .toml, .dtd, .xsd</div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="imageFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">图像文件</span>
+              </div>
+              <div class="file-type-details">包含: .png, .jpeg, .jpg, .bmp</div>
+              <div class="model-enhancement">
+                <label class="switch">
+                  <input type="checkbox" id="imageEnhanceToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="enhancement-label">启用模型增强（需要耗费token）</span>
+              </div>
+            </div>
+
+            <div class="file-type-group">
+              <div class="file-type-header">
+                <label class="switch">
+                  <input type="checkbox" id="archiveFilesToggle">
+                  <span class="slider"></span>
+                </label>
+                <span class="file-type-title">仅索引标题的文件</span>
+              </div>
+              <div class="file-type-details">包含: 压缩文件(.zip, .rar, .7z等)、镜像文件(.iso, .img等)、容器文件(.ova, .ovf等)</div>
+            </div>
           </div>
-          <div class="switch-label-group">
-            <label class="switch">
-              <input type="checkbox" id="preRecognizePDFs">
-              <span class="slider"></span>
-            </label>
-            <span>预识别PDF</span>
+
+          <!-- 增加保存按钮 -->
+          <div class="index-settings-actions">
+            <button id="saveIndexSettings" class="btn">保存索引设置</button>
           </div>
-          <div class="switch-label-group">
-            <label class="switch">
-              <input type="checkbox" id="preRecognizePPTs">
-              <span class="slider"></span>
-            </label>
-            <span>预识别PPT</span>
+        </div>
+
+          <!-- 忽略目录设置 -->
+          <div class="ignore-directories-section">
+            <h4>忽略特定目录文件</h4>
+            <textarea id="ignoredDirectories" class="ignore-directories-input"
+              placeholder="每行输入一个要忽略的目录路径&#10;例如:&#10;node_modules&#10;.git&#10;temp"></textarea>
           </div>
         </div>
       </div>

@@ -6,9 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.wibot.documentParser.DocumentParserInterface;
+import com.wibot.documentParserSelector.DocumentParserSelectorInterface;
 import com.wibot.persistence.*;
 import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.UserDirectoryIndexPO;
+import com.wibot.utils.llm.PathMatcherUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +21,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -30,6 +34,11 @@ public class DirectoryProcessingService {
 
     @Autowired
     private DocumentDataRepository documentDataRepository;
+
+    @Autowired
+    private SystemConfigService systemConfigService;
+    @Autowired
+    private DocumentParserSelectorInterface selector;
 
     // 每10秒检查新任务
     @Scheduled(fixedRate = 10000)
@@ -67,17 +76,22 @@ public class DirectoryProcessingService {
         Path dirPath = Paths.get(index.getDirectoryPath());
 
         logger.debug("开始处理目录: {}", index.getDirectoryPath());
+        // 获取忽略配置
+        String ignoredDirsStr = systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, "");
+        List<String> ignoredPatterns = Arrays.asList(ignoredDirsStr.split("\n"));
+        PathMatcherUtil matcher = new PathMatcherUtil(ignoredPatterns);
 
         // 处理文件
         try (Stream<Path> paths = Files.walk(dirPath)) {
-            paths.filter(Files::isRegularFile).forEach(filePath -> {
-                try {
-                    processFile(filePath, StandardWatchEventKinds.ENTRY_CREATE);
-                } catch (Exception e) {
-                    logger.error("处理文件失败: {}", filePath, e);
-                    // 继续处理其他文件
-                }
-            });
+            paths.filter(Files::isRegularFile).filter(path -> !matcher.matches(dirPath.relativize(path)))
+                    .forEach(filePath -> {
+                        try {
+                            processFile(filePath, StandardWatchEventKinds.ENTRY_CREATE);
+                        } catch (Exception e) {
+                            logger.error("处理文件失败: {}", filePath, e);
+                            // 继续处理其他文件
+                        }
+                    });
         }
 
         index.setIndexStatus(UserDirectoryIndexPO.STATUS_COMPLETED);
@@ -109,26 +123,37 @@ public class DirectoryProcessingService {
 
         // 创建文档数据
         DocumentDataPO documentData = createDocumentData(filePath);
-
+        DocumentParserInterface parser = selector.select(documentData.getExtension());
+        boolean shouldProcess = parser.shouldProcess(documentData.getExtension());
         try {
             // 检查是否存在相同文件
             Optional<DocumentDataPO> existingDoc = documentDataRepository.findByFilePath(documentData.getFilePath());
 
             if (existingDoc.isPresent()) {
+
                 DocumentDataPO existing = existingDoc.get();
-                // 如果MD5相同，跳过处理
-                if (existing.getMd5().equals(documentData.getMd5())) {
-                    logger.debug("文件未改变，跳过处理: {}", filePath);
-                    return;
+
+                if (!shouldProcess) {
+                    logger.debug("文件类型不支持，跳过处理: {}", filePath);
+                    existing.setProcessedState(DocumentDataPO.PROCESSED_STATE_DELETED);
+                    documentDataRepository.save(existing);
                 } else {
-                    // 更新现有记录
-                    documentData.setId(existing.getId());
-                    documentData.setVersion(existing.getVersion()); // 设置版本号
-                    // 重置处理状态
-                    documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
+                    // 如果MD5相同，跳过处理
+                    if (existing.getMd5().equals(documentData.getMd5())) {
+                        logger.debug("文件未改变，跳过处理: {}", filePath);
+                        return;
+                    } else {
+                        // 更新现有记录
+                        documentData.setId(existing.getId());
+                        documentData.setVersion(existing.getVersion()); // 设置版本号
+                        // 重置处理状态
+                        documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
+                    }
                 }
             }
-
+            if (!shouldProcess) {
+                return;
+            }
             // 保存文档数据
             documentData = documentDataRepository.save(documentData);
             logger.info("保存文档数据: {}", documentData.getFileName());

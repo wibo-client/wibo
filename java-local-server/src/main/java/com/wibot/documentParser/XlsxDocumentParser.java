@@ -70,4 +70,9 @@ public class XlsxDocumentParser extends AbstractDocumentParser {
                     markdownSheets.add(sheetMarkdown.toString());
                 })).doRead();
     }
+
+    @Override
+    protected String getFileType() {
+        return "spreadsheet";
+    }
 }
