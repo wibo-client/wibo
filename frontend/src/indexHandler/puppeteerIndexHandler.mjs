@@ -1,52 +1,25 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
-import ConfigKeys from '../config/configKeys.mjs';
-import path from 'path';
-import fs from 'fs';
-
 
 export class PuppeteerIndexHandler extends IndexHandlerInterface {
     constructor() {
         super();
-       
+
     }
 
-    async init(globalContext,handlerConfig) {
-        this.globalConfig = globalContext.globalConfig;
+    async init(globalContext, handlerConfig) {
+        this.globalContext = globalContext;
+        this.handlerConfig = handlerConfig;
+
         this.rerankImpl = globalContext.rerankImpl;
         this.contentAggregator = globalContext.contentAggregator;
-        this.pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 10;
-        this.userDataDir = path.resolve(this.globalConfig.userDataDir || './user_data');
-  
     }
 
     /**
      * 
      */
-    
+
     async rewriteQuery(query) {
         return [query];
-    }
-
-    async getPossiblePath(path) {
-        const pathPrefix = this.handlerConfig.pathPrefix;
-        if (!pathPrefix.endsWith('/')) {
-            throw new Error("Path prefix should end with /");
-        }
-
-        const possiblePaths = [];
-        if (path.length < pathPrefix.length) {
-            const relativePath = pathPrefix.substring(path.length);
-            if (relativePath) {
-                const nextSlashIndex = relativePath.indexOf('/');
-                if (nextSlashIndex !== -1) {
-                    possiblePaths.push(relativePath.substring(0, nextSlashIndex + 1));
-                } else {
-                    possiblePaths.push(relativePath);
-                }
-            }
-        }
-
-        return possiblePaths;
     }
 
     getInterfaceDescription() {
@@ -108,8 +81,8 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
         throw new Error('Method not implemented.');
     }
 
-    async fetchAggregatedContent(summaryList) {    
-         return await this.contentAggregator.aggregateContent(summaryList.slice(0, this.pageFetchLimit));
+    async fetchAggregatedContent(summaryList) {
+        return await this.contentAggregator.aggregateContent(summaryList.slice(0, this.pageFetchLimit));
     }
 }
 

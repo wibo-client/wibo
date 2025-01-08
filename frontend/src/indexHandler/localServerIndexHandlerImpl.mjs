@@ -1,5 +1,6 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
 
+
 export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     constructor() {
         super();
@@ -7,10 +8,8 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     }
 
     async init(globalContext, handlerConfig) {
-        this.globalConfig = globalContext.globalConfig;
-        await this.setupPortCheck();
+        this.globalContext = globalContext;
     }
-
 
     getHandlerName() {
         return 'LocalServerIndexHandlerImpl';
@@ -20,13 +19,17 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         return '本地搜索服务';
     }
 
-    async search(queryStr, pathPrefix = '', topN = 20) {
+    async search(queryStr, pathPrefix = '') {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');
         }
 
         try {
-            const response = await fetch(`${this.BASE_URL}/search?queryStr=${encodeURIComponent(queryStr)}&pathPrefix=${encodeURIComponent(pathPrefix)}&TopN=${topN}`);
+            const configHandler = this.globalContext.configHandler;
+            const globalConfig = await configHandler.getGlobalConfig();
+            const searchItemNumbers = globalConfig.searchItemNumbers || 20;
+
+            const response = await fetch(`${this.BASE_URL}/search?queryStr=${encodeURIComponent(queryStr)}&pathPrefix=${encodeURIComponent(pathPrefix)}&TopN=${searchItemNumbers}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -44,18 +47,23 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         }
 
         try {
+            const configHandler = this.globalContext.configHandler;
+            const globalConfig = await configHandler.getGlobalConfig();
+            const pageFetchLimit = globalConfig.pageFetchLimit || 5;
+
+            const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
             const response = await fetch(`${this.BASE_URL}/fetchAggregatedContent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ summaryList }),
+                body: JSON.stringify({ summaryList: limitedSummaryList }),
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Fetch aggregated content failed:', error);

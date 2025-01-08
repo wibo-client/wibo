@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PuppeteerIndexHandler } from './puppeteerIndexHandler.mjs';
-import ConfigKeys from '../config/configKeys.mjs';
+
 
 puppeteer.use(StealthPlugin());
 
@@ -9,12 +9,14 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     constructor() {
         super();
     }
-    
+
     async init(globalContext, handlerConfig) {
         await super.init(globalContext, handlerConfig);
-        this.globalConfig = globalContext.globalConfig;
-        this.browserTimeout = this.globalConfig.browserTimeout || 30;
-        this.searchItemNumbers = this.globalConfig.searchItemNumbers || 20;
+        this.globalContext = globalContext;
+    }
+
+    getInterfaceDescription() {
+        return '百度 Puppeteer 索引处理器';
     }
 
     async getBrowserConfig(headless) {
@@ -65,14 +67,14 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     async retryOperation(operation, maxRetries = 3, delayMs = 1000) {
         let lastError;
         let attempt = 0;
-        
+
         while (attempt < maxRetries) {
             try {
                 return await operation();
             } catch (error) {
                 lastError = error;
                 console.warn(`重试操作失败 (${attempt + 1}/${maxRetries}):`, error.message);
-                
+
                 if (attempt < maxRetries - 1) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 }
@@ -89,22 +91,25 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
         return this.retryOperation(async () => {
             try {
-                // 设置导航超时
+                const configHandler = this.globalContext.configHandler;
+                const globalConfig = await configHandler.getGlobalConfig();
+                const browserTimeout = globalConfig.browserTimeout || 30;
+
                 const response = await page.goto(url, {
-                    timeout: this.browserTimeout * 1000,
+                    timeout: browserTimeout * 1000,
                     waitUntil: 'networkidle0'
                 });
-                
+
                 if (!response || !response.ok()) {
                     throw new Error(`Navigation failed: ${response ? response.status() : 'no response'}`);
                 }
 
                 if (waitForSelector) {
-                    await page.waitForSelector(waitForSelector, { 
-                        timeout: this.browserTimeout * 1000 
+                    await page.waitForSelector(waitForSelector, {
+                        timeout: browserTimeout * 1000
                     });
                 }
-                
+
                 console.info(`成功导航到页面: ${url} 并等待元素: ${waitForSelector}`);
             } catch (error) {
                 // 如果导航失败，确保页面处于可用状态
@@ -125,12 +130,15 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         let page = null;
 
         try {
-            const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? 
-                this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
-            
+            const configHandler = this.globalContext.configHandler;
+            const globalConfig = await configHandler.getGlobalConfig();
+            const headless = globalConfig.headless === undefined ? true : globalConfig.headless;
+            const browserTimeout = globalConfig.browserTimeout || 30;
+            const searchItemNumbers = globalConfig.searchItemNumbers || 20;
+
             browser = await puppeteer.launch(await this.getBrowserConfig(headless));
             page = await browser.newPage();
-            
+
             // 设置页面错误处理
             page.on('error', err => {
                 console.error('页面崩溃:', err);
@@ -146,18 +154,18 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
             await this.navigateToPage(page, 'https://www.baidu.com', 'input[name="wd"]');
             await page.type('input[name="wd"]', query);
             await page.keyboard.press('Enter');
-            await page.waitForSelector('h3', { timeout: this.browserTimeout * 1000 });
+            await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
 
             const results = [];
             let totalResults = 0;
 
-            while (totalResults < this.searchItemNumbers) {
+            while (totalResults < searchItemNumbers) {
                 const pageResults = await this.processSearchResults(page);
                 const filteredResults = pageResults.filter(result => !result.isAd);
                 results.push(...filteredResults);
                 totalResults += filteredResults.length;
 
-                if (totalResults >= this.searchItemNumbers) break;
+                if (totalResults >= searchItemNumbers) break;
 
                 const nextPageSelector = 'a.n';
                 const nextPageExists = await page.$(nextPageSelector);
@@ -166,16 +174,16 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 await page.click(nextPageSelector);
                 const randomWaitTime = Math.floor(Math.random() * 500) + 500;
                 await new Promise(resolve => setTimeout(resolve, randomWaitTime));
-                await page.waitForSelector('h3', { timeout: this.browserTimeout * 1000 });
+                await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
             }
 
-            const outputContent = results.slice(0, this.searchItemNumbers).map(result => {
+            const outputContent = results.slice(0, searchItemNumbers).map(result => {
                 if (recordDescription && result.description) {
                     result.description = result.description.replace(/(播报|暂停|||爱企查|\n)/g, '');
                 }
                 return result;
             });
-            
+
             console.info("任务处理完成 , 结果数量:", outputContent.length);
             return outputContent;
         } catch (error) {

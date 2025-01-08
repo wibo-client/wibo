@@ -13,11 +13,17 @@ export class PluginHandlerImpl {
 
     async init(globalContext) {
         this.globalContext = globalContext;
-        this.globalConfig = globalContext.globalConfig;
+        const configHandler = this.globalContext.configHandler;
+        this.globalConfig = await configHandler.getGlobalConfig();
+
+        this.loadPlugins();
+
+        // 初始化默认处理器
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
-        this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'localhost:8080';
-        this.loadPlugins();
+
+        // 从配置中获取市场URL，如果未配置则使用默认值
+        this.mktplaceUrl = this.globalConfig.mktplaceUrl || 'https://wibo.cc/mktplace';
         await this.updatePathSuggestions();
     }
 
@@ -47,7 +53,7 @@ export class PluginHandlerImpl {
     async initializePluginInstance(PluginClass, handlerConfig, pluginCode = null) {
         const evaluatedModule = this.evaluateModule(pluginCode || PluginClass);
         const pluginInstance = new evaluatedModule[handlerConfig.indexHandlerInterface]();
-        
+
         await pluginInstance.init(this.globalContext, handlerConfig);
         // const description = pluginInstance.getInterfaceDescription();
         // console.log(`Plugin description: ${description}`);
@@ -77,7 +83,7 @@ export class PluginHandlerImpl {
         try {
             console.debug(`Loading plugins.`);
             this.pluginInstanceMap.clear();
-            
+
             const instanceConfigs = pluginStore.getAllInstanceConfigs();
             const templates = pluginStore.getAllPluginTemplates();
 
@@ -101,7 +107,7 @@ export class PluginHandlerImpl {
             throw new Error("Failed to load plugins");
         }
     }
-    
+
     async addPluginTemplateFromFile(filePath) {
         try {
             console.debug(`Adding plugin template from file: ${filePath}`);
@@ -164,8 +170,8 @@ export class PluginHandlerImpl {
         // 2. 检查其他实例是否还在使用相同的插件模板
         const instanceConfigs = pluginStore.getAllInstanceConfigs();
         const otherInstancesUsingTemplate = Object.entries(instanceConfigs)
-            .filter(([prefix, config]) => 
-                prefix !== pathPrefix && 
+            .filter(([prefix, config]) =>
+                prefix !== pathPrefix &&
                 config.indexHandlerInterface === interfaceName
             );
 
@@ -205,7 +211,7 @@ export class PluginHandlerImpl {
     async getPluginInstanceMapInfo() {
         try {
             const pluginInstanceMap = {};
-            
+
             // 遍历所有插件实例
             for (const [pathPrefix, pluginInstance] of this.pluginInstanceMap) {
                 try {

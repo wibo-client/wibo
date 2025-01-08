@@ -17,7 +17,7 @@ export class IndexHandlerInterface {
     async rewriteQuery(query) {
         return [query];
     }
-    
+
     // 删除 getPossiblePath 方法
     // async getPossiblePath(path) {
     //     throw new Error('Method not implemented.');
@@ -82,5 +82,5 @@ export class IndexHandlerInterface {
     async search(queryStr, pathPrefix, TopN) {
         throw new Error('Method not implemented.');
     }
-    
+
 }

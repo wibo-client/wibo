@@ -11,7 +11,7 @@
 <body>
 
 
-  <h1>围脖 WIBO</h1>
+  <h3>围脖（WIBO） 你的个人知识助手</h3>
   <div class="tabs">
     <div class="tab active" data-tab="interaction">对话</div>
     <div class="tab" data-tab="config">配置</div>
@@ -21,13 +21,12 @@
   <!-- 交互界面内容区域 -->
   <div id="interaction" class="tab-content active">
     <div id="chat-container">
-      <h2>围脖（WIBO） 你的个人知识助手 </h2>
       <div id="messages"></div>
       <div id="input-container">
         <textarea id="user-input" placeholder="输入你的问题" rows="1"></textarea>
         <div class="input-group">
           <select id="request-type">
-            <option value="searchAndChat">WIBO捡问</option>
+            <option value="searchAndChat">捡问</option>
             <option value="searchWithRerank">搜索增强</option>
             <option value="search">搜索直出</option>
             <option value="chat">模型直答</option>
@@ -84,7 +83,7 @@
           <span>启用本地知识库</span>
         </div>
       </div>
-      
+
       <div id="localKnowledgeBaseConfig" style="display: none;">
         <hr>
         <!-- 子栏目0：服务状态 -->
@@ -100,7 +99,7 @@
           </div>
         </div>
         <hr>
-        
+
         <!-- 子栏目1：知识库管理 -->
         <h4>知识库管理</h4>
         <div class="form-group">
@@ -125,7 +124,7 @@
           </tbody>
         </table>
         <hr>
-        
+
         <!-- 子栏目2：远程上传文件 -->
         <div class="form-group">
           <div class="switch-label-group">
@@ -146,7 +145,7 @@
             </div>
           </div>
         </div>
-        
+
         <hr>
         <!-- 子栏目3：模型增强 -->
         <div class="form-group">
@@ -180,12 +179,13 @@
   <!-- 将原插件内容区域改为快捷导航内容 -->
   <div id="navigation" class="tab-content">
     <div class="section">
-        <h3>常用路径</h3>
-        <div id="quickLinksContainer" class="quick-links">
-            <!-- 动态内容将在这里生成 -->
-        </div>
+      <h3>常用路径</h3>
+      <div id="quickLinksContainer" class="quick-links">
+        <!-- 动态内容将在这里生成 -->
+      </div>
     </div>
   </div>
 
 </body>
+
 </html>

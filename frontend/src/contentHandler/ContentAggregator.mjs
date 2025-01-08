@@ -1,36 +1,35 @@
 import ContentCrawler from './contentCrawler.mjs';
 import MarkdownSplitUtil from '../spliter/markdownSpliter.mjs';
 import stringSimilarity from 'string-similarity';
-import ConfigKeys from '../config/configKeys.mjs';
 
 class ContentAggregator {
   constructor() {
-    this.browserConcurrency = 1; // 默认并发数
   }
 
   async init(globalContext) {
-    this.globalConfig = globalContext.globalConfig;
-    const pageFetchLimit = this.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5; // 默认值为10
-    this.browserConcurrency = this.globalConfig[ConfigKeys.BROWSER_CONCURRENCY] || pageFetchLimit;
-    this.pageFetchLimit = pageFetchLimit;
-    this.crawler = new ContentCrawler(this.globalConfig); // 传递 globalConfig
-  } 
+    this.globalContext = globalContext;
+  }
 
   async aggregateContent(summaryList) {
-    const limitedSummaryList = summaryList.slice(0, this.pageFetchLimit); // 根据 pageFetchLimit 取任务
+    const configHandler = this.globalContext.configHandler;
+    const globalConfig = await configHandler.getGlobalConfig();
+    const pageFetchLimit = globalConfig.pageFetchLimit || 5;
+    const browserConcurrency = globalConfig.browserConcurrency || pageFetchLimit;
+
+    const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
     const promises = limitedSummaryList.map(async (summary, index) => {
-      // 随机间隔 0~300 毫秒
       await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 301)));
-      
-      const content = await this.crawler.fetchPageContent(summary.url);
+
+      const crawler = new ContentCrawler(this.globalContext);
+      const content = await crawler.fetchPageContent(summary.url);
       summary.content = this.extractRelevantContent(content, summary);
       summary.paragraphOrder = index + 1;
       return summary;
     });
 
     const results = [];
-    for (let i = 0; i < promises.length; i += this.browserConcurrency) {
-      const chunk = promises.slice(i, i + this.browserConcurrency);
+    for (let i = 0; i < promises.length; i += browserConcurrency) {
+      const chunk = promises.slice(i, i + browserConcurrency);
       results.push(...await Promise.all(chunk));
     }
 

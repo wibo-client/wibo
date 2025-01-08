@@ -6,18 +6,44 @@ export default class ChatHandler {
     this.setupAutoResizeInput();
   }
 
-  setupMessageHooks() {
+  async setupMessageHooks() {
     const sendButton = document.getElementById('send-message');
     const chatInput = document.getElementById('user-input');
     const typeSelect = document.getElementById('request-type');
+    const foregroundExecution = document.getElementById('foregroundExecution');
 
-    if (!sendButton || !chatInput || !typeSelect) {
+    if (!sendButton || !chatInput || !typeSelect || !foregroundExecution) {
       console.error('Required chat elements not found:', {
         sendButton: !!sendButton,
         chatInput: !!chatInput,
-        typeSelect: !!typeSelect
+        typeSelect: !!typeSelect,
+        foregroundExecution: !!foregroundExecution
       });
       return;
+    }
+
+    // 添加对 foregroundExecution 的监听
+    foregroundExecution.addEventListener('change', async (event) => {
+      try {
+        const globalConfigStr = await window.electron.getConfig('appGlobalConfig');
+        const globalConfig = globalConfigStr ? JSON.parse(globalConfigStr) : {};
+
+        // 直接设置 headless 属性
+        globalConfig.headless = event.target.checked;
+
+        await window.electron.setConfig('appGlobalConfig', JSON.stringify(globalConfig));
+      } catch (error) {
+        console.error('设置 headless 配置失败:', error);
+      }
+    });
+
+    // 初始化复选框状态
+    try {
+      const globalConfigStr = await window.electron.getConfig('appGlobalConfig');
+      const globalConfig = globalConfigStr ? JSON.parse(globalConfigStr) : {};
+      foregroundExecution.checked = !globalConfig.headless;
+    } catch (error) {
+      console.error('获取 headless 配置失败:', error);
     }
 
     sendButton.addEventListener('click', () => this.sendMessage());
@@ -44,9 +70,6 @@ export default class ChatHandler {
       chatInput.style.height = chatInput.scrollHeight + 'px';
     });
 
-    chatInput.addEventListener('focus', () => {
-      document.getElementById('pathDropdown').style.display = 'none';
-    });
   }
 
   setupAutoResizeInput() {
@@ -56,14 +79,14 @@ export default class ChatHandler {
     userInput.addEventListener('input', () => {
       // 重置高度以获取正确的 scrollHeight
       userInput.style.height = 'auto';
-      
+
       // 计算行数（每行大约20px）
       const lineHeight = 20;
       const lines = Math.min(6, Math.ceil(userInput.scrollHeight / lineHeight));
-      
+
       // 设置新的高度
       userInput.style.height = `${lines * lineHeight}px`;
-      
+
       // 更新 rows 属性
       userInput.rows = lines;
     });
@@ -73,11 +96,10 @@ export default class ChatHandler {
     const message = document.getElementById('user-input').value;         // 改为 user-input
     const type = document.getElementById('request-type').value;         // 改为 request-type
     const path = document.getElementById('pathInput').value;
-    const executeInForeground = document.getElementById('foregroundExecution').checked; // 改为 foregroundExecution
 
     try {
       const feedbackBox = document.getElementById('messages');          // 改为 messages
-      
+
       // 用户输入信息
       const userMessageElement = document.createElement('div');
       userMessageElement.className = 'message user';
@@ -95,7 +117,7 @@ export default class ChatHandler {
 
       feedbackBox.scrollTop = feedbackBox.scrollHeight;
       let wholeMessage = '# WIBO : \n\n';
-      
+
       const requestContext = {
         onChunk: (chunk) => {
           wholeMessage += chunk;
@@ -105,11 +127,10 @@ export default class ChatHandler {
       };
 
       await window.electron.sendMessage(
-        message, 
-        type, 
-        path, 
-        requestContext, 
-        executeInForeground
+        message,
+        type,
+        path,
+        requestContext
       );
     } catch (error) {
       console.error('发送消息错误:', error);

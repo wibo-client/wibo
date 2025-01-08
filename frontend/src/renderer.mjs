@@ -1,6 +1,5 @@
 import AuthClass from './auth/auth.mjs';
 import { marked } from 'marked'; // 从 npm 包中导入 marked
-import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
 import ChatHandler from './rendererModules/chat/chatHandler.mjs';
 import KnowledgeBaseHandler from './rendererModules/knowledge/knowledgeBaseHandler.mjs';
 import BrowserConfigHandler from './rendererModules/browser/browserConfigHandler.mjs';
@@ -9,7 +8,7 @@ const BASE_URL = 'http://localhost:8080'; // 设置本地服务的 URL
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM 加载完成');
-  
+
   // 初始化各个模块
   const chatHandler = new ChatHandler();
   const knowledgeBaseHandler = new KnowledgeBaseHandler();
@@ -26,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const path = item.dataset.path;
       const pathInput = document.getElementById('pathInput');
       const userInput = document.getElementById('user-input');
-      
+
       // 设置路径并切换到对话标签页
       pathInput.value = path;
       switchToTab('interaction');
@@ -77,7 +76,7 @@ async function checkServerStatus() {
       statusText.textContent = '离线';
       processPid.textContent = '-';
       processPort.textContent = '-';
-     // console.log('Server not healthy:', serverStatus); // 添加调试日志
+      // console.log('Server not healthy:', serverStatus); // 添加调试日志
     }
   } catch (error) {
     console.error('服务状态检查失败:', error);
@@ -95,30 +94,30 @@ async function setupQuickNavigation() {
     // 获取插件实例映射
     const pluginMap = await electron.getPluginInstanceMap();
     const container = document.getElementById('quickLinksContainer');
-    
+
     if (!container) return;
-    
+
     // 清空现有内容
     container.innerHTML = '';
-    
+
     // 为每个插件创建快捷导航项
     for (const [pathPrefix, plugin] of Object.entries(pluginMap)) {
       const linkItem = document.createElement('div');
       linkItem.className = 'quick-link-item';
       linkItem.dataset.path = pathPrefix;
-      
+
       const textSpan = document.createElement('span');
       textSpan.className = 'quick-link-text';
       textSpan.textContent = plugin.name || pathPrefix;
-      
+
       linkItem.appendChild(textSpan);
       container.appendChild(linkItem);
-      
+
       // 添加点击事件
       linkItem.addEventListener('click', () => {
         const pathInput = document.getElementById('pathInput');
         const userInput = document.getElementById('user-input');
-        
+
         pathInput.value = pathPrefix;
         switchToTab('interaction');
         userInput.focus();

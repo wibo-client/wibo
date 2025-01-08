@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import MainWindow from './mainWindow.mjs';
 import FileHandler from './file/fileHandler.mjs';
 import ConfigHandler from './config/configHandler.mjs';
-import ConfigKeys from './config/configKeys.mjs'; // 引入共享的配置枚举值
 import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
 import LLMBasedRerankImpl from './rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
 import LLMBasedQueryRewriter from './requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
@@ -33,35 +32,34 @@ let globalContext; // 声明全局变量
 
 async function init(createWindow = true) {
   console.log('Initializing application...');
- 
-  const globalConfig = await configHandler.getGlobalConfig(); // 获取全局配置
 
   globalContext = { // 初始化全局变量
     pluginHandler,
     llmCaller,
-    globalConfig,
     fileHandler,
     configHandler,
     contentAggregator,
-    rerankImpl ,
+    rerankImpl,
     rewriteQueryer
   };
-  let modelSK = globalConfig[ConfigKeys.MODEL_SK];
+
+  let globalConfig = await configHandler.getGlobalConfig();
+  let modelSK = globalConfig.modelSK; // 从全局配置中获取模型 SK
+
   if (modelSK) {
     console.log(`Using model SK: ${modelSK}`);
     await llmCaller.init(modelSK);
-  }else
-  {
+  } else {
     console.log(`No model SK is set`);
   }
- 
+
   await rewriteQueryer.init(llmCaller);
   await rerankImpl.init(globalContext); // 调用 init 方法
   await contentAggregator.init(globalContext); // 调用 init 方法
-  await pluginHandler.init(globalContext); // 传递 globalConfig
- 
+  await pluginHandler.init(globalContext);
 
-  if(createWindow) {
+
+  if (createWindow) {
     mainWindow = new MainWindow(__dirname);
     mainWindow.create();
   }
@@ -147,10 +145,10 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('get-plugin-instance-map', async () => {
     try {
-        return await pluginHandler.getPluginInstanceMapInfo();
+      return await pluginHandler.getPluginInstanceMapInfo();
     } catch (error) {
-        console.error('Error getting plugin instance map:', error);
-        throw error;
+      console.error('Error getting plugin instance map:', error);
+      throw error;
     }
   });
 
@@ -168,7 +166,9 @@ app.whenReady().then(async () => {
 
     try {
       const selectedPlugin = await pluginHandler.select(path);
-      const pageFetchLimit = globalContext.globalConfig[ConfigKeys.PAGE_FETCH_LIMIT] || 5;
+
+      let globalConfig = await configHandler.getGlobalConfig();
+      let pageFetchLimit = globalConfig.pageFetchLimit; // 从全局配置中获取模型 SK
 
       if (type === 'search') {
         const searchResult = await selectedPlugin.search(message, path);
@@ -288,7 +288,7 @@ app.whenReady().then(async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
     });
-    
+
     if (!result.canceled && result.filePaths.length > 0) {
       return {
         filePath: result.filePaths[0]
@@ -300,7 +300,7 @@ app.whenReady().then(async () => {
   // 重写 toggle-knowledge-base 处理,修改handler名称与preload一致
   ipcMain.handle('toggleKnowledgeBase', async (event, enable) => {
     try {
-  
+
       if (enable) {
         const result = await localServerManager.startServer();
         return result;
@@ -310,8 +310,8 @@ app.whenReady().then(async () => {
       }
     } catch (error) {
       console.error('切换知识库服务失败:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: error.message || '操作失败'
       };
     }
@@ -322,7 +322,7 @@ app.whenReady().then(async () => {
     const desiredState = localServerManager.desiredState;
     const savedProcess = localServerManager.store.get('javaProcess');
     const isHealthy = savedProcess ? await localServerManager.checkHealth(savedProcess.port) : false;
-    
+
     return {
       desiredState,
       isHealthy,
@@ -338,7 +338,7 @@ app.whenReady().then(async () => {
       await localServerManager.stopServer();
       // 直接调用内部停止方法，强制关闭进程
       await localServerManager._stopServer();
-      
+
       // 额外确保进程被清理
       const savedProcess = localServerManager.store.get('javaProcess');
       if (savedProcess && savedProcess.pid) {
@@ -361,7 +361,7 @@ app.whenReady().then(async () => {
     let sb = '';
     let fileNumber = 1;
     searchResults.forEach(result => {
-      sb += `## index ${fileNumber++} 标题 ： [${result.title}](${result.url})\n\n`;
+      sb += `#### index ${fileNumber++} 标题 ： [${result.title}](${result.url})\n\n`;
 
       sb += `${result.description}\n`;
       if (result.date) {

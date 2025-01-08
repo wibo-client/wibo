@@ -1,5 +1,3 @@
-import ConfigKeys from '../../config/configKeys.mjs';
-
 export default class BrowserConfigHandler {
   constructor() {
     this.setupEventListeners();
@@ -17,19 +15,19 @@ export default class BrowserConfigHandler {
     const configJson = await window.electron.getConfig('appGlobalConfig');
     if (configJson) {
       const config = JSON.parse(configJson);
-      
-      // 特殊处理 MODEL_SK，因为需要显示遮罩后的值
-      if (config[ConfigKeys.MODEL_SK]) {
-        const maskedSK = this.maskSK(config[ConfigKeys.MODEL_SK]);
+
+      // 处理 modelSK 的特殊显示
+      if (config.modelSK) {
+        const maskedSK = this.maskSK(config.modelSK);
         document.getElementById('masked-ak').textContent = `当前AK: ${maskedSK}`;
       }
 
-      // 统一处理配置项
+      // 加载基础配置项
       const configFields = [
-        ConfigKeys.BROWSER_TIMEOUT,
-        ConfigKeys.BROWSER_CONCURRENCY,
-        ConfigKeys.HEADLESS,
-        ConfigKeys.PAGE_FETCH_LIMIT
+        'browserTimeout',
+        'browserConcurrency',
+        'headless',
+        'pageFetchLimit'
       ];
 
       configFields.forEach(key => {
@@ -47,22 +45,17 @@ export default class BrowserConfigHandler {
   }
 
   async handleSaveConfig() {
-    const browserTimeout = document.getElementById(ConfigKeys.BROWSER_TIMEOUT)?.value;
-    const browserConcurrency = document.getElementById(ConfigKeys.BROWSER_CONCURRENCY)?.value;
-    const headless = document.getElementById(ConfigKeys.HEADLESS)?.value;
-    const pageFetchLimit = document.getElementById(ConfigKeys.PAGE_FETCH_LIMIT)?.value;
-
     const config = {
-      [ConfigKeys.BROWSER_TIMEOUT]: browserTimeout,
-      [ConfigKeys.BROWSER_CONCURRENCY]: browserConcurrency, 
-      [ConfigKeys.HEADLESS]: headless,
-      [ConfigKeys.PAGE_FETCH_LIMIT]: pageFetchLimit
+      browserTimeout: document.getElementById('browserTimeout')?.value,
+      browserConcurrency: document.getElementById('browserConcurrency')?.value,
+      headless: document.getElementById('headless')?.value,
+      pageFetchLimit: document.getElementById('pageFetchLimit')?.value
     };
 
     await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
 
     alert('配置已保存');
-    await loadConfigValues();
+    await this.loadConfigValues();
     await window.electron.reinitialize();
   }
 }

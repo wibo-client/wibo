@@ -1,6 +1,5 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import ConfigKeys from '../config/configKeys.mjs';
 import CookieUtils from '../utils/cookieUtils.mjs';
 import path from 'path';
 
@@ -8,16 +7,23 @@ import path from 'path';
 puppeteer.use(StealthPlugin());
 
 export class ContentCrawler {
-    constructor(globalConfig) {
-        this.globalConfig = globalConfig;
-        this.userDataDir = path.resolve(this.globalConfig.userDataDir || './user_data');
-        this.cookieUtils = new CookieUtils(this.userDataDir);
+    constructor(globalContext) {
+        this.globalContext = globalContext;
+
     }
 
+
+
     async fetchPageContent(url) {
+        let globalConfig = await configHandler.getGlobalConfig();
+
+        const userDataDirString = globalConfig.userDataDir;
+        const userDataDir = path.resolve(userDataDirString || './user_data');
+        const cookieUtils = new CookieUtils(userDataDir);
+
         console.info("开始处理任务");
-        const headless = this.globalConfig[ConfigKeys.HEADLESS] !== undefined ? this.globalConfig[ConfigKeys.HEADLESS] === 'true' : false;
-        
+        const headless = globalConfig.headless !== undefined ? globalConfig.headless === 'true' : false;
+
         for (let attempt = 1; attempt <= 2; attempt++) { // 修改尝试次数为2次
             let browser;
             try {
@@ -46,7 +52,7 @@ export class ContentCrawler {
                 });
 
                 // 加载 cookies
-                await this.cookieUtils.loadCookies(page, new URL(url).hostname);
+                await cookieUtils.loadCookies(page, new URL(url).hostname);
 
                 // 设置 protocolTimeout
                 page.setDefaultNavigationTimeout(60000);
@@ -68,7 +74,7 @@ export class ContentCrawler {
                 console.log(markdownText);
 
                 // 保存 cookies
-                await this.cookieUtils.saveCookies(page, new URL(url).hostname);
+                await cookieUtils.saveCookies(page, new URL(url).hostname);
 
                 return markdownText;
             } catch (error) {
@@ -107,7 +113,7 @@ if (require.main === module) {
         process.exit(1);
     }
 
-    const crawler = new ContentCrawler({ [ConfigKeys.HEADLESS]: headless });
+    const crawler = new ContentCrawler({ headless: false });
     crawler.fetchPageContent(url).then(({ markdownText, currentUrl }) => {
         console.log("Current URL:", currentUrl);
     }).catch(error => {

@@ -1,11 +1,10 @@
-import ConfigKeys from '../../config/configKeys.mjs';
 
 export default class KnowledgeBaseHandler {
   constructor() {
     this.BASE_URL = null;
     this.updateTimer = null;  // 添加定时器引用
     this.setupEventListeners();
-    
+
     // 不再直接启动定时更新，而是通过状态检查来控制
     this.setupPortCheck();
     this.componentDidMount(); // 在构造函数中调用
@@ -52,7 +51,7 @@ export default class KnowledgeBaseHandler {
 
     // 初始检查
     await updateBaseUrl();
-    
+
     // 定期检查
     setInterval(async () => {
       await updateBaseUrl();
@@ -64,12 +63,12 @@ export default class KnowledgeBaseHandler {
       const serverStatus = await window.electron.getServerDesiredState();
       const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
       const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
-      
+
       if (localKnowledgeBaseToggle && localKnowledgeBaseConfig) {
         // 保持开关状态与期望状态一致
         localKnowledgeBaseToggle.checked = serverStatus.desiredState;
         localKnowledgeBaseConfig.style.display = serverStatus.desiredState ? 'block' : 'none';
-        
+
         // 如果期望状态是开启，但实际状态是关闭，显示提示
         if (serverStatus.desiredState && !serverStatus.isHealthy) {
           console.log('[KnowledgeBase] Service is starting...');
@@ -120,15 +119,15 @@ export default class KnowledgeBaseHandler {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       })
-      .then(response => response.json())
-      .then(data => {
-        if (!data.success) {
-          alert(data.message);
-        }
-      })
-      .catch(error => {
-        alert('操作失败: ' + error.message);
-      });
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) {
+            alert(data.message);
+          }
+        })
+        .catch(error => {
+          alert('操作失败: ' + error.message);
+        });
     };
 
     if (preRecognizeImagesToggle) {
@@ -176,19 +175,19 @@ export default class KnowledgeBaseHandler {
   async toggleRemoteUpload() {
     const remoteUploadToggle = document.getElementById('remoteUploadToggle');
     const configSection = document.getElementById('remoteUploadConfig');
-    
+
     if (!configSection || !remoteUploadToggle) return;
 
     const enable = remoteUploadToggle.checked;
     configSection.style.display = enable ? 'block' : 'none';
-    
+
     try {
       const response = await fetch(`${this.BASE_URL}/admin/toggle-remote-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enable })
       });
-      
+
       const data = await response.json();
       if (data.success) {
         if (enable) {
@@ -232,7 +231,7 @@ export default class KnowledgeBaseHandler {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: directory })
       });
-      
+
       const data = await response.json();
       if (data.success) {
         document.getElementById('localDirectory').value = '';
@@ -252,7 +251,7 @@ export default class KnowledgeBaseHandler {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path })
         });
-        
+
         const data = await response.json();
         if (data.success) {
           await this.updateMonitoredDirs();
@@ -269,7 +268,7 @@ export default class KnowledgeBaseHandler {
       console.log('[KnowledgeBase] Skipping update - service not available');
       return;
     }
-    
+
     try {
       const response = await fetch(`${this.BASE_URL}/admin/list/monitored-dirs`);
       const data = await response.json();
