@@ -207,7 +207,7 @@ export default class ChatHandler {
       // 用户输入信息
       const userMessageElement = document.createElement('div');
       userMessageElement.className = 'message user';
-      userMessageElement.innerHTML = `你：<br><br>${message} <br><br><br>`;
+      userMessageElement.innerHTML = marked("### 你 : \n\n" + message + "\n\n");
       feedbackBox.appendChild(userMessageElement);
 
       // 清空用户输入框
@@ -220,7 +220,7 @@ export default class ChatHandler {
       feedbackBox.appendChild(wibaMessageElement);
 
       feedbackBox.scrollTop = feedbackBox.scrollHeight;
-      let wholeMessage = '# WIBO : \n\n';
+      let wholeMessage = '### WIBO : \n\n';
 
       const requestContext = {
         onChunk: (chunk) => {

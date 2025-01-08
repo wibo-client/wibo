@@ -4,7 +4,6 @@ import PluginHandlerImpl from './indexHandler/pluginHandlerImpl.mjs';
 import LLMCall from './llmCaller/LLMCall.mjs';
 import { fileURLToPath } from 'url';
 import MainWindow from './mainWindow.mjs';
-import FileHandler from './file/fileHandler.mjs';
 import ConfigHandler from './config/configHandler.mjs';
 import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
 import LLMBasedRerankImpl from './rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
@@ -18,52 +17,41 @@ if (__dirname.endsWith(path.join('src'))) {
 }
 
 let mainWindow;
-const configHandler = new ConfigHandler(); // 不再传递 store 实例
-const pluginHandler = new PluginHandlerImpl();
-const fileHandler = new FileHandler(__dirname);
-const contentAggregator = new ContentAggregator();
-const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
-const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
-const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
-
-const llmCaller = new LLMCall();
-
 let globalContext; // 声明全局变量
 
 async function init(createWindow = true) {
   console.log('Initializing application...');
 
+  const configHandler = new ConfigHandler(); // 不再传递 store 实例
+  const pluginHandler = new PluginHandlerImpl();
+  const contentAggregator = new ContentAggregator();
+  const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
+  const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
+  const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
+  const llmCaller = new LLMCall();
+
   globalContext = { // 初始化全局变量
     pluginHandler,
     llmCaller,
-    fileHandler,
     configHandler,
     contentAggregator,
     rerankImpl,
-    rewriteQueryer
+    rewriteQueryer,
+    localServerManager
   };
 
-  let globalConfig = await configHandler.getGlobalConfig();
-  let modelSK = globalConfig.modelSK; // 从全局配置中获取模型 SK
-
-  if (modelSK) {
-    console.log(`Using model SK: ${modelSK}`);
-    await llmCaller.init(modelSK);
-  } else {
-    console.log(`No model SK is set`);
-  }
-
-  await rewriteQueryer.init(llmCaller);
+  await llmCaller.init(globalContext);
+  await rewriteQueryer.init(globalContext);
   await rerankImpl.init(globalContext); // 调用 init 方法
   await contentAggregator.init(globalContext); // 调用 init 方法
   await pluginHandler.init(globalContext);
+
 
 
   if (createWindow) {
     mainWindow = new MainWindow(__dirname);
     mainWindow.create();
   }
-  return globalContext;
 }
 
 let javaProcess = null; // 存储 Java 进程的引用
@@ -71,9 +59,7 @@ let javaProcess = null; // 存储 Java 进程的引用
 app.whenReady().then(async () => {
   console.log('App is ready.');
 
-  globalContext = await init(); // 初始化全局变量
-
-  const { pluginHandler, fileHandler, configHandler } = globalContext;
+  await init(); // 初始化全局变量
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -91,18 +77,6 @@ app.whenReady().then(async () => {
     console.log('App is quitting.');
   });
 
-  ipcMain.handle('calculate-md5', async (event, filePath) => {
-    return await fileHandler.calculateMD5InWorker(filePath);
-  });
-
-  ipcMain.handle('list-files', async (event, dirPath) => {
-    return await fileHandler.listFiles(dirPath);
-  });
-
-  ipcMain.handle('read-file', async (event, filePath) => {
-    return await fileHandler.readFile(filePath);
-  });
-
   ipcMain.handle('select-directory', async () => {
     return await dialog.showOpenDialog({
       properties: ['openDirectory']
@@ -118,34 +92,34 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('add-plugin-from-file', async (event, filePath) => {
-    await pluginHandler.addPluginTemplateFromFile(filePath);
+    await globalContext.pluginHandler.addPluginTemplateFromFile(filePath);
   });
 
   ipcMain.handle('get-config', async (event, key) => {
-    const config = await configHandler.getConfig(key);
+    const config = await globalContext.configHandler.getConfig(key);
     return JSON.stringify(config); // 返回 JSON 字符串
   });
 
   ipcMain.handle('set-config', (event, { key, value }) => {
     const configValue = JSON.parse(value); // 将 JSON 字符串解析为对象
-    configHandler.setConfig(key, configValue);
+    globalContext.configHandler.setConfig(key, configValue);
   });
 
   ipcMain.handle('get-token', () => {
-    return configHandler.getToken();
+    return globalContext.configHandler.getToken();
   });
 
   ipcMain.handle('set-token', (event, token) => {
-    configHandler.setToken(token);
+    globalContext.configHandler.setToken(token);
   });
 
   ipcMain.handle('remove-token', () => {
-    configHandler.removeToken();
+    globalContext.configHandler.removeToken();
   });
 
   ipcMain.handle('get-plugin-instance-map', async () => {
     try {
-      return await pluginHandler.getPluginInstanceMapInfo();
+      return await globalContext.pluginHandler.getPluginInstanceMapInfo();
     } catch (error) {
       console.error('Error getting plugin instance map:', error);
       throw error;
@@ -154,7 +128,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('delete-plugin', async (event, pathPrefix) => {
     try {
-      await pluginHandler.deletePlugin(pathPrefix);
+      await globalContext.pluginHandler.deletePlugin(pathPrefix);
     } catch (error) {
       console.error('删除插件错误:', error);
       throw error;
@@ -165,9 +139,9 @@ app.whenReady().then(async () => {
     console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
 
     try {
-      const selectedPlugin = await pluginHandler.select(path);
+      const selectedPlugin = await globalContext.pluginHandler.select(path);
 
-      let globalConfig = await configHandler.getGlobalConfig();
+      let globalConfig = await globalContext.configHandler.getGlobalConfig();
       let pageFetchLimit = globalConfig.pageFetchLimit; // 从全局配置中获取模型 SK
 
       if (type === 'search') {
@@ -240,7 +214,7 @@ app.whenReady().then(async () => {
         const returnStrfinal = { value: '' };
         const collectedResults = [];
 
-        await llmCaller.callAsync(messages, true, (chunk) => {
+        await globalContext.llmCaller.callAsync(messages, true, (chunk) => {
           event.sender.send('llm-stream', chunk, requestId);
         });
 
@@ -259,19 +233,19 @@ app.whenReady().then(async () => {
         console.info("Final combined output: ", returnStrfinal.value);
         event.sender.send('llm-stream', returnStrfinal.value, requestId);
       } else if (type === 'chat') {
-        await llmCaller.callAsync([{ role: 'user', content: message }], true, (chunk) => {
+        await globalContext.llmCaller.callAsync([{ role: 'user', content: message }], true, (chunk) => {
           event.sender.send('llm-stream', chunk, requestId);
         });
       }
     } catch (error) {
-      console.error(`Error occurred in handler for 'send-message': ${error}`);
+      console.error(`Error occurred in handler for 'send-message': ${error}`, error);
       event.sender.send('error', { message: error.message }, requestId);
     }
   });
 
   ipcMain.handle('fetch-path-suggestions', async (event, input) => {
     try {
-      const suggestions = await pluginHandler.fetchPathSuggestions(input);
+      const suggestions = await globalContext.pluginHandler.fetchPathSuggestions(input);
       event.sender.send('path-suggestions', suggestions);
     } catch (error) {
       console.error('获取路径建议错误:', error);
@@ -302,10 +276,10 @@ app.whenReady().then(async () => {
     try {
 
       if (enable) {
-        const result = await localServerManager.startServer();
+        const result = await globalContext.localServerManager.startServer();
         return result;
       } else {
-        const result = await localServerManager.stopServer();
+        const result = await globalContext.localServerManager.stopServer();
         return result;
       }
     } catch (error) {
@@ -319,9 +293,9 @@ app.whenReady().then(async () => {
 
   // 添加 IPC 事件处理器
   ipcMain.handle('get-server-desired-state', async () => {
-    const desiredState = localServerManager.desiredState;
-    const savedProcess = localServerManager.store.get('javaProcess');
-    const isHealthy = savedProcess ? await localServerManager.checkHealth(savedProcess.port) : false;
+    const desiredState = globalContext.localServerManager.desiredState;
+    const savedProcess = globalContext.localServerManager.store.get('javaProcess');
+    const isHealthy = savedProcess ? await globalContext.localServerManager.checkHealth(savedProcess.port) : false;
 
     return {
       desiredState,
@@ -335,12 +309,12 @@ app.whenReady().then(async () => {
   app.on('before-quit', async () => {
     try {
       // 先设置期望状态为关闭
-      await localServerManager.stopServer();
+      await globalContext.localServerManager.stopServer();
       // 直接调用内部停止方法，强制关闭进程
-      await localServerManager._stopServer();
+      await globalContext.localServerManager._stopServer();
 
       // 额外确保进程被清理
-      const savedProcess = localServerManager.store.get('javaProcess');
+      const savedProcess = globalContext.localServerManager.store.get('javaProcess');
       if (savedProcess && savedProcess.pid) {
         try {
           if (process.platform === 'win32') {

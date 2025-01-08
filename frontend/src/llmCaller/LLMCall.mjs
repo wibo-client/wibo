@@ -2,19 +2,32 @@ import OpenAI from "openai";
 
 export class LLMCall {
   constructor() {
+    this.currentApiKey = null;
+    this.openai = null;
   }
 
-  async init(apiKey) {
-    let apikeyLocal = apiKey;
-    let baseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    this.openai = new OpenAI({
-      apiKey: apikeyLocal,
-      baseURL: baseURL
-    });
+  async init(globalContext) {
+    this.globalContext = globalContext;
+    await this.updateClientIfNeeded();
+  }
+
+  async updateClientIfNeeded() {
+    const configHandler = this.globalContext.configHandler;
+    const globalConfig = await configHandler.getGlobalConfig();
+    const apiKey = globalConfig.modelSK;
+
+    if (apiKey !== this.currentApiKey) {
+      this.currentApiKey = apiKey;
+      this.openai = new OpenAI({
+        apiKey: this.currentApiKey,
+        baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      });
+    }
   }
 
   async callAsync(userPrompts, stream = false, onStreamChunk = null) {
     try {
+      await this.updateClientIfNeeded();
       const messages = userPrompts.map(prompt => ({ role: prompt.role, content: prompt.content }));
       const completion = await this.openai.chat.completions.create({
         model: "qwen-plus",
@@ -37,8 +50,9 @@ export class LLMCall {
     }
   }
 
-  callSync(userPrompts) {
+  async callSync(userPrompts) {
     try {
+      await this.updateClientIfNeeded();
       const messages = userPrompts.map(prompt => ({ role: prompt.role, content: prompt.content }));
       const completion = this.openai.chat.completions.create({
         model: "qwen-plus",

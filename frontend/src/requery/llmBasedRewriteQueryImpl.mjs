@@ -6,8 +6,9 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
         super();
     }
 
-    async init(llmCaller) {
-        this.llmCaller = llmCaller;
+    async init(globalContext) {
+        this.globalContext = globalContext;
+
     }
 
     /**
@@ -23,7 +24,7 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
         }];
 
         try {
-            const response = await this.llmCaller.callAsync(userPrompts);
+            const response = await this.globalContext.llmCaller.callAsync(userPrompts);
             const keywords = JSON.parse(response[0]);
             console.info("Received JSON result from LLM:", keywords);
 

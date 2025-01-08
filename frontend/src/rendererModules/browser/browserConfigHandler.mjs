@@ -9,6 +9,12 @@ export default class BrowserConfigHandler {
     if (saveBrowserConfigButton) {
       saveBrowserConfigButton.addEventListener('click', () => this.handleSaveConfig());
     }
+
+    // 添加AK保存按钮的事件监听
+    const saveConfigButton = document.getElementById('saveConfigButton');
+    if (saveConfigButton) {
+      saveConfigButton.addEventListener('click', () => this.handleSaveAK());
+    }
   }
 
   async loadConfigValues() {
@@ -57,5 +63,20 @@ export default class BrowserConfigHandler {
     alert('配置已保存');
     await this.loadConfigValues();
     await window.electron.reinitialize();
+  }
+
+  async handleSaveAK() {
+    const accessKey = document.getElementById('accessKey')?.value;
+    if (!accessKey) {
+      alert('请输入Access Key');
+      return;
+    }
+
+    const config = JSON.parse(await window.electron.getConfig('appGlobalConfig') || '{}');
+    config.modelSK = accessKey;
+
+    await window.electron.setConfig('appGlobalConfig', JSON.stringify(config));
+    alert('Access Key已保存在客户端');
+    await this.loadConfigValues();
   }
 }

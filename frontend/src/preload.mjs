@@ -6,7 +6,6 @@ contextBridge.exposeInMainWorld('electron', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   getConfig: (key) => ipcRenderer.invoke('get-config', key),
   setConfig: (key, value) => ipcRenderer.invoke('set-config', { key, value }),
-  listFiles: (dir) => ipcRenderer.invoke('list-files', dir),
 
   sendMessage: (message, type, path, context) => {
     const requestId = uuidv4();
@@ -29,8 +28,10 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 知识库相关方法 - 确保命名一致
   toggleKnowledgeBase: (enable) => ipcRenderer.invoke('toggleKnowledgeBase', enable),
+  showDirectoryPicker: () => ipcRenderer.invoke('show-directory-picker'),
 
-  // 文件系统相关方法
+
+  // 路径建议相关方法
   fetchPathSuggestions: (input) => ipcRenderer.invoke('fetch-path-suggestions', input),
 
   onPathSuggestions: (callback) => {
@@ -38,12 +39,6 @@ contextBridge.exposeInMainWorld('electron', {
       callback(suggestions);
     });
   },
-
-
-  readFile: (path) => ipcRenderer.invoke('read-file', path),
-  calculateMD5: (path) => ipcRenderer.invoke('calculate-md5', path),
-  selectFile: () => ipcRenderer.invoke('select-file'),
-  showDirectoryPicker: () => ipcRenderer.invoke('show-directory-picker'),
 
   // 获取服务器状态
   getServerDesiredState: () => ipcRenderer.invoke('get-server-desired-state'),
@@ -58,8 +53,6 @@ contextBridge.exposeInMainWorld('electron', {
   getPluginInstanceMap: () => ipcRenderer.invoke('get-plugin-instance-map'),
   deletePlugin: (pathPrefix) => ipcRenderer.invoke('delete-plugin', pathPrefix),
   reinitialize: () => ipcRenderer.invoke('reinitialize')
-
-
 });
 
 // 认证相关 API
