@@ -4,8 +4,20 @@ import Store from 'electron-store';
 import fetch from 'node-fetch';
 import path from 'path';
 import fs from 'fs/promises';  // 添加 fs/promises 导入
+/*
+gpt 生成的这个表太漂亮了，我直接贴出来。 
 
-class LocalServerManager {
+修改后的状态矩阵分析
+前台标记打开server	持有PID	进程存续	状态描述	处理方案
+✓ 已标记	✓ 有值	✓ 存在	正常状态	继续使用现有进程
+✓ 已标记	✓ 有值	✗ 不存在	进程异常终止	清理PID并重启进程
+✓ 已标记	✗ 空值	-	初始状态	启动新进程
+✗ 未标记	✓ 有值	✓ 存在	需要关闭	关闭当前进程并清理PID
+✗ 未标记	✓ 有值	✗ 不存在	状态残留	清理PID
+✗ 未标记	✗ 空值	-	完全关闭	无需处理
+*/
+
+export default class LocalServerManager {
     constructor() {
         this.javaProcess = null;
         this.isRunning = false;
@@ -46,24 +58,115 @@ class LocalServerManager {
         }, 5000); // 每5秒同步一次状态
     }
 
-    // 状态同步逻辑
+    // 增加状态检查方法
+    isDebugMode() {
+        return Boolean(this.portForDebug);
+    }
+
+    // 修改状态同步逻辑
     async syncState() {
         try {
             await this.acquireLock();
 
-            const actualState = await this.checkProcessStatus();
-            // 添加10%概率的日志输出
-            if (Math.random() < 0.1) {
-                console.log(`[StateSync] Desired: ${this.desiredState}, Actual: ${actualState}`);
-            }
+            const serverInfo = await this.getCurrentServerInfo();
+            const nextAction = this.determineNextAction(serverInfo);
+            await this.executeAction(nextAction, serverInfo);
 
-            if (this.desiredState && !actualState) {
-                await this._startServer();
-            } else if (!this.desiredState && actualState) {
-                await this._stopServer();
-            }
         } finally {
             this.releaseLock();
+        }
+    }
+
+    // 新增：获取当前服务器信息
+    async getCurrentServerInfo() {
+        const desiredState = this.desiredState;
+        const savedProcess = this.store.get('javaProcess');
+        const hasPid = Boolean(savedProcess?.pid);
+        let processExists = false;
+
+        if (hasPid) {
+            try {
+                process.kill(savedProcess.pid, 0);
+                const isHealthy = await this.checkHealth(savedProcess.port);
+                processExists = isHealthy;
+            } catch (e) {
+                processExists = false;
+            }
+        }
+
+        return {
+            desiredState,
+            hasPid,
+            processExists,
+            pid: savedProcess?.pid,
+            port: savedProcess?.port
+        };
+    }
+
+    // 新增：确定下一步动作
+    determineNextAction(serverInfo) {
+        const { desiredState, hasPid, processExists } = serverInfo;
+        const debugMode = this.isDebugMode();
+
+        // 状态矩阵处理
+        if (desiredState) {
+            if (hasPid) {
+                if (processExists) {
+                    return 'CONTINUE';  // 正常状态，继续使用
+                } else {
+                    // 调试模式下只清理PID，不重启
+                    return debugMode ? 'CLEANUP' : 'RESTART';
+                }
+            } else {
+                // 调试模式下不自动启动
+                return debugMode ? 'WAIT' : 'START';
+            }
+        } else {
+            if (hasPid) {
+                if (processExists) {
+                    return 'SHUTDOWN';  // 需要关闭进程
+                } else {
+                    return 'CLEANUP';   // 清理残留PID
+                }
+            } else {
+                return 'NONE';        // 完全关闭状态，无需处理
+            }
+        }
+    }
+
+    // 新增：执行对应动作
+    async executeAction(action, serverInfo) {
+        console.log(`[StateManager] Executing action: ${action}`);
+
+        switch (action) {
+            case 'CONTINUE':
+                // 正常状态，无需处理
+                break;
+
+            case 'RESTART':
+                await this.cleanupExistingProcesses();
+                await this._startServer();
+                break;
+
+            case 'START':
+                await this._startServer();
+                break;
+
+            case 'SHUTDOWN':
+                await this._stopServer();
+                break;
+
+            case 'CLEANUP':
+                await this.cleanupExistingProcesses();
+                break;
+
+            case 'WAIT':
+                console.log('[StateManager] Debug mode: Waiting for manual process management');
+                break;
+
+            case 'NONE':
+                // 完全关闭状态，无需处理
+                break;
         }
     }
 
@@ -222,6 +325,13 @@ class LocalServerManager {
             console.log('[LocalServer] Server is starting, please wait...');
             return;
         }
+
+        // 调试模式下不启动新进程
+        if (this.isDebugMode()) {
+            console.log('[LocalServer] Debug mode: Skipping server start');
+            return;
+        }
+
         try {
             this.startLock = true;
 
@@ -320,9 +430,9 @@ class LocalServerManager {
         const savedProcess = this.store.get('javaProcess');
         if (!savedProcess || !savedProcess.pid) return;
 
-        // 如果是调试模式且端口匹配，则跳过清理
-        if (this.portForDebug && savedProcess.port === this.portForDebug) {
-            console.log('[LocalServer] Debug mode: Skipping process cleanup');
+        // 调试模式下，如果端口匹配则保留进程
+        if (this.isDebugMode() && savedProcess.port === this.portForDebug) {
+            console.log('[LocalServer] Debug mode: Keeping debug process alive');
             return;
         }
 
@@ -354,8 +464,8 @@ class LocalServerManager {
     async _stopServer() {
         if (!this.isRunning || !this.javaProcess) return;
 
-        // 如果是调试模式且端口匹配，则跳过停止
-        if (this.portForDebug && this.currentPort === this.portForDebug) {
+        // 调试模式下不停止进程
+        if (this.isDebugMode() && this.currentPort === this.portForDebug) {
             console.log('[LocalServer] Debug mode: Skipping server stop');
             this.isRunning = false;
             this.javaProcess = null;
@@ -383,5 +493,3 @@ class LocalServerManager {
         }
     }
 }
-
-export default LocalServerManager;
