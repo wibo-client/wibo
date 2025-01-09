@@ -4,12 +4,13 @@ import fs from 'fs';
 import vm from 'vm';
 import pluginStore from './pluginStore.mjs';
 import { PathSuggestionService } from '../pathSuggestion/PathSuggestionService.mjs';
+import LocalServerIndexHandlerImpl from './localServerIndexHandlerImpl.mjs';
 
 export class PluginHandlerImpl {
     constructor() {
         this.pluginInstanceMap = new Map();
         this.pathSuggestionService = new PathSuggestionService();
-        this.updateInterval = 5 * 60 * 1000; // 5分钟更新一次
+        this.updateInterval = 1 * 60 * 1000; // 5分钟更新一次
         this.lastUpdateTime = 0;
     }
 
@@ -23,6 +24,9 @@ export class PluginHandlerImpl {
         this.defaultHandler = new BaiduPuppeteerIndexHandlerImpl();
         await this.defaultHandler.init(globalContext, null);
         this.pluginInstanceMap.set('/baidu/', this.defaultHandler);
+        const localServerIndexHander = new LocalServerIndexHandlerImpl();
+        await localServerIndexHander.init(globalContext, null);
+        this.pluginInstanceMap.set('/local/', localServerIndexHander);
 
         // 从配置中获取市场URL，如果未配置则使用默认值
         this.mktplaceUrl = await configHandler.getMktPlace();

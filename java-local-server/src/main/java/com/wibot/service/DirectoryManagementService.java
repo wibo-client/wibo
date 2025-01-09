@@ -61,14 +61,21 @@ public class DirectoryManagementService {
             List<DocumentDataPO> docs = documentDataRepository.findByFilePathStartingWith(path);
             int totalDocs = docs.size();
             
-            // 统计已完成数量（包括已索引和已忽略的文件）
-            long completedDocs = docs.stream()
-                    .filter(doc -> DocumentDataPO.PROCESSED_STATE_FILE_INDEXED.equals(doc.getProcessedState()) 
-                              || DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
-                    .count();
+            // 分别统计已索引和已忽略的文件数
+            long indexedDocs = 0;
+            long ignoredDocs = 0;
+            for (DocumentDataPO doc : docs) {
+                if (DocumentDataPO.PROCESSED_STATE_FILE_INDEXED.equals(doc.getProcessedState())) {
+                    indexedDocs++;
+                } else if (DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState())) {
+                    ignoredDocs++;
+                }
+            }
 
+            long completedDocs = indexedDocs + ignoredDocs;
             dirInfo.put("fileCount", totalDocs);
-            dirInfo.put("completedCount", completedDocs);
+            dirInfo.put("ignoredCount", ignoredDocs);
+            dirInfo.put("indexedCount", indexedDocs);
             dirInfo.put("completionRate",
                     totalDocs > 0 ? String.format("%.1f%%", (completedDocs * 100.0 / totalDocs)) : "0%");
             result.add(dirInfo);

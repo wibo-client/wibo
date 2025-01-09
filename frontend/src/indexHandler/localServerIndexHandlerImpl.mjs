@@ -1,22 +1,39 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
-
+import LocalServerManager from '../server/LocalServerManager.mjs';
 
 export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     constructor() {
         super();
         this.BASE_URL = null;
+        this.serverManager = null;
     }
 
     async init(globalContext, handlerConfig) {
         this.globalContext = globalContext;
+        this.serverManager = new LocalServerManager();
+
+        // 监听服务器状态更新
+        if (process.send) {
+            process.on('message', (message) => {
+                if (message.type === 'serverStateUpdate') {
+                    this.updateBaseUrl(message.data);
+                }
+            });
+        }
+
+        // 初始获取服务器信息
+        const serverInfo = await this.serverManager.getCurrentServerInfo();
+        this.updateBaseUrl(serverInfo);
     }
 
-    getHandlerName() {
-        return 'LocalServerIndexHandlerImpl';
-    }
-
-    getInterfaceDescription() {
-        return '本地搜索服务';
+    updateBaseUrl(serverInfo) {
+        if (serverInfo.isHealthy && serverInfo.port) {
+            this.BASE_URL = `http://localhost:${serverInfo.port}`;
+            console.log('[LocalServerIndexHandler] Base URL updated:', this.BASE_URL);
+        } else {
+            this.BASE_URL = null;
+            console.log('[LocalServerIndexHandler] Server is not available');
+        }
     }
 
     async search(queryStr, pathPrefix = '') {
@@ -73,13 +90,14 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');
         }
-
         try {
             const response = await fetch(`${this.BASE_URL}/getAllPaths`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            return await response.json();
+            const paths = await response.json();
+            // 为每个路径添加 "/local/" 前缀
+            return paths.map(path => `/local${path}`);
         } catch (error) {
             console.error('Get all paths failed:', error);
             throw error;
@@ -94,6 +112,14 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     async rerank(documentPartList, queryString) {
         // 本地服务器不需要重新排序
         return documentPartList;
+    }
+
+    getHandlerName() {
+        return 'LocalServerIndexHandlerImpl';
+    }
+
+    getInterfaceDescription() {
+        return '本地搜索服务';
     }
 }
 

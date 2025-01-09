@@ -1,0 +1,9 @@
+{
+  "extension": [
+    "mjs"
+  ],
+  "package": "./package.json",
+  "recursive": true,
+  "require": "@babel/register",
+  "exit": true
+}

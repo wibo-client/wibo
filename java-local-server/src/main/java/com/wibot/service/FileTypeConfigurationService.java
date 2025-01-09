@@ -35,9 +35,21 @@ public class FileTypeConfigurationService {
         DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_PDF_RECOGNITION, false);
         DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_PPT_RECOGNITION, false);
 
-        // 默认忽略目录
         DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, 
-            "node_modules\n.git\n.idea\n.vscode\ntarget\nbuild");
+        "**/node_modules/**\n" +     // 任意目录下的 node_modules
+        "**/.git/**\n" +            // 任意目录下的 .git
+        "**/.idea/**\n" +           // 任意目录下的 .idea
+        "**/.vscode/**\n" +         // 任意目录下的 .vscode
+        "**/target/**\n" +          // 任意目录下的 target
+        "**/build/**\n" +           // 任意目录下的 build
+        "**/*.class\n" +            // 所有 .class 文件
+        "**/*.log\n" +              // 所有 .log 文件
+        "**/.DS_Store\n" +          // macOS 系统文件
+        "**/Thumbs.db\n" +          // Windows 系统文件
+        "**/*.swp\n" +              // Vim 临时文件
+        "**/__pycache__/**\n" +     // Python 缓存
+        "**/*.pyc"                  // Python 编译文件
+    );
     }
 
     public void initializeDefaultConfigs() {

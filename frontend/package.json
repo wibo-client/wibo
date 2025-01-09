@@ -15,7 +15,8 @@
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux",
+    "test": "mocha 'test/**/*.mjs' --experimental-modules"
   },
   "keywords": [],
   "author": "",
@@ -34,12 +35,16 @@
   "devDependencies": {
     "@babel/cli": "^7.26.4",
     "@babel/core": "^7.26.0",
+    "@babel/plugin-transform-modules-commonjs": "^7.26.3",
     "@babel/preset-env": "^7.26.0",
+    "@babel/register": "^7.25.9",
     "babel-loader": "^9.2.1",
+    "chai": "^5.1.2",
     "copy-webpack-plugin": "^12.0.2",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "html-webpack-plugin": "^5.6.3",
+    "mocha": "^11.0.1",
     "webpack": "^5.97.1",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.0",
@@ -57,16 +62,18 @@
       "target": "AppImage"
     },
     "files": [
-    "dist/**/*",
-    "node_modules/**/*",
-    "package.json"
-  ],
-  "extraResources": [
-    {
-      "from": "path/to/extra/resources",
-      "to": "resources",
-      "filter": ["**/*"]
-    }
-  ]
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "path/to/extra/resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   }
 }

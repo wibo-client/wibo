@@ -472,12 +472,13 @@ export default class KnowledgeBaseHandler {
         const row = tbody.insertRow();
         row.insertCell(0).textContent = dir.path;
         row.insertCell(1).textContent = dir.fileCount;
-        row.insertCell(2).textContent = dir.completedCount;
-        row.insertCell(3).textContent = dir.completionRate;
+        row.insertCell(2).textContent = dir.ignoredCount;
+        row.insertCell(3).textContent = dir.indexedCount;
+        row.insertCell(4).textContent = dir.completionRate;
         const deleteButton = document.createElement('button');
         deleteButton.textContent = '删除';
         deleteButton.onclick = () => this.deleteMonitoredDir(dir.path);
-        row.insertCell(4).appendChild(deleteButton);
+        row.insertCell(5).appendChild(deleteButton);
       });
     } catch (error) {
       console.warn('[KnowledgeBase] Failed to update monitored dirs:', error.message);

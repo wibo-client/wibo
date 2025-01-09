@@ -6,7 +6,7 @@ module.exports = {
   mode: 'development',
   entry: {
     main: './src/main.mjs',
-    preload: './src/preload.mjs' // 添加 preload 入口点
+    preload: './src/preload.mjs'
   },
   target: 'electron-main',
   externals: [nodeExternals()],
@@ -17,19 +17,13 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.mjs']
   },
-  devtool: 'source-map', // 启用源映射
+  devtool: 'source-map',
   module: {
     rules: [
       {
         test: /\.m?js$/,
         exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env'],
-            plugins: ['@babel/plugin-transform-spread']
-          }
-        }
+        use: 'babel-loader'
       }
     ]
   },

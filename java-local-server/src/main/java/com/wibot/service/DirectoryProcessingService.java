@@ -24,10 +24,15 @@ import java.util.Optional;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.Collections;
 
 @Service
 public class DirectoryProcessingService {
     private static final Logger logger = LoggerFactory.getLogger(DirectoryProcessingService.class);
+    
+    private volatile PathMatcherUtil ignoredPathMatcher;
+    private volatile long lastUpdateTime = 0;
+    private static final long UPDATE_INTERVAL = 60000; // 60秒更新间隔
 
     @Autowired
     private UserDirectoryIndexRepository indexRepository;
@@ -39,6 +44,31 @@ public class DirectoryProcessingService {
     private SystemConfigService systemConfigService;
     @Autowired
     private DocumentParserSelectorInterface selector;
+
+    private PathMatcherUtil getIgnoredPathMatcher() {
+        long currentTime = System.currentTimeMillis();
+        if (ignoredPathMatcher == null || (currentTime - lastUpdateTime) > UPDATE_INTERVAL) {
+            synchronized (this) {
+                // 双重检查，避免并发更新
+                if (ignoredPathMatcher == null || (currentTime - lastUpdateTime) > UPDATE_INTERVAL) {
+                    try {
+                        String ignoredDirsStr = systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, "");
+                        List<String> ignoredPatterns = Arrays.asList(ignoredDirsStr.split("\n"));
+                        ignoredPathMatcher = new PathMatcherUtil(ignoredPatterns);
+                        lastUpdateTime = currentTime;
+                        logger.debug("已更新忽略规则匹配器，规则数量: {}", ignoredPatterns.size());
+                    } catch (Exception e) {
+                        logger.error("更新忽略规则匹配器失败", e);
+                        // 如果更新失败且没有现有实例，创建一个空的匹配器
+                        if (ignoredPathMatcher == null) {
+                            ignoredPathMatcher = new PathMatcherUtil(Collections.emptyList());
+                        }
+                    }
+                }
+            }
+        }
+        return ignoredPathMatcher;
+    }
 
     // 每10秒检查新任务
     @Scheduled(fixedRate = 10000)
@@ -77,26 +107,41 @@ public class DirectoryProcessingService {
         }
     }
 
+    private void markFileAsIgnored(Path filePath) throws IOException {
+        logger.debug("标记文件为忽略状态: {}", filePath);
+        Optional<DocumentDataPO> existingDoc = documentDataRepository.findByFilePath(filePath.toString());
+        
+        DocumentDataPO documentData;
+        if (existingDoc.isPresent()) {
+            documentData = existingDoc.get();
+        } else {
+            documentData = createDocumentDataWithoutMd5(filePath);
+        }
+        
+        documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_IGNORED);
+        documentDataRepository.save(documentData);
+    }
+
     private void processDirectory(UserDirectoryIndexPO index) throws Exception {
         Path dirPath = Paths.get(index.getDirectoryPath());
 
         logger.debug("开始处理目录: {}", index.getDirectoryPath());
-        // 获取忽略配置
-        String ignoredDirsStr = systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, "");
-        List<String> ignoredPatterns = Arrays.asList(ignoredDirsStr.split("\n"));
-        PathMatcherUtil ignoredPathMatcher = new PathMatcherUtil(ignoredPatterns);
 
         // 处理文件
         try (Stream<Path> paths = Files.walk(dirPath)) {
-            paths.filter(Files::isRegularFile).filter(path -> !ignoredPathMatcher.matches(dirPath.relativize(path)))
-                    .forEach(filePath -> {
-                        try {
-                            processFile(filePath, StandardWatchEventKinds.ENTRY_CREATE);
-                        } catch (Exception e) {
-                            logger.error("处理文件失败: {}", filePath, e);
-                            // 继续处理其他文件
+            paths.filter(Files::isRegularFile)
+                .forEach(filePath -> {
+                    try {
+                        // 使用 getter 方法获取最新的匹配器
+                        if (getIgnoredPathMatcher().matches(dirPath.relativize(filePath))) {
+                            markFileAsIgnored(filePath);
+                            return;
                         }
-                    });
+                        processFile(filePath, StandardWatchEventKinds.ENTRY_CREATE);
+                    } catch (Exception e) {
+                        logger.error("处理文件失败: {}", filePath, e);
+                    }
+                });
         }
 
         index.setIndexStatus(UserDirectoryIndexPO.STATUS_COMPLETED);
@@ -153,9 +198,7 @@ public class DirectoryProcessingService {
     private void handleExistingDocument(DocumentDataPO existing, DocumentDataPO newDoc, boolean shouldProcess, Path filePath) 
             throws Exception {
         if (!shouldProcess) {
-            existing.setProcessedState(DocumentDataPO.PROCESSED_STATE_IGNORED);
-            documentDataRepository.save(existing);
-            logger.debug("现有文件已标记为忽略: {}", filePath);
+            markFileAsIgnored(filePath);
             return;
         }
 
@@ -283,20 +326,14 @@ public class DirectoryProcessingService {
     public void handleIgnoreRulesChange(String directoryPath) {
         try {
             Path dirPath = Paths.get(directoryPath);
-            // 获取新的忽略配置
-            String ignoredDirsStr = systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, "");
-            List<String> ignoredPatterns = Arrays.asList(ignoredDirsStr.split("\n"));
-            PathMatcherUtil matcher = new PathMatcherUtil(ignoredPatterns);
-
             // 获取所有已索引的文件
             List<DocumentDataPO> indexedDocs = documentDataRepository.findByFilePathStartingWithAndProcessedState(
                 directoryPath, DocumentDataPO.PROCESSED_STATE_FILE_INDEXED);
 
-            // 重新评估每个文件
+            // 使用 getter 方法获取最新的匹配器
             for (DocumentDataPO doc : indexedDocs) {
                 Path filePath = Paths.get(doc.getFilePath());
-                if (matcher.matches(dirPath.relativize(filePath))) {
-                    // 如果文件现在应该被忽略
+                if (getIgnoredPathMatcher().matches(dirPath.relativize(filePath))) {
                     doc.setProcessedState(DocumentDataPO.PROCESSED_STATE_IGNORED);
                     documentDataRepository.save(doc);
                     logger.info("文件状态更新为忽略: {}", doc.getFilePath());
