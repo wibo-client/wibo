@@ -36,6 +36,8 @@ export default class LocalServerManager {
         this.startTimeout = 180000;  // 启动超时时间改为3分钟
         this.stopTimeout = 30000;    // 停止超时时间设为30秒
         this.healthCheckInterval = 2000; // 健康检查间隔2秒
+        this.jarPath = null; // 添加 jarPath 属性
+        this.initializeJarPath(); // 在构造函数中调用初始化
     }
 
     // 获取状态同步锁
@@ -286,22 +288,50 @@ export default class LocalServerManager {
         }
     }
 
+    // 新增：初始化 jarPath 方法
+    async initializeJarPath() {
+        try {
+            const foundJarPath = await this.findJarFile();
+            if (foundJarPath) {
+                this.jarPath = foundJarPath;
+                console.log('[LocalServer] Jar file initialized:', this.jarPath);
+            } else {
+                console.warn('[LocalServer] No jar file found during initialization');
+            }
+        } catch (error) {
+            console.error('[LocalServer] Failed to initialize jar path:', error);
+        }
+    }
+
     // 对外的启动接口 - 立即返回
     async startServer() {
-        const jarPath = await this.findJarFile();
-        if (!jarPath) {
+        try {
+            // 确保 jarPath 已初始化
+            if (!this.jarPath) {
+                const foundJarPath = await this.findJarFile();
+                if (!foundJarPath) {
+                    this.desiredState = false;
+                    this.store.set('serverDesiredState', false);
+                    return {
+                        success: false,
+                        message: '未找到可执行的 jar 文件'
+                    };
+                }
+                this.jarPath = foundJarPath;
+            }
+
+            this.desiredState = true;
+            this.store.set('serverDesiredState', true);
+            return { success: true, message: '已设置启动指令' };
+        } catch (error) {
+            console.error('[LocalServer] Start server error:', error);
             this.desiredState = false;
             this.store.set('serverDesiredState', false);
             return {
                 success: false,
-                message: '未找到可执行的 jar 文件'
+                message: '启动服务器失败: ' + error.message
             };
         }
-
-        this.jarPath = jarPath; // 保存 jarPath 供内部使用
-        this.desiredState = true;
-        this.store.set('serverDesiredState', true);
-        return { success: true, message: '已设置启动指令' };
     }
 
     // 对外的停止接口 - 立即返回
@@ -345,6 +375,20 @@ export default class LocalServerManager {
         if (this.isDebugMode()) {
             console.log('[LocalServer] Debug mode: Skipping server start');
             return;
+        }
+
+        // 确保有 jarPath
+        if (!this.jarPath) {
+            try {
+                const foundJarPath = await this.findJarFile();
+                if (!foundJarPath) {
+                    throw new Error('No jar file available');
+                }
+                this.jarPath = foundJarPath;
+            } catch (error) {
+                console.error('[LocalServer] Failed to get jar path:', error);
+                throw new Error('Cannot start server: jar file not found');
+            }
         }
 
         try {
