@@ -1,4 +1,3 @@
-
 export default class KnowledgeBaseHandler {
   constructor() {
     this.BASE_URL = null;
@@ -6,6 +5,14 @@ export default class KnowledgeBaseHandler {
     this.isUpdatingUI = false; // 添加UI更新锁定标志
     this.uiLockTimeout = null; // 添加UI锁定计时器
     this.setupEventListeners();
+    this.lastServerState = null; // 添加状态缓存
+    this.lastKnownState = {
+      isHealthy: false,
+      port: null,
+      desiredState: false,
+      debugMode: false
+    };
+    this.stateChangeCallbacks = new Set();
 
     // 不再直接启动定时更新，而是通过状态检查来控制
     this.setupPortCheck();
@@ -31,14 +38,66 @@ export default class KnowledgeBaseHandler {
     }
   }
 
-  // 修改 setupPortCheck 方法
+  // 新增：状态变化处理方法
+  handleStateChange(newState) {
+    const stateChanged = JSON.stringify(newState) !== JSON.stringify(this.lastKnownState);
+
+    if (stateChanged) {
+      this.lastKnownState = { ...newState };
+      this.updateUIState(newState);
+      this.stateChangeCallbacks.forEach(callback => callback(newState));
+    }
+  }
+
+  // 新增：UI状态更新方法
+  updateUIState(state) {
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const configSection = document.getElementById('localKnowledgeBaseConfig');
+    const toggle = document.getElementById('localKnowledgeBaseToggle');
+
+    if (statusDot && statusText) {
+      if (state.isHealthy) {
+        statusDot.style.backgroundColor = '#4CAF50';
+        statusText.textContent = state.debugMode ? '调试模式运行中' : '正常运行中';
+      } else if (state.desiredState) {
+        statusDot.style.backgroundColor = '#FFA500';
+        statusText.textContent = '启动中...';
+      } else {
+        statusDot.style.backgroundColor = '#9E9E9E';
+        statusText.textContent = '已关闭';
+      }
+    }
+
+    if (configSection && toggle) {
+      toggle.checked = state.desiredState;
+      configSection.style.display = state.desiredState ? 'block' : 'none';
+    }
+  }
+
+  // 修改 setupPortCheck 方法，增加状态转换处理
   async setupPortCheck() {
     const updateBaseUrl = async () => {
       try {
         const serverStatus = await window.electron.getServerDesiredState();
+        // 添加调试模式检测
+        const debugMode = Boolean(serverStatus.debugPort);
+
+        const newState = {
+          isHealthy: serverStatus.isHealthy,
+          port: serverStatus.port,
+          desiredState: serverStatus.desiredState,
+          debugMode
+        };
+
+        this.handleStateChange(newState);
+
         if (serverStatus.isHealthy && serverStatus.port) {
           this.BASE_URL = `http://localhost:${serverStatus.port}`;
-          this.startUpdateTimer(); // 服务在线时启动定时器
+          // 非调试模式才启动定时更新
+          if (!debugMode) {
+            this.startUpdateTimer();
+          }
           await this.initializeIndexSettings(); // 服务启动后初始化索引设置
           return true;
         } else {
@@ -270,6 +329,7 @@ export default class KnowledgeBaseHandler {
     }
   }
 
+  // 修改 toggleLocalKnowledgeBase 方法
   async toggleLocalKnowledgeBase() {
     const configSection = document.getElementById('localKnowledgeBaseConfig');
     const toggle = document.getElementById('localKnowledgeBaseToggle');
@@ -286,7 +346,10 @@ export default class KnowledgeBaseHandler {
       const result = await window.electron.toggleKnowledgeBase(enable);
 
       if (result.success) {
-        alert(enable ? '本地知识库服务启动，启动需要时间，等到服务状态为在线时就可用了' : '本地知识库服务已关闭');
+        // 在非调试模式下才显示提示
+        if (!this.lastKnownState.debugMode) {
+          alert(enable ? '本地知识库服务启动，启动需要时间，等到服务状态为在线时就可用了' : '本地知识库服务已关闭');
+        }
       } else {
         toggle.checked = !enable;
         configSection.style.display = !enable ? 'block' : 'none';

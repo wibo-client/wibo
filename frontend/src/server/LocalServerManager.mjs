@@ -24,7 +24,7 @@ export default class LocalServerManager {
         this.portManager = new PortManager();
         this.store = new Store();
         this.currentPort = null;
-        this.portForDebug = 8080; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = null; // 添加调试端口配置，可以根据需要修改端口号
         // 从 store 中读取 desiredState，默认为 false
         this.desiredState = this.store.get('serverDesiredState', false);
         this.stateLock = false; // 状态同步锁
@@ -72,6 +72,19 @@ export default class LocalServerManager {
             const nextAction = this.determineNextAction(serverInfo);
             await this.executeAction(nextAction, serverInfo);
 
+            // 发送状态更新到渲染进程
+            if (process.send) {
+                process.send({
+                    type: 'serverStateUpdate',
+                    data: {
+                        isHealthy: serverInfo.processExists,
+                        port: serverInfo.port,
+                        desiredState: this.desiredState,
+                        debugPort: serverInfo.debugPort
+                    }
+                });
+            }
+
         } finally {
             this.releaseLock();
         }
@@ -99,7 +112,9 @@ export default class LocalServerManager {
             hasPid,
             processExists,
             pid: savedProcess?.pid,
-            port: savedProcess?.port
+            port: savedProcess?.port,
+            debugPort: this.isDebugMode() ? this.portForDebug : null,
+            isHealthy: processExists
         };
     }
 
