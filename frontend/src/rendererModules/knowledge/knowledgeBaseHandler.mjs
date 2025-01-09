@@ -75,40 +75,40 @@ export default class KnowledgeBaseHandler {
     }
   }
 
-  // 修改 setupPortCheck 方法，增加状态转换处理
+  // 修改 setupPortCheck 方法
   async setupPortCheck() {
     const updateBaseUrl = async () => {
       try {
         const serverStatus = await window.electron.getServerDesiredState();
-        // 添加调试模式检测
         const debugMode = Boolean(serverStatus.debugPort);
 
+        // 调试模式下使用调试端口
+        const activePort = debugMode ? serverStatus.debugPort : serverStatus.port;
+
         const newState = {
-          isHealthy: serverStatus.isHealthy,
-          port: serverStatus.port,
-          desiredState: serverStatus.desiredState,
+          isHealthy: serverStatus.isHealthy || debugMode,  // 调试模式下默认为健康
+          port: activePort,
+          desiredState: serverStatus.desiredState || debugMode,  // 调试模式下视为已开启
           debugMode
         };
 
         this.handleStateChange(newState);
 
-        if (serverStatus.isHealthy && serverStatus.port) {
-          this.BASE_URL = `http://localhost:${serverStatus.port}`;
-          // 非调试模式才启动定时更新
-          if (!debugMode) {
-            this.startUpdateTimer();
-          }
-          await this.initializeIndexSettings(); // 服务启动后初始化索引设置
+        // 更新 BASE_URL
+        if (activePort) {
+          this.BASE_URL = `http://localhost:${activePort}`;
+          this.startUpdateTimer();
+          await this.initializeIndexSettings();
           return true;
         } else {
           this.BASE_URL = null;
-          this.stopUpdateTimer();  // 服务离线时停止定时器
+          this.stopUpdateTimer();
           return false;
         }
       } catch (error) {
         console.error('Failed to get server status:', error);
         this.BASE_URL = null;
-        this.stopUpdateTimer();  // 出错时停止定时器
+        this.stopUpdateTimer();
         return false;
       }
     };
@@ -421,7 +421,7 @@ export default class KnowledgeBaseHandler {
       const response = await fetch(`${this.BASE_URL}/admin/submit/path`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: directory })
+        body: JSON.stringify({ path: directory })  // 修改为正确的请求体格式
       });
 
       const data = await response.json();
@@ -441,7 +441,7 @@ export default class KnowledgeBaseHandler {
         const response = await fetch(`${this.BASE_URL}/admin/delete/monitored-dir`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path })
+          body: JSON.stringify({ path: path })  // 修改为正确的请求体格式
         });
 
         const data = await response.json();

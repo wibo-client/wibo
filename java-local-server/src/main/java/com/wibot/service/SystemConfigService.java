@@ -35,7 +35,7 @@ public class SystemConfigService {
     public static final String CONFIG_PPT_RECOGNITION = "model.enhancement.pptRecognition";
 
     // 文件类型索引配置前缀
-    public static final String CONFIG_FILE_TYPE_PREFIX = "index.filetype.";
+    public static final String CONFIG_FILE_TYPE_PREFIX = "filetype.";
     
     // 忽略目录配置
     public static final String CONFIG_IGNORED_DIRECTORIES = "index.ignored.directories";
@@ -48,8 +48,32 @@ public class SystemConfigService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    // 缓存相关字段
+    private final Map<String, CacheEntry> configCache = new HashMap<>();
+    private long lastClearTime = System.currentTimeMillis();
+    private static final long CACHE_CLEAR_INTERVAL = 30000; // 30秒
+
+    private static class CacheEntry {
+        final Object value;
+        final long timestamp;
+
+        CacheEntry(Object value) {
+            this.value = value;
+            this.timestamp = System.currentTimeMillis();
+        }
+    }
+
+    private void checkAndClearCache() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastClearTime > CACHE_CLEAR_INTERVAL) {
+            configCache.clear();
+            lastClearTime = currentTime;
+            logger.debug("Config cache cleared at: {}", lastClearTime);
+        }
+    }
+
     /**
-     * 保存配置
+     * 保存配置并清除缓存
      * 
      * @param key   配置键
      * @param value 配置值(任意对象，将被转换为JSON)
@@ -69,10 +93,48 @@ public class SystemConfigService {
                 config.setConfigValue(jsonValue);
                 configRepository.save(config);
             }
+            
+            // 保存时清除所有缓存
+            configCache.clear();
+            lastClearTime = System.currentTimeMillis();
         } catch (JsonProcessingException e) {
             logger.error("Error saving config: {} ", key, e);
             throw new RuntimeException("配置保存失败", e);
         }
+    }
+
+    /**
+     * 读取配置(带缓存)
+     * 
+     * @param key          配置键
+     * @param clazz        配置值类型
+     * @param defaultValue 默认值
+     * @return 配置值对象
+     */
+    public <T> T getConfig(String key, Class<T> clazz, T defaultValue) {
+        checkAndClearCache();
+        
+        String cacheKey = key + "_" + clazz.getName();
+        CacheEntry entry = configCache.get(cacheKey);
+        
+        if (entry != null) {
+            @SuppressWarnings("unchecked")
+            T cachedValue = (T) entry.value;
+            return cachedValue;
+        }
+
+        Optional<SystemConfigPO> config = configRepository.findByConfigKey(key);
+        if (config.isPresent()) {
+            try {
+                T value = objectMapper.readValue(config.get().getConfigValue(), clazz);
+                configCache.put(cacheKey, new CacheEntry(value));
+                return value;
+            } catch (JsonProcessingException e) {
+                logger.error("Error reading config: {} ", key, e);
+                return defaultValue;
+            }
+        }
+        return defaultValue;
     }
 
     /**
@@ -84,27 +146,6 @@ public class SystemConfigService {
      */
     public <T> T getConfig(String key, Class<T> clazz) {
         return getConfig(key, clazz, null);
-    }
-
-    /**
-     * 读取配置
-     * 
-     * @param key          配置键
-     * @param clazz        配置值类型
-     * @param defaultValue 默认值
-     * @return 配置值对象
-     */
-    public <T> T getConfig(String key, Class<T> clazz, T defaultValue) {
-        Optional<SystemConfigPO> config = configRepository.findByConfigKey(key);
-        if (config.isPresent()) {
-            try {
-                return objectMapper.readValue(config.get().getConfigValue(), clazz);
-            } catch (JsonProcessingException e) {
-                logger.error("Error reading config: {} ", key, e);
-                return defaultValue;
-            }
-        }
-        return defaultValue;
     }
 
     /**

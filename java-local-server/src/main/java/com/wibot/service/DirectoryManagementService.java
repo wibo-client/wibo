@@ -60,8 +60,11 @@ public class DirectoryManagementService {
 
             List<DocumentDataPO> docs = documentDataRepository.findByFilePathStartingWith(path);
             int totalDocs = docs.size();
+            
+            // 统计已完成数量（包括已索引和已忽略的文件）
             long completedDocs = docs.stream()
-                    .filter(doc -> DocumentDataPO.PROCESSED_STATE_FILE_INDEXED.equals(doc.getProcessedState()))
+                    .filter(doc -> DocumentDataPO.PROCESSED_STATE_FILE_INDEXED.equals(doc.getProcessedState()) 
+                              || DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
                     .count();
 
             dirInfo.put("fileCount", totalDocs);

@@ -7,7 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.wibot.service.ApiKeyService;
 import com.wibot.service.DirectoryManagementService;
-import com.wibot.service.ModelEnhancementService;
+import com.wibot.service.FileTypeConfigurationService;
 import com.wibot.service.RemoteUploadService;
 import com.wibot.service.SystemConfigService;
 import java.util.Map;
@@ -30,7 +30,8 @@ public class AdminController {
     private DirectoryManagementService directoryManagementService;
 
     @Autowired
-    private ModelEnhancementService modelEnhancementService;
+    private FileTypeConfigurationService modelEnhancementService;
+    
     @Autowired
     private RemoteUploadService remoteUploadService;
 
@@ -49,12 +50,6 @@ public class AdminController {
     //     return "admin";
     // }
 
-    @PostMapping("/admin/submit/path")
-    @ResponseBody
-    public Map<String, Object> handlePathSubmission(@RequestBody Map<String, String> request) {
-        String path = request.get("path");
-        return directoryManagementService.handlePathSubmission(path);
-    }
 
     // @GetMapping("/index/status")
     // @ResponseBody
@@ -109,6 +104,13 @@ public class AdminController {
     @ResponseBody
     public Map<String, Object> getAK() {
         return apiKeyService.getAK();
+    }
+    
+    @PostMapping("/admin/submit/path")
+    @ResponseBody
+    public Map<String, Object> handlePathSubmission(@RequestBody Map<String, String> request) {
+        String path = request.get("path");
+        return directoryManagementService.handlePathSubmission(path);
     }
 
     @PostMapping("/admin/delete/monitored-dir")

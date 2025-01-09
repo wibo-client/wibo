@@ -37,7 +37,7 @@ public abstract class AbstractDocumentParser implements DocumentParserInterface 
         }
         
         Boolean enabled = systemConfigService.getConfig(
-            "index.filetype." + fileType + ".enabled",
+            "filetype." + fileType + ".enabled",
             Boolean.class,
             false
         );

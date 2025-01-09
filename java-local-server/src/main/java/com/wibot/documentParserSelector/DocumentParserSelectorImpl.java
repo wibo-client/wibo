@@ -149,7 +149,7 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
         case "key":
             return defaultParser;
         default:
-            logger.info("No parser found for extension: {}", extension);
+            logger.debug("No parser found for extension: {}", extension);
             return defaultParser;
         }
     }

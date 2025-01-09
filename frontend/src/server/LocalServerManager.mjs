@@ -24,7 +24,7 @@ export default class LocalServerManager {
         this.portManager = new PortManager();
         this.store = new Store();
         this.currentPort = null;
-        this.portForDebug = null; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
         // 从 store 中读取 desiredState，默认为 false
         this.desiredState = this.store.get('serverDesiredState', false);
         this.stateLock = false; // 状态同步锁
@@ -99,11 +99,24 @@ export default class LocalServerManager {
         const hasPid = Boolean(savedProcess?.pid);
         let processExists = false;
 
-        if (hasPid) {
+        if (this.isDebugMode() && this.portForDebug) {
+            // 调试模式下，直接做健康检查
+            try {
+                processExists = await this.checkHealth(this.portForDebug);
+                // 如果健康检查成功，保存调试进程信息
+                if (processExists && !savedProcess) {
+                    this.store.set('javaProcess', {
+                        port: this.portForDebug,
+                        pid: 0  // 调试模式下不需要真实PID
+                    });
+                }
+            } catch (e) {
+                processExists = false;
+            }
+        } else if (hasPid) {
             try {
                 process.kill(savedProcess.pid, 0);
-                const isHealthy = await this.checkHealth(savedProcess.port);
-                processExists = isHealthy;
+                processExists = await this.checkHealth(savedProcess.port);
             } catch (e) {
                 processExists = false;
             }
@@ -114,7 +127,7 @@ export default class LocalServerManager {
             hasPid,
             processExists,
             pid: savedProcess?.pid,
-            port: savedProcess?.port,
+            port: this.isDebugMode() ? this.portForDebug : savedProcess?.port,
             debugPort: this.isDebugMode() ? this.portForDebug : null,
             isHealthy: processExists
         };
@@ -190,15 +203,16 @@ export default class LocalServerManager {
     // 健康检查方法
     async checkHealth(port, retryCount = 0) {
         try {
-            //console.log(`[HealthCheck] Checking health on port ${port}`);
             const response = await fetch(`http://localhost:${port}/health`);
-            //console.log(`[HealthCheck] Response status:`, response.status);
             return response.ok;
         } catch (error) {
-            console.warn(`[HealthCheck] Failed attempt ${retryCount + 1}:`, error.message);
+            // 如果是调试端口且是第一次检查，给予更长的等待时间
+            if (port === this.portForDebug && retryCount === 0) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                return this.checkHealth(port, retryCount + 1);
+            }
 
             if (retryCount < this.MAX_HEALTH_RETRIES) {
-                // 等待一秒后重试
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 return this.checkHealth(port, retryCount + 1);
             }

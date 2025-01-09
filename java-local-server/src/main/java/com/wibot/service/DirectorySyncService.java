@@ -36,7 +36,6 @@ public class DirectorySyncService {
     private final AtomicInteger processingCount = new AtomicInteger(0);
 
     @Scheduled(fixedRate = 30000) // 5分钟执行一次
-
     public synchronized void syncDirectories() {
         logger.info("开始目录同步任务");
         List<UserDirectoryIndexPO> completedTasks = indexRepository
@@ -55,25 +54,36 @@ public class DirectorySyncService {
         String directoryPath = task.getDirectoryPath();
         Path dirPath = Paths.get(directoryPath);
 
-        // 获取数据库中该目录下的所有文件记录
+        // 修改获取现有文件记录的逻辑，分离正常文件和被忽略的文件
         List<DocumentDataPO> existingDocs = documentDataRepository.findByFilePathStartingWith(directoryPath);
-
-        Map<String, DocumentDataPO> existingDocsMap = existingDocs.stream()
-                .filter(doc -> !DocumentDataPO.PROCESSED_STATE_DELETED.equals(doc.getProcessedState()))
+        
+        // 分别处理正常文件和被忽略的文件
+        Map<String, DocumentDataPO> normalDocsMap = existingDocs.stream()
+                .filter(doc -> !DocumentDataPO.PROCESSED_STATE_DELETED.equals(doc.getProcessedState())
+                        && !DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
                 .collect(Collectors.toMap(DocumentDataPO::getFilePath, doc -> doc));
 
-        // 获取文件系统中的实际文件列表
+        Map<String, DocumentDataPO> ignoredDocsMap = existingDocs.stream()
+                .filter(doc -> DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
+                .collect(Collectors.toMap(DocumentDataPO::getFilePath, doc -> doc));
+
+        // 获取当前文件系统中的文件
         Set<String> currentFiles = new HashSet<>();
         try (Stream<Path> paths = Files.walk(dirPath)) {
             paths.filter(Files::isRegularFile).forEach(path -> currentFiles.add(path.toString()));
         }
 
-        // 分析文件变化
-        Set<String> newFiles = findNewFiles(currentFiles, existingDocsMap.keySet());
-        Set<String> deletedFiles = findDeletedFiles(currentFiles, existingDocsMap.keySet());
-        Set<String> updatedFiles = findUpdatedFiles(currentFiles, existingDocsMap);
+        // 分析正常文件的变化
+        Set<String> newFiles = findNewFiles(currentFiles, normalDocsMap.keySet(), ignoredDocsMap.keySet());
+        Set<String> deletedFiles = findDeletedFiles(currentFiles, normalDocsMap.keySet());
+        Set<String> updatedFiles = findUpdatedFiles(currentFiles, normalDocsMap);
 
-        // 批量处理文件变化
+        // 分析被忽略文件的变化（检查删除）
+        Set<String> deletedIgnoredFiles = findDeletedFiles(currentFiles, ignoredDocsMap.keySet());
+        // 合并所有需要删除的文件
+        deletedFiles.addAll(deletedIgnoredFiles);
+
+        // 处理文件变化
         processBatch(newFiles, StandardWatchEventKinds.ENTRY_CREATE, "新增");
         processBatch(deletedFiles, StandardWatchEventKinds.ENTRY_DELETE, "删除");
         processBatch(updatedFiles, StandardWatchEventKinds.ENTRY_MODIFY, "更新");
@@ -81,8 +91,10 @@ public class DirectorySyncService {
         indexRepository.save(task);
     }
 
-    private Set<String> findNewFiles(Set<String> currentFiles, Set<String> existingFiles) {
-        return currentFiles.stream().filter(path -> !existingFiles.contains(path)).collect(Collectors.toSet());
+    private Set<String> findNewFiles(Set<String> currentFiles, Set<String> existingFiles, Set<String> ignoredFiles) {
+        return currentFiles.stream()
+                .filter(path -> !existingFiles.contains(path) && !ignoredFiles.contains(path))
+                .collect(Collectors.toSet());
     }
 
     private Set<String> findDeletedFiles(Set<String> currentFiles, Set<String> existingFiles) {

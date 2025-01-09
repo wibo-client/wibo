@@ -11,6 +11,7 @@ public class UserDirectoryIndexPO {
     public static final String STATUS_COMPLETED = "completed";
     public static final String STATUS_PENDING = "pending"; // 待处理
     public static final String STATUS_DELETED = "deleted"; // 新增删除状态
+    public static final String STATUS_IGNORE_TRIGGERED = "ignore_triggered"; // 索引中
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)

@@ -6,14 +6,16 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 @Service
-public class ModelEnhancementService {
-    private static final Logger logger = LoggerFactory.getLogger(ModelEnhancementService.class);
+public class FileTypeConfigurationService {
+    private static final Logger logger = LoggerFactory.getLogger(FileTypeConfigurationService.class);
 
     @Autowired
     private SystemConfigService systemConfigService;
 
     private boolean alreadyInitialized = false;
 
+    @Autowired
+    private DirectoryProcessingService directoryProcessingService;
     // 添加默认配置常量
     private static final Map<String, Object> DEFAULT_CONFIGS = new HashMap<>();
     static {
@@ -86,6 +88,8 @@ public class ModelEnhancementService {
 
             response.put("success", true);
             response.put("message", "索引设置已更新");
+
+            directoryProcessingService.triggerIgnoreRulesChangeForAllDirectories();
         } catch (Exception e) {
             logger.error("更新索引设置失败", e);
             response.put("success", false);

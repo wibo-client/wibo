@@ -123,7 +123,14 @@ public class DocumentProcessorService {
                     // }
                 }
             } catch (Exception e) {
-                logger.error("线程 {} (处理器 {}) 处理{}文档时出错", Thread.currentThread().getName(), processorId, currentDoc, e);
+                
+                logger.atError()
+                      .setMessage("线程 {} (处理器 {}) 处理文档时出错: {}")
+                      .addArgument(Thread.currentThread().getName())
+                      .addArgument(processorId)
+                      .addArgument(currentDoc != null ? currentDoc.getFilePath() : "未知文档")
+                      .setCause(e)
+                      .log();
             }
 
         }
