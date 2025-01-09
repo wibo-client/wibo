@@ -122,7 +122,7 @@ public class DirectoryProcessingService {
         }
 
         // 创建文档数据
-        DocumentDataPO documentData = createDocumentData(filePath);
+        DocumentDataPO documentData = createDocumentDataWithoutMd5(filePath);
         DocumentParserInterface parser = selector.select(documentData.getExtension());
         boolean shouldProcess = parser.shouldProcess(documentData.getExtension());
         try {
@@ -139,12 +139,14 @@ public class DirectoryProcessingService {
                     documentDataRepository.save(existing);
                 } else {
                     // 如果MD5相同，跳过处理
-                    if (existing.getMd5().equals(documentData.getMd5())) {
+                    String newMd5 = calculateMD5(filePath);
+                    if (existing.getMd5().equals(newMd5)) {
                         logger.debug("文件未改变，跳过处理: {}", filePath);
                         return;
                     } else {
                         // 更新现有记录
                         documentData.setId(existing.getId());
+                        documentData.setMd5(newMd5);
                         documentData.setVersion(existing.getVersion()); // 设置版本号
                         // 重置处理状态
                         documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
@@ -174,7 +176,7 @@ public class DirectoryProcessingService {
         }
     }
 
-    private DocumentDataPO createDocumentData(Path filePath) throws IOException {
+    private DocumentDataPO createDocumentDataWithoutMd5(Path filePath) throws IOException {
         DocumentDataPO documentData = new DocumentDataPO();
         documentData.setFileName(filePath.getFileName().toString());
         documentData.setFilePath(filePath.toString());
@@ -183,14 +185,7 @@ public class DirectoryProcessingService {
         documentData.setUpdateDateTime(
                 LocalDateTime.ofInstant(Files.getLastModifiedTime(filePath).toInstant(), ZoneId.systemDefault()));
         documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
-        try {
-            String md5 = calculateMD5(filePath);
-            documentData.setMd5(md5);
-        } catch (Exception e) {
-            logger.error("计算文件MD5失败: {}", filePath, e);
-            throw new IOException("MD5计算失败", e);
-        }
-
+      
         return documentData;
     }
 
