@@ -10,7 +10,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
-import java.awt.Desktop;
 import java.net.URI;
 import java.io.IOException;
 
@@ -46,36 +45,3 @@ public class App {
     }
 }
 
-@Component
-class BrowserOpener {
-    private final Environment environment;
-
-    public BrowserOpener(Environment environment) {
-        this.environment = environment;
-    }
-
-   // @EventListener(ApplicationStartedEvent.class)
-    public void openBrowser() {
-        try {
-            String port = environment.getProperty("server.port", "8080");
-            String url = "http://localhost:" + port + "/chatClient";
-
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(new URI(url));
-            } else {
-                // 对于不支持Desktop API的系统，使用命令行方式打开
-                Runtime rt = Runtime.getRuntime();
-                String os = System.getProperty("os.name").toLowerCase();
-                if (os.contains("win")) {
-                    rt.exec("rundll32 url.dll,FileProtocolHandler " + url);
-                } else if (os.contains("mac")) {
-                    rt.exec("open " + url);
-                } else if (os.contains("nix") || os.contains("nux")) {
-                    rt.exec("xdg-open " + url);
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
