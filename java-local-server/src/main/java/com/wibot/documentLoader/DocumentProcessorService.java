@@ -69,6 +69,11 @@ public class DocumentProcessorService {
     }
 
     private void processDocuments(int processorId) {
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         DocumentDataPO currentDoc = null;
         while (true) {
             try {

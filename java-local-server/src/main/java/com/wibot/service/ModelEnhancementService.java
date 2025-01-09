@@ -12,6 +12,8 @@ public class ModelEnhancementService {
     @Autowired
     private SystemConfigService systemConfigService;
 
+    private boolean alreadyInitialized = false;
+
     // 添加默认配置常量
     private static final Map<String, Object> DEFAULT_CONFIGS = new HashMap<>();
     static {
@@ -36,8 +38,11 @@ public class ModelEnhancementService {
             "node_modules\n.git\n.idea\n.vscode\ntarget\nbuild");
     }
 
-    @jakarta.annotation.PostConstruct
     public void initializeDefaultConfigs() {
+        if (alreadyInitialized) {
+            return;
+        }
+        alreadyInitialized = true;
         try {
             for (Map.Entry<String, Object> entry : DEFAULT_CONFIGS.entrySet()) {
                 String key = entry.getKey();
@@ -54,6 +59,7 @@ public class ModelEnhancementService {
 
 
     public Map<String, Object> updateIndexSettings(Map<String, Object> config) {
+        initializeDefaultConfigs();
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> fileTypes = (Map<String, Object>) config.get("fileTypes");
@@ -89,6 +95,7 @@ public class ModelEnhancementService {
     }
 
     public Map<String, Object> resetToDefaultConfig() {
+        initializeDefaultConfigs();
         Map<String, Object> response = new HashMap<>();
         try {
             for (Map.Entry<String, Object> entry : DEFAULT_CONFIGS.entrySet()) {
@@ -105,6 +112,7 @@ public class ModelEnhancementService {
     }
 
     public Map<String, Object> getEffectiveConfig() {
+        initializeDefaultConfigs();
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> effectiveConfig = new HashMap<>();
@@ -130,6 +138,7 @@ public class ModelEnhancementService {
     }
 
     public Map<String, Object> getCurrentIndexSettings() {
+        initializeDefaultConfigs();
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> fileTypes = new HashMap<>();

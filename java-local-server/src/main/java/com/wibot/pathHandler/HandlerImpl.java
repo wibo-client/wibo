@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 import com.wibot.index.DocumentIndexInterface;
 import com.wibot.persistence.HandlerConfigRepository;
 
-import jakarta.annotation.PostConstruct;
 
 @Component
 public class HandlerImpl implements PathBasedIndexHandlerSelector {

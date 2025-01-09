@@ -3,8 +3,6 @@ package com.wibot.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
-
 import java.util.*;
 
 @Service
@@ -12,8 +10,13 @@ public class IndexSettingsService {
     @Autowired
     private SystemConfigService systemConfigService;
 
-    @PostConstruct
+    private boolean alreadyInitialized = false;
+
     public void initDefaultSettings() {
+        if(alreadyInitialized) {
+            return;
+        }
+        alreadyInitialized = true;
         initSimpleFileTypeConfig("text", true);
         initSimpleFileTypeConfig("spreadsheet", true);
         initSimpleFileTypeConfig("web", true);
@@ -29,6 +32,7 @@ public class IndexSettingsService {
     }
 
     public Map<String, Object> updateIndexSettings(Map<String, Object> config) {
+        initDefaultSettings();
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> fileTypes = (Map<String, Object>) config.get("fileTypes");
@@ -45,6 +49,7 @@ public class IndexSettingsService {
     }
 
     private void initDefaultIgnoredDirectories() {
+
         if (systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, null) == null) {
             List<String> defaultIgnoredDirs = Arrays.asList(
                 ".git", ".svn", "node_modules", "__pycache__",
@@ -65,6 +70,7 @@ public class IndexSettingsService {
     }
 
     private void initEnhancedFileTypeConfig(String type, boolean defaultEnabled, boolean defaultEnhanced) {
+
         // 初始化启用状态
         String enabledKey = "index.filetype." + type + ".enabled";
         if (systemConfigService.getValue(enabledKey, null) == null) {
@@ -93,6 +99,7 @@ public class IndexSettingsService {
     }
 
     private void updateFileTypeConfigs(Map<String, Object> fileTypes) {
+        
         // 更新基础文件类型配置
         updateBasicFileType(fileTypes, "text");
         updateBasicFileType(fileTypes, "spreadsheet");
@@ -148,6 +155,7 @@ public class IndexSettingsService {
 
     // 获取当前索引设置
     public Map<String, Object> getCurrentSettings() {
+        initDefaultSettings();
         Map<String, Object> settings = new HashMap<>();
         Map<String, Object> fileTypes = new HashMap<>();
         

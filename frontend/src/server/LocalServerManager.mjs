@@ -12,10 +12,11 @@ class LocalServerManager {
         this.portManager = new PortManager();
         this.store = new Store();
         this.currentPort = null;
+        this.portForDebug = 8080; // 添加调试端口配置，可以根据需要修改端口号
         // 从 store 中读取 desiredState，默认为 false
         this.desiredState = this.store.get('serverDesiredState', false);
         this.stateLock = false; // 状态同步锁
-        
+
         // 启动状态同步任务
         this.startStateSyncTask();
         this.MAX_HEALTH_RETRIES = 5;  // 添加最大重试次数
@@ -49,7 +50,7 @@ class LocalServerManager {
     async syncState() {
         try {
             await this.acquireLock();
-            
+
             const actualState = await this.checkProcessStatus();
             // 添加10%概率的日志输出
             if (Math.random() < 0.1) {
@@ -75,13 +76,13 @@ class LocalServerManager {
             return response.ok;
         } catch (error) {
             console.warn(`[HealthCheck] Failed attempt ${retryCount + 1}:`, error.message);
-            
+
             if (retryCount < this.MAX_HEALTH_RETRIES) {
                 // 等待一秒后重试
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 return this.checkHealth(port, retryCount + 1);
             }
-            
+
             return false;
         }
     }
@@ -95,13 +96,13 @@ class LocalServerManager {
             try {
                 // 首先检查进程是否存在
                 process.kill(savedProcess.pid, 0);
-                
+
                 // 进程存在，继续检查健康状态
                 const isHealthy = await this.checkHealth(savedProcess.port);
-                
+
                 if (!isHealthy) {
                     console.warn('[ProcessCheck] Process exists but health check failed');
-                    
+
                     // 尝试终止进程
                     try {
                         if (process.platform === 'win32') {
@@ -126,12 +127,12 @@ class LocalServerManager {
                     return false;
                 }
                 this.savedProcess = savedProcess;
-                
+
                 // 进程正常且健康
                 this.currentPort = savedProcess.port;
                 this.isRunning = true;
                 return true;
-                
+
             } catch (e) {
                 console.warn('[ProcessCheck] Process check failed:', e.message);
                 this.store.delete('javaProcess');
@@ -152,7 +153,7 @@ class LocalServerManager {
         }
 
         return this.isRunning;
-    } 
+    }
 
     // 查找 jar 文件的辅助方法
     async findJarFile() {
@@ -173,12 +174,12 @@ class LocalServerManager {
         if (!jarPath) {
             this.desiredState = false;
             this.store.set('serverDesiredState', false);
-            return { 
-                success: false, 
-                message: '未找到可执行的 jar 文件' 
+            return {
+                success: false,
+                message: '未找到可执行的 jar 文件'
             };
         }
-        
+
         this.jarPath = jarPath; // 保存 jarPath 供内部使用
         this.desiredState = true;
         this.store.set('serverDesiredState', true);
@@ -223,11 +224,14 @@ class LocalServerManager {
         }
         try {
             this.startLock = true;
-            
+
             // 确保没有遗留进程
             await this.cleanupExistingProcesses();
-            
-            this.currentPort = await this.portManager.findAvailablePort();
+
+            // 优先使用调试端口
+            this.currentPort = this.portForDebug || await this.portManager.findAvailablePort();
+            console.log(`[LocalServer] Using port: ${this.currentPort}${this.portForDebug ? ' (debug mode)' : ''}`);
+
             const args = [
                 '-jar',
                 this.jarPath,
@@ -292,7 +296,7 @@ class LocalServerManager {
                 console.log('[LocalServer] Server starting ');
                 // 开始健康检查
                 checkHealth();
-              
+
             });
 
         } catch (error) {
@@ -316,6 +320,12 @@ class LocalServerManager {
         const savedProcess = this.store.get('javaProcess');
         if (!savedProcess || !savedProcess.pid) return;
 
+        // 如果是调试模式且端口匹配，则跳过清理
+        if (this.portForDebug && savedProcess.port === this.portForDebug) {
+            console.log('[LocalServer] Debug mode: Skipping process cleanup');
+            return;
+        }
+
         try {
             if (process.platform === 'win32') {
                 await new Promise(resolve => {
@@ -330,11 +340,11 @@ class LocalServerManager {
                     console.log('[LocalServer] Process already terminated:', e.message);
                 }
             }
-            
+
             // 清理存储的进程信息
             this.store.delete('javaProcess');
             await new Promise(resolve => setTimeout(resolve, 2000));
-            
+
         } catch (e) {
             console.error('[LocalServer] Error cleaning up process:', e);
         }
@@ -343,6 +353,14 @@ class LocalServerManager {
     // 修改停止方法
     async _stopServer() {
         if (!this.isRunning || !this.javaProcess) return;
+
+        // 如果是调试模式且端口匹配，则跳过停止
+        if (this.portForDebug && this.currentPort === this.portForDebug) {
+            console.log('[LocalServer] Debug mode: Skipping server stop');
+            this.isRunning = false;
+            this.javaProcess = null;
+            return;
+        }
 
         try {
             const pid = this.javaProcess.pid;
@@ -355,7 +373,7 @@ class LocalServerManager {
 
             // 等待进程完全停止
             await this.waitForProcessStop(pid);
-            
+
             this.isRunning = false;
             this.javaProcess = null;
             this.store.delete('javaProcess');

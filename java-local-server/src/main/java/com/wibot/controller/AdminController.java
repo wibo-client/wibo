@@ -44,10 +44,10 @@ public class AdminController {
         return "chat";
     }
 
-    @GetMapping("/admin")
-    public String adminPage() {
-        return "admin";
-    }
+    // @GetMapping("/admin")
+    // public String adminPage() {
+    //     return "admin";
+    // }
 
     @PostMapping("/admin/submit/path")
     @ResponseBody
@@ -56,11 +56,11 @@ public class AdminController {
         return directoryManagementService.handlePathSubmission(path);
     }
 
-    @GetMapping("/index/status")
-    @ResponseBody
-    public Map<String, Object> getIndexStatus(@RequestParam String path) {
-        return directoryManagementService.getIndexStatus(path);
-    }
+    // @GetMapping("/index/status")
+    // @ResponseBody
+    // public Map<String, Object> getIndexStatus(@RequestParam String path) {
+    //     return directoryManagementService.getIndexStatus(path);
+    // }
 
     // 获取监控目录列表
     @GetMapping("/admin/list/monitored-dirs")
@@ -82,14 +82,14 @@ public class AdminController {
         return remoteUploadService.getRemoteUploadStatus();
     }
 
-    @GetMapping("/upload")
-    public String uploadPage() {
-        boolean enabled = systemConfigService.getBooleanValue(SystemConfigService.CONFIG_REMOTE_UPLOAD_ENABLED, false);
-        if (!enabled) {
-            return "redirect:/admin"; // 如果功能未启用，重定向到管理页面
-        }
-        return "upload";
-    }
+    // @GetMapping("/upload")
+    // public String uploadPage() {
+    //     boolean enabled = systemConfigService.getBooleanValue(SystemConfigService.CONFIG_REMOTE_UPLOAD_ENABLED, false);
+    //     if (!enabled) {
+    //         return "redirect:/admin"; // 如果功能未启用，重定向到管理页面
+    //     }
+    //     return "upload";
+    // }
 
     @PostMapping("/admin/uploadFile")
     @ResponseBody
@@ -124,12 +124,14 @@ public class AdminController {
         return remoteUploadService.getUploadConfig();
     }
 
-    @PostMapping("/update-index-settings")
+    @PostMapping("/admin/update-index-settings")
+    @ResponseBody
     public Map<String, Object> updateIndexSettings(@RequestBody Map<String, Object> config) {
         return modelEnhancementService.updateIndexSettings(config);
     }
 
-    @GetMapping("/current-index-settings")
+    @GetMapping("/admin/current-index-settings")
+    @ResponseBody
     public Map<String, Object> getCurrentIndexSettings() {
         return modelEnhancementService.getCurrentIndexSettings();
     }
