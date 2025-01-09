@@ -40,6 +40,6 @@ public class SourceCodeParser extends AbstractDocumentParser {
 
     @Override
     protected String getFileType() {
-        return "web";
+        return "code";
     }
 }
