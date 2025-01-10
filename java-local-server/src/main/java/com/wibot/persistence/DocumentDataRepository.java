@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 
 import com.wibot.persistence.entity.DocumentDataPO;
 
+import org.springframework.data.repository.query.Param;
+
 @Repository
 public interface DocumentDataRepository
                 extends ListCrudRepository<DocumentDataPO, Long>, JpaSpecificationExecutor<DocumentDataPO> {
@@ -78,8 +80,9 @@ public interface DocumentDataRepository
          */
         @Modifying
         @Query("UPDATE DocumentDataPO d SET d.lastProcessingUpdate = :lastProcessingUpdate WHERE d.processorId = :processorId AND d.processedState = :processedState")
-        void updateLastProcessingUpdateForProcessor(String processorId, LocalDateTime lastProcessingUpdate,
-                        String processedState);
+        void updateLastProcessingUpdateForProcessor(@Param("processorId") String processorId, 
+                                                    @Param("lastProcessingUpdate") LocalDateTime lastProcessingUpdate,
+                                                    @Param("processedState") String processedState);
 
         // @Query("SELECT d FROM DocumentDataPO d WHERE d.filePath LIKE
         // CONCAT(:directoryPath, '%')")
@@ -96,7 +99,7 @@ public interface DocumentDataRepository
          * @return 文档数据列表
          */
         @Query("SELECT d FROM DocumentDataPO d WHERE d.processedState IN :states ORDER BY d.id ASC")
-        List<DocumentDataPO> findByProcessedStateInOrderById(List<String> states, Pageable pageable);
+        List<DocumentDataPO> findByProcessedStateInOrderById(@Param("states") List<String> states, Pageable pageable);
 
         /**
          * 根据文件路径前缀和处理状态查找文档
@@ -125,6 +128,8 @@ public interface DocumentDataRepository
          */
         @Modifying
         @Query("UPDATE DocumentDataPO d SET d.processedState = :newState WHERE d.filePath LIKE CONCAT(:directoryPath, '%') AND d.processedState = :oldState")
-        void updateProcessedStateByDirectory(String directoryPath, String oldState, String newState);
+        void updateProcessedStateByDirectory(@Param("directoryPath") String directoryPath, 
+                                             @Param("oldState") String oldState, 
+                                             @Param("newState") String newState);
 
 }

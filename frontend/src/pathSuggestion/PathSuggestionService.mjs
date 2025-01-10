@@ -59,6 +59,9 @@ export class PathSuggestionService {
     }
 
     getNextLevelPath(currentPath, searchTerm) {
+        // 将 Windows 风格路径转换为 Unix 风格路径
+        currentPath = currentPath.replace(/\\/g, '/');
+
         const parts = currentPath.split('/').filter(Boolean);
         let currentNode = this.pathTree;
         for (const part of parts) {
@@ -72,21 +75,61 @@ export class PathSuggestionService {
         const result = [];
         const searchLower = searchTerm.toLowerCase();
 
+        // 步骤1：用关键词搜索，找到所有匹配该关键词的路径
+        const matchingPaths = new Map();
         const traverse = (node, path) => {
+            for (const [key, childNode] of node) {
+                const fullPath = `${path}${key}/`;
+                if (key.toLowerCase().includes(searchLower)) {
+                    const keywordIndex = fullPath.toLowerCase().indexOf(searchLower);
+                    const prefix = fullPath.substring(0, keywordIndex + searchLower.length);
+                    let suffix = fullPath.substring(keywordIndex + searchLower.length);
+                    // 去掉文件，只记录目录部分
+                    if (!suffix.endsWith('/')) {
+                        suffix = suffix.substring(0, suffix.lastIndexOf('/') + 1);
+                    }
+                    if (!matchingPaths.has(prefix)) {
+                        matchingPaths.set(prefix, new Set());
+                    }
+                    matchingPaths.get(prefix).add(suffix);
+                }
+                traverse(childNode, fullPath);
+            }
+        };
+        traverse(currentNode, currentPath.endsWith('/') ? currentPath : `${currentPath}/`);
+
+        // 步骤2：基于已有的前向有限分支+路径当前位置，往下延展直到下一个/
+        const nodeTree = new Map();
+        matchingPaths.forEach((suffixes, prefix) => {
+            suffixes.forEach(suffix => {
+                const fullPath = prefix + suffix;
+                const parts = fullPath.split('/').filter(Boolean);
+                let currentNode = nodeTree;
+                parts.forEach(part => {
+                    if (!currentNode.has(part)) {
+                        currentNode.set(part, new Map());
+                    }
+                    currentNode = currentNode.get(part);
+                });
+            });
+        });
+
+        const traverseNodeTree = (node, path) => {
             if (node.size === 1) {
                 for (const [key, childNode] of node) {
-                    traverse(childNode, `${path}${key}/`);
+                    traverseNodeTree(childNode, `${path}${key}/`);
                 }
             } else {
                 for (const [key, childNode] of node) {
-                    if (key.toLowerCase().includes(searchLower)) {
-                        result.push(`${path}${key}/`);
-                    }
+                    result.push(`${path}${key}/`);
                 }
             }
         };
 
-        traverse(currentNode, currentPath.endsWith('/') ? currentPath : `${currentPath}/`);
+        nodeTree.forEach((childNode, key) => {
+            traverseNodeTree(childNode, `/${key}/`);
+        });
+
         return result;
     }
 
@@ -96,9 +139,10 @@ export class PathSuggestionService {
         let selectedPlugin = null;
 
         for (const [path, plugin] of this.pluginPathMap) {
-            if (pathPrefix.startsWith(path) && path.length > longestMatch.length) {
+            if (path.startsWith(pathPrefix) && path.length > longestMatch.length) {
                 longestMatch = path;
                 selectedPlugin = plugin;
+                return selectedPlugin;
             }
         }
 

@@ -44,11 +44,31 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         try {
             const configHandler = this.globalContext.configHandler;
             const searchItemNumbers = await configHandler.getSearchItemNumbers();
+            if (pathPrefix.startsWith('/local/')) {
+                pathPrefix = pathPrefix.substring(7);
+            }
 
-            const response = await fetch(`${this.BASE_URL}/search?queryStr=${encodeURIComponent(queryStr)}&pathPrefix=${encodeURIComponent(pathPrefix)}&TopN=${searchItemNumbers}`);
+            // 处理 Windows 样式路径
+            if (pathPrefix.includes(':')) {
+                pathPrefix = pathPrefix.replace(/\//g, '\\');
+            }
+
+            const response = await fetch(`${this.BASE_URL}/search`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    queryStr,
+                    pathPrefix,
+                    TopN: searchItemNumbers
+                }),
+            });
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+
             const results = await response.json();
             return results;
         } catch (error) {

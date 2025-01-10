@@ -10,7 +10,9 @@ import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -34,14 +36,15 @@ public class SearchSimpleAPI {
     /**
      * 完整的搜索方法，支持所有搜索参数
      * 
-     * @param queryStr   搜索关键词
-     * @param pathPrefix 文件路径前缀，用于筛选特定目录下的文档
-     * @param TopN       返回结果的最大数量
+     * @param searchParams 搜索参数
      * @return 文档片段列表
      */
-    @GetMapping("/search")
-    public List<SearchResultVO> search(@RequestParam String queryStr, @RequestParam String pathPrefix,
-            @RequestParam int TopN) {
+    @PostMapping("/search")
+    public List<SearchResultVO> search(@RequestBody Map<String, Object> searchParams) {
+        String queryStr = (String) searchParams.get("queryStr");
+        String pathPrefix = (String) searchParams.get("pathPrefix");
+        int TopN = (int) searchParams.get("TopN");
+
         DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(pathPrefix);
         List<SearchDocumentResult> results = documentIndexInterface.search(queryStr, pathPrefix, TopN);
 
