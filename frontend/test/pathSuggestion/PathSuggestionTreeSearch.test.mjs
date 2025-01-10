@@ -12,8 +12,8 @@ describe('PathSuggestionService TreeSearch Tests', () => {
     service.addPathToTree('/usr/local/edf');
     service.addPathToTree('/usr/search/local/abc');
 
-    service.addPathToTree('/local/C:\\Program Files\\test');
-    service.addPathToTree('/local/D:\\workspace\\project');
+    service.addPathToTree('/local/C:/Program Files//test');
+    service.addPathToTree('/local/D:/workspace//project');
     service.addPathToTree('/local/usr/dev/test');
 
     // 测试场景4的单一路径链

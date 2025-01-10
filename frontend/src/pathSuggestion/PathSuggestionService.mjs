@@ -46,8 +46,6 @@ export class PathSuggestionService {
     }
 
     addPathToTree(path) {
-        // 将 Windows 风格路径转换为 Unix 风格路径
-        path = path.replace(/\\/g, '/');
         const parts = path.split('/').filter(Boolean);
         let currentNode = this.pathTree;
         for (const part of parts) {
@@ -59,8 +57,6 @@ export class PathSuggestionService {
     }
 
     getNextLevelPath(currentPath, searchTerm) {
-        // 将 Windows 风格路径转换为 Unix 风格路径
-        currentPath = currentPath.replace(/\\/g, '/');
         const parts = currentPath.split('/').filter(Boolean);
         let currentNode = this.pathTree;
         for (const part of parts) {
