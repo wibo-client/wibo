@@ -46,6 +46,8 @@ export class PathSuggestionService {
     }
 
     addPathToTree(path) {
+        // 将 Windows 风格路径转换为 Unix 风格路径
+        path = path.replace(/\\/g, '/');
         const parts = path.split('/').filter(Boolean);
         let currentNode = this.pathTree;
         for (const part of parts) {
@@ -56,112 +58,38 @@ export class PathSuggestionService {
         }
     }
 
-    _normalizeSearchTerm(searchTerm) {
-        return searchTerm.startsWith('/') ? searchTerm.slice(1) : searchTerm;
-    }
-
-    _normalizeWindowsPath(path) {
-        if (path.includes('\\')) {
-            const parts = path.split('\\');
-            if (/^[A-Z]:$/i.test(parts[0])) {
-                return parts[0].toUpperCase() + '\\';
-            }
-        }
-        return path;
-    }
-
-    _unfoldSingleChildNode(node, prefix) {
-        // 继续展开直到遇到多个子节点或没有子节点
-        while (node.size === 1) {
-            const [key, childNode] = node.entries().next().value;
-            prefix = prefix.endsWith('/') ? prefix + key + '/' : prefix + '/' + key + '/';
-            node = childNode;
-        }
-        return { prefix, node };
-    }
-
-    _searchAllNodes(node, parts = [], result = [], searchTerm = '') {
-        if (searchTerm === 'descrioption') {
-            searchTerm = 'description';
-        }
-        for (const [key, childNode] of node.entries()) {
-            const newParts = [...parts, key];
-            const fullPath = '/' + newParts.join('/');
-            if (fullPath.toLowerCase().includes(searchTerm.toLowerCase())) {
-                result.push(fullPath + (childNode.size ? '/' : ''));
-            }
-            this._searchAllNodes(childNode, newParts, result, searchTerm);
-        }
-        return result;
-    }
-
     getNextLevelPath(currentPath, searchTerm) {
-        const prefix = currentPath;
-
-        if (currentPath === 'descrioption') {
-            return this._searchAllNodes(this.pathTree, [], [], 'description');
-        }
-
-        let parts = currentPath.split('/').filter(Boolean);
+        // 将 Windows 风格路径转换为 Unix 风格路径
+        currentPath = currentPath.replace(/\\/g, '/');
+        const parts = currentPath.split('/').filter(Boolean);
         let currentNode = this.pathTree;
-
-        // 处理 .git 路径的特殊情况
-        if (currentPath.toLowerCase().includes('\\.git')) {
-            const gitPath = currentPath.replace(/\\/g, '/');
-            parts = gitPath.split('/').filter(Boolean);
-        }
-
-        // 导航到当前节点
-
-        // 处理 .git 路径的特殊情况，不区分大小写
-        if (currentPath.toLowerCase().includes('\\.git')) {
-            const gitPath = currentPath.replace(/\\/g, '/');
-            parts = gitPath.split('/').filter(Boolean);
-        }
-
-        // 导航到当前节点
         for (const part of parts) {
-            if (!currentNode.has(part)) {
+            if (currentNode.has(part)) {
+                currentNode = currentNode.get(part);
+            } else {
                 return [];
             }
-            currentNode = currentNode.get(part);
         }
 
-        // 自动展开单一子节点
-        const unfolded = this._unfoldSingleChildNode(currentNode, prefix);
-        let newPrefix = unfolded.prefix;
-        currentNode = unfolded.node;
+        const result = [];
+        const searchLower = searchTerm.toLowerCase();
 
-        const normalizedSearchTerm = this._normalizeSearchTerm(searchTerm);
-        const suggestions = new Set();
-
-        for (const [key, childNode] of currentNode.entries()) {
-            const normalizedKey = key.toLowerCase();
-            if (normalizedSearchTerm && !normalizedKey.includes(normalizedSearchTerm.toLowerCase())) {
-                continue;
-            }
-
-            const normalizedPrefix = newPrefix.toLowerCase();
-            if (normalizedPrefix === '/local/') {
-                if (/^[a-z]:\\/.test(normalizedKey)) {
-                    suggestions.add(this._normalizeWindowsPath(normalizedKey));
-                } else {
-                    suggestions.add(key + '/');
+        const traverse = (node, path) => {
+            if (node.size === 1) {
+                for (const [key, childNode] of node) {
+                    traverse(childNode, `${path}${key}/`);
                 }
-            } else if (normalizedPrefix.includes('\\.git')) {
-                suggestions.add(newPrefix + '\\' + key + '\\');
             } else {
-                const path = newPrefix.endsWith('/') ? newPrefix + key + '/' : newPrefix + '/' + key + '/';
-                suggestions.add(path);
+                for (const [key, childNode] of node) {
+                    if (key.toLowerCase().includes(searchLower)) {
+                        result.push(`${path}${key}/`);
+                    }
+                }
             }
-        }
+        };
 
-        // 限制根路径只返回第一级
-        if (currentPath === '' || currentPath === '/') {
-            return Array.from(suggestions).filter(p => p.split('/').length <= 3);
-        }
-
-        return Array.from(suggestions);
+        traverse(currentNode, currentPath.endsWith('/') ? currentPath : `${currentPath}/`);
+        return result;
     }
 
     selectPluginForPath(pathPrefix = '') {
