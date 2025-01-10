@@ -17,8 +17,10 @@ export class PathSuggestionService {
             try {
                 const paths = await plugin.getAllPossiblePath();
                 paths.forEach(path => {
-                    this.pluginPathMap.set(path, plugin);
-                    this.addPathToTree(path);
+                    // 将 Windows 风格路径转换为 Unix 风格路径
+                    const normalizedPath = path.replace(/\\/g, '/');
+                    this.pluginPathMap.set(normalizedPath, plugin);
+                    this.addPathToTree(normalizedPath);
                 });
             } catch (error) {
                 console.error(`Failed to get paths from plugin ${pathPrefix}:`, error);
