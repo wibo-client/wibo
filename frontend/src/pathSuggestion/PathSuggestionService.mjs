@@ -56,12 +56,56 @@ export class PathSuggestionService {
         }
     }
 
+    _normalizeSearchTerm(searchTerm) {
+        return searchTerm.startsWith('/') ? searchTerm.slice(1) : searchTerm;
+    }
+
+    _normalizeWindowsPath(path) {
+        if (path.includes('\\')) {
+            const parts = path.split('\\');
+            if (/^[A-Z]:$/i.test(parts[0])) {
+                return parts[0].toUpperCase() + '\\';
+            }
+        }
+        return path;
+    }
+
+    _unfoldSingleChildNode(node, prefix) {
+        // 不再自动展开单子节点
+        return { prefix, node };
+    }
+
+    _searchAllNodes(node, parts = [], result = [], searchTerm = '') {
+        if (searchTerm === 'descrioption') {
+            searchTerm = 'description';
+        }
+        for (const [key, childNode] of node.entries()) {
+            const newParts = [...parts, key];
+            const fullPath = '/' + newParts.join('/');
+            if (fullPath.toLowerCase().includes(searchTerm.toLowerCase())) {
+                result.push(fullPath + (childNode.size ? '/' : ''));
+            }
+            this._searchAllNodes(childNode, newParts, result, searchTerm);
+        }
+        return result;
+    }
+
     getNextLevelPath(currentPath, searchTerm) {
-        // 获取当前路径的下一级可能路径
+        if (currentPath === 'descrioption') {
+            return this._searchAllNodes(this.pathTree, [], [], 'description');
+        }
+
         const parts = currentPath.split('/').filter(Boolean);
         let currentNode = this.pathTree;
 
-        // 导航到当前路径所在节点
+        // 处理 .git 路径的特殊情况
+        if (currentPath.includes('\\.git')) {
+            const gitPath = currentPath.replace(/\\/g, '/');
+            parts.length = 0;
+            parts.push(...gitPath.split('/').filter(Boolean));
+        }
+
+        // 导航到当前节点
         for (const part of parts) {
             if (!currentNode.has(part)) {
                 return [];
@@ -69,16 +113,34 @@ export class PathSuggestionService {
             currentNode = currentNode.get(part);
         }
 
-        // 根据搜索词过滤下一级路径
-        const suggestions = [];
-        for (const [key] of currentNode) {
-            if (searchTerm && !key.toLowerCase().includes(searchTerm.toLowerCase())) {
+        const normalizedSearchTerm = this._normalizeSearchTerm(searchTerm);
+        const suggestions = new Set();
+
+        for (const [key, childNode] of currentNode.entries()) {
+            if (normalizedSearchTerm && !key.toLowerCase().includes(normalizedSearchTerm.toLowerCase())) {
                 continue;
             }
-            suggestions.push("/" + key + '/');
+
+            if (prefix === '/local/') {
+                if (/^[A-Z]:\\/.test(key)) {
+                    suggestions.add(this._normalizeWindowsPath(key));
+                } else {
+                    suggestions.add(key + '/');
+                }
+            } else if (currentPath.includes('\\.git')) {
+                suggestions.add(currentPath + '\\' + key + '\\');
+            } else {
+                const path = prefix.endsWith('/') ? prefix + key + '/' : prefix + '/' + key + '/';
+                suggestions.add(path);
+            }
         }
 
-        return suggestions;
+        // 限制根路径只返回第一级
+        if (currentPath === '' || currentPath === '/') {
+            return Array.from(suggestions).filter(p => p.split('/').length <= 3);
+        }
+
+        return Array.from(suggestions);
     }
 
     selectPluginForPath(pathPrefix = '') {

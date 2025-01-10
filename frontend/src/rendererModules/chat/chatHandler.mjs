@@ -222,9 +222,19 @@ export default class ChatHandler {
 
       const requestContext = {
         onChunk: (chunk) => {
+          const feedbackBox = document.getElementById('messages');
+          // 检查用户是否在底部
+          const isAtBottom = Math.abs(
+            feedbackBox.scrollHeight - feedbackBox.scrollTop - feedbackBox.clientHeight
+          ) < 5;
+
           wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);
-          feedbackBox.scrollTop = feedbackBox.scrollHeight;
+
+          // 仅当用户在底部时才自动滚动
+          if (isAtBottom) {
+            feedbackBox.scrollTop = feedbackBox.scrollHeight;
+          }
         }
       };
 

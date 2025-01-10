@@ -17,13 +17,19 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.mjs']
   },
-  devtool: 'source-map',
+  devtool: 'source-map', // 启用源映射
   module: {
     rules: [
       {
         test: /\.m?js$/,
         exclude: /node_modules/,
-        use: 'babel-loader'
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env'],
+            plugins: ['@babel/plugin-transform-spread']
+          }
+        }
       }
     ]
   },

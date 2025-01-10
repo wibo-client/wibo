@@ -1,9 +1,8 @@
-node_modules
-.DS_Store
+**/node_modules
 .env
-src/.DS_Store
+**/.DS_Store
 dist
-.vscode
+**/.vscode
 user_data
 src/plugins
 java-local-server/target
@@ -12,3 +11,6 @@ java-local-server/indexDir
 java-local-server/logs/spring-boot-logger.log
 java-local-server/WIBO_H2DB.trace.db
 frontend/logs/spring-boot-logger.log
+**/.project
+**/.settings/** */
+java-local-server/.settings/org.eclipse.jdt.core.prefs
