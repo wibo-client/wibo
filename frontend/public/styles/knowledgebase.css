@@ -1,0 +1,152 @@
+/* 知识库相关样式 */
+.knowledge-base-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.directory-input-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.directory-input-group input {
+  flex: 1;
+}
+
+.directory-input-group button {
+  white-space: nowrap;
+}
+
+.directory-input-group .btn-select-dir {
+  white-space: nowrap;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
+.directory-input-group .btn-select-dir:hover {
+  background-color: #e0e0e0;
+}
+
+
+/* 表格样式 */
+.monitored-dirs-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.monitored-dirs-table th,
+.monitored-dirs-table td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+}
+
+.monitored-dirs-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.monitored-dirs-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.monitored-dirs-table tr:hover {
+  background-color: #f0f0f0;
+}
+
+
+
+/* 服务状态样式 */
+.service-status {
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 5px;
+  margin-bottom: 15px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online {
+  background-color: #4CAF50;
+  box-shadow: 0 0 5px #4CAF50;
+}
+
+.status-dot.offline {
+  background-color: #f44336;
+  box-shadow: 0 0 5px #f44336;
+}
+
+.service-details {
+  font-size: 0.9em;
+  color: #666;
+}
+
+
+
+/* 索引设置样式 */
+.file-types-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.file-type-group {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.file-type-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.file-type-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: #495057;
+}
+
+.file-type-details {
+  color: #6c757d;
+  font-size: 12px;
+  margin-left: 58px;
+}
+
+.model-enhancement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  margin-left: 58px;
+  padding-top: 6px;
+  border-top: 1px dashed #dee2e6;
+}
+
+.enhancement-label {
+  font-size: 12px;
+  color: #495057;
+}

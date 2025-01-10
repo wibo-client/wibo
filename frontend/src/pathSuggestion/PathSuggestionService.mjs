@@ -71,7 +71,12 @@ export class PathSuggestionService {
     }
 
     _unfoldSingleChildNode(node, prefix) {
-        // 不再自动展开单子节点
+        // 继续展开直到遇到多个子节点或没有子节点
+        while (node.size === 1) {
+            const [key, childNode] = node.entries().next().value;
+            prefix = prefix.endsWith('/') ? prefix + key + '/' : prefix + '/' + key + '/';
+            node = childNode;
+        }
         return { prefix, node };
     }
 
@@ -91,18 +96,27 @@ export class PathSuggestionService {
     }
 
     getNextLevelPath(currentPath, searchTerm) {
+        const prefix = currentPath;
+
         if (currentPath === 'descrioption') {
             return this._searchAllNodes(this.pathTree, [], [], 'description');
         }
 
-        const parts = currentPath.split('/').filter(Boolean);
+        let parts = currentPath.split('/').filter(Boolean);
         let currentNode = this.pathTree;
 
         // 处理 .git 路径的特殊情况
-        if (currentPath.includes('\\.git')) {
+        if (currentPath.toLowerCase().includes('\\.git')) {
             const gitPath = currentPath.replace(/\\/g, '/');
-            parts.length = 0;
-            parts.push(...gitPath.split('/').filter(Boolean));
+            parts = gitPath.split('/').filter(Boolean);
+        }
+
+        // 导航到当前节点
+
+        // 处理 .git 路径的特殊情况，不区分大小写
+        if (currentPath.toLowerCase().includes('\\.git')) {
+            const gitPath = currentPath.replace(/\\/g, '/');
+            parts = gitPath.split('/').filter(Boolean);
         }
 
         // 导航到当前节点
@@ -113,24 +127,31 @@ export class PathSuggestionService {
             currentNode = currentNode.get(part);
         }
 
+        // 自动展开单一子节点
+        const unfolded = this._unfoldSingleChildNode(currentNode, prefix);
+        let newPrefix = unfolded.prefix;
+        currentNode = unfolded.node;
+
         const normalizedSearchTerm = this._normalizeSearchTerm(searchTerm);
         const suggestions = new Set();
 
         for (const [key, childNode] of currentNode.entries()) {
-            if (normalizedSearchTerm && !key.toLowerCase().includes(normalizedSearchTerm.toLowerCase())) {
+            const normalizedKey = key.toLowerCase();
+            if (normalizedSearchTerm && !normalizedKey.includes(normalizedSearchTerm.toLowerCase())) {
                 continue;
             }
 
-            if (prefix === '/local/') {
-                if (/^[A-Z]:\\/.test(key)) {
-                    suggestions.add(this._normalizeWindowsPath(key));
+            const normalizedPrefix = newPrefix.toLowerCase();
+            if (normalizedPrefix === '/local/') {
+                if (/^[a-z]:\\/.test(normalizedKey)) {
+                    suggestions.add(this._normalizeWindowsPath(normalizedKey));
                 } else {
                     suggestions.add(key + '/');
                 }
-            } else if (currentPath.includes('\\.git')) {
-                suggestions.add(currentPath + '\\' + key + '\\');
+            } else if (normalizedPrefix.includes('\\.git')) {
+                suggestions.add(newPrefix + '\\' + key + '\\');
             } else {
-                const path = prefix.endsWith('/') ? prefix + key + '/' : prefix + '/' + key + '/';
+                const path = newPrefix.endsWith('/') ? newPrefix + key + '/' : newPrefix + '/' + key + '/';
                 suggestions.add(path);
             }
         }

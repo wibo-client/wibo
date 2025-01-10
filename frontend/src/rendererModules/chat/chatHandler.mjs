@@ -195,9 +195,14 @@ export default class ChatHandler {
   }
 
   async sendMessage() {
-    const message = document.getElementById('user-input').value;         // 改为 user-input
-    const type = document.getElementById('request-type').value;         // 改为 request-type
+    const message = document.getElementById('user-input').value.trim();  // 使用 trim() 去除首尾空格
+    const type = document.getElementById('request-type').value;
     const path = document.getElementById('pathInput').value;
+
+    // 如果消息为空则直接返回
+    if (!message) {
+      return;
+    }
 
     try {
       const feedbackBox = document.getElementById('messages');          // 改为 messages

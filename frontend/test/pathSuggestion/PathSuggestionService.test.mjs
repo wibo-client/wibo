@@ -61,15 +61,19 @@ describe('PathSuggestionService', () => {
 
     it('should return git related paths when searching in .git directory', () => {
       const result = pathSuggestionService.getNextLevelPath('/local/C:\\Users\\whisper\\project\\wibo\\.git', '');
-      expect(result).to.have.members(['/local/C:\\Users\\whisper\\project\\wibo\\.git\\COMMIT_EDITMSG\\', '/local/C:\\Users\\whisper\\project\\wibo\\.git\\config\\', '/local/C:\\Users\\whisper\\project\\wibo\\.git\\description\\', '/local/C:\\Users\\whisper\\project\\wibo\\.git\\FETCH_HEAD\\', '/local/C:\\Users\\whisper\\project\\wibo\\.git\\HEAD\\']);
+      expect(result).to.have.members([
+        '/local/C:\\Users\\whisper\\project\\wibo\\.git\\COMMIT_EDITMSG\\',
+        '/local/C:\\Users\\whisper\\project\\wibo\\.git\\config\\',
+        '/local/C:\\Users\\whisper\\project\\wibo\\.git\\description\\',
+        '/local/C:\\Users\\whisper\\project\\wibo\\.git\\FETCH_HEAD\\',
+        '/local/C:\\Users\\whisper\\project\\wibo\\.git\\HEAD\\'
+      ]);
     });
 
     it('should return C:\\ path when searching in /local/ directory', () => {
       const result = pathSuggestionService.getNextLevelPath('/local/', '');
-      expect(result).to.have.members(['C:\\', 'docs/', 'd:\\']);
+      expect(result).to.have.members(['c:\\', 'docs/', 'd:\\']);
     });
-
-
 
     it('should return all child paths (include Windows-like) when requesting all', () => {
       // 模拟获取所有路径

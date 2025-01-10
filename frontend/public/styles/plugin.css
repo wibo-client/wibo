@@ -1,47 +1,46 @@
-
 /* 插件相关样式 */
 .plugin-list {
-    list-style-type: none;
-    padding: 0;
-  }
-  
-  .plugin-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px;
-    border: 1px solid #ccc;
-    margin-bottom: 5px;
-    border-radius: 5px;
-    background-color: #fff;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  .plugin-actions button {
-    margin-left: 5px;
-    padding: 5px 10px;
-    border: none;
-    border-radius: 5px;
-    background-color: #007BFF;
-    color: white;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  .plugin-actions button:hover {
-    background-color: #0056b3;
-  }
-  
-  .plugin-section {
-    margin-bottom: 20px;
-    width: 100%;
-  }
-  
-  .plugin-column {
-    flex: 1;
-    padding: 0 10px;
-  }
-  
-  .plugin-actions {
-    display: flex;
-    gap: 10px;
-  }
+  list-style-type: none;
+  padding: 0;
+}
+
+.plugin-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #ccc;
+  margin-bottom: 5px;
+  border-radius: 5px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.plugin-actions button {
+  margin-left: 5px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  background-color: #007BFF;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.plugin-actions button:hover {
+  background-color: #0056b3;
+}
+
+.plugin-section {
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.plugin-column {
+  flex: 1;
+  padding: 0 10px;
+}
+
+.plugin-actions {
+  display: flex;
+  gap: 10px;
+}
