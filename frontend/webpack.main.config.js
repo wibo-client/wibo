@@ -6,7 +6,7 @@ module.exports = {
   mode: 'development',
   entry: {
     main: './src/main.mjs',
-    preload: './src/preload.mjs'
+    preload: './src/preload.mjs' // 添加 preload 入口点
   },
   target: 'electron-main',
   externals: [nodeExternals()],
