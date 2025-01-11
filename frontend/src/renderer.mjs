@@ -4,7 +4,7 @@ import ChatHandler from './rendererModules/chat/chatHandler.mjs';
 import KnowledgeBaseHandler from './rendererModules/knowledge/knowledgeBaseHandler.mjs';
 import BrowserConfigHandler from './rendererModules/browser/browserConfigHandler.mjs';
 
-const BASE_URL = 'http://localhost:8080'; // 设置本地服务的 URL
+
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM 加载完成');
