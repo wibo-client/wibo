@@ -19,12 +19,11 @@ gpt 生成的这个表太漂亮了，我直接贴出来。
 
 export default class LocalServerManager {
     constructor() {
-        this.javaProcess = null;
         this.isRunning = false;
         this.portManager = new PortManager();
         this.store = new Store();
         this.currentPort = null;
-        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
         // 从 store 中读取 desiredState，默认为 false
         this.desiredState = this.store.get('serverDesiredState', false);
         this.stateLock = false; // 状态同步锁
@@ -72,6 +71,15 @@ export default class LocalServerManager {
 
             const serverInfo = await this.getCurrentServerInfo();
             const nextAction = this.determineNextAction(serverInfo);
+
+            // 添加对 startLock 的检查，防止重复启动
+            if (nextAction === 'START' || nextAction === 'RESTART') {
+                if (this.startLock) {
+                    console.log('[StateManager] Server is already starting, skipping action:', nextAction);
+                    return;
+                }
+            }
+
             await this.executeAction(nextAction, serverInfo);
 
             // 发送状态更新到渲染进程
@@ -408,6 +416,7 @@ export default class LocalServerManager {
             }
         }
 
+        let javaProcess;
         try {
             this.startLock = true;
 
@@ -425,7 +434,7 @@ export default class LocalServerManager {
                 '--spring.profiles.active=product'
             ];
 
-            this.javaProcess = spawn('java', args, {
+            javaProcess = spawn('java', args, {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 
@@ -439,7 +448,7 @@ export default class LocalServerManager {
                             console.log('[LocalServer] Server is healthy on port:', this.currentPort);
                             // 立即保存进程信息
                             this.store.set('javaProcess', {
-                                pid: this.javaProcess.pid,
+                                pid: javaProcess.pid,
                                 port: this.currentPort
                             });
                             this.isRunning = true;
@@ -460,21 +469,21 @@ export default class LocalServerManager {
                     setTimeout(checkHealth, this.healthCheckInterval);
                 };
 
-                this.javaProcess.stdout.on('data', (data) => {
+                javaProcess.stdout.on('data', (data) => {
                     const output = data.toString();
                     console.log(`[LocalServer] ${output}`);
                     // 不再依赖输出判断启动状态，完全依赖健康检查
                 });
 
-                this.javaProcess.stderr.on('data', (data) => {
+                javaProcess.stderr.on('data', (data) => {
                     console.error(`[LocalServer Error] ${data}`);
                 });
 
-                this.javaProcess.on('error', (error) => {
+                javaProcess.on('error', (error) => {
                     reject(error);
                 });
 
-                this.javaProcess.on('exit', (code, signal) => {
+                javaProcess.on('exit', (code, signal) => {
                     if (!this.isRunning) {
                         reject(new Error(`Process exited with code ${code}`));
                     }
@@ -488,13 +497,6 @@ export default class LocalServerManager {
         } catch (error) {
             console.error('[LocalServer] Start error:', error);
             this.isRunning = false;
-            if (this.javaProcess) {
-                try {
-                    this.javaProcess.kill('SIGKILL');
-                } catch (e) {
-                    // 忽略关闭错误
-                }
-            }
             throw error; // 向上传递错误
         } finally {
             this.startLock = false;
@@ -538,30 +540,29 @@ export default class LocalServerManager {
 
     // 修改停止方法
     async _stopServer() {
-        if (!this.isRunning || !this.javaProcess) return;
+        if (!this.isRunning) return;
 
         // 调试模式下不停止进程
-        if (this.isDebugMode() && this.currentPort === this.portForDebug) {
+        const savedProcess = this.store.get('javaProcess');
+        if (this.isDebugMode() && savedProcess.port === this.portForDebug) {
             console.log('[LocalServer] Debug mode: Skipping server stop');
             this.isRunning = false;
-            this.javaProcess = null;
             return;
         }
 
         try {
-            const pid = this.javaProcess.pid;
-            console.log('[LocalServer] Stopping server...');
+            const pid = savedProcess.pid;
+            console.log('[LocalServer] Stopping server... PID:', pid);
             if (process.platform === 'win32') {
                 spawn('taskkill', ['/pid', pid, '/f', '/t']);
             } else {
-                this.javaProcess.kill('SIGTERM');
+                process.kill(pid, 'SIGTERM');
             }
 
             // 等待进程完全停止
             await this.waitForProcessStop(pid);
 
             this.isRunning = false;
-            this.javaProcess = null;
             this.store.delete('javaProcess');
             console.log('[LocalServer] Server stopped');
         } catch (error) {

@@ -73,9 +73,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  app.on('quit', () => {
-    console.log('App is quitting.');
-  });
 
   ipcMain.handle('select-directory', async () => {
     return await dialog.showOpenDialog({
@@ -306,8 +303,7 @@ app.whenReady().then(async () => {
   // 确保在应用退出时清理 Java 进程
   app.on('before-quit', async () => {
     try {
-      // 先设置期望状态为关闭
-      await globalContext.localServerManager.stopServer();
+      console.log('Stopping Java process...');
       // 直接调用内部停止方法，强制关闭进程
       await globalContext.localServerManager._stopServer();
 
@@ -320,13 +316,21 @@ app.whenReady().then(async () => {
           } else {
             process.kill(savedProcess.pid, 'SIGKILL');
           }
+
+          console.log('Java process stopped. PID:', savedProcess.pid);
+
         } catch (e) {
           // 忽略错误，进程可能已经不存在
+          console.error('Error stopping Java process:', e);
         }
       }
     } catch (error) {
       console.error('停止 Java 进程失败:', error);
     }
+  });
+
+  app.on('quit', () => {
+    console.log('App is quitting.');
   });
 
   function buildSearchResultsString(searchResults) {
