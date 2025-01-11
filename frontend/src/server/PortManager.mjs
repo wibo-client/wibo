@@ -4,8 +4,11 @@ class PortManager {
     constructor() {
         this.MIN_PORT = 50000;
         this.MAX_PORT = 65535;
+        this.startLock = false;  // 添加启动锁
     }
 
+
+    
     getRandomPort() {
         return Math.floor(
             Math.random() * (this.MAX_PORT - this.MIN_PORT + 1) + this.MIN_PORT

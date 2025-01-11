@@ -1,5 +1,4 @@
 import { IndexHandlerInterface } from './indexHandlerInter.mjs';
-import LocalServerManager from '../server/LocalServerManager.mjs';
 
 export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     constructor() {
@@ -10,7 +9,6 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
 
     async init(globalContext, handlerConfig) {
         this.globalContext = globalContext;
-        this.serverManager = new LocalServerManager();
 
         // 监听服务器状态更新
         if (process.send) {

@@ -279,16 +279,10 @@ app.whenReady().then(async () => {
 
   // 添加 IPC 事件处理器
   ipcMain.handle('get-server-desired-state', async () => {
-    const desiredState = globalContext.localServerManager.desiredState;
-    const savedProcess = globalContext.localServerManager.store.get('javaProcess');
-    const isHealthy = savedProcess ? await globalContext.localServerManager.checkHealth(savedProcess.port) : false;
+  
+    const ret = await globalContext.localServerManager.getCurrentServerInfo();
 
-    return {
-      desiredState,
-      isHealthy,
-      pid: savedProcess?.pid || null,
-      port: savedProcess?.port || null
-    };
+    return ret;
   });
 
   // 添加新的 IPC 处理器

@@ -19,19 +19,14 @@ gpt 生成的这个表太漂亮了，我直接贴出来。
 
 export default class LocalServerManager {
     constructor() {
-        this.isRunning = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.currentPort = null;
         this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
-        // 从 store 中读取 desiredState，默认为 false
-        this.desiredState = this.store.get('serverDesiredState', false);
-        this.stateLock = false; // 状态同步锁
 
         // 启动状态同步任务
         this.startStateSyncTask();
         this.MAX_HEALTH_RETRIES = 5;  // 添加最大重试次数
-        this.startLock = false;  // 添加启动锁
+       
         this.startTimeout = 180000;  // 启动超时时间改为3分钟
         this.stopTimeout = 30000;    // 停止超时时间设为30秒
         this.healthCheckInterval = 2000; // 健康检查间隔2秒
@@ -39,19 +34,24 @@ export default class LocalServerManager {
         this.initializeJarPath(); // 在构造函数中调用初始化
     }
 
-    // 获取状态同步锁
-    async acquireLock() {
-        while (this.stateLock) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        this.stateLock = true;
+    // 新增：获取 desiredState 方法
+    getDesiredState() {
+        return this.store.get('serverDesiredState', false);
     }
 
-    // 释放状态同步锁
-    releaseLock() {
-        this.stateLock = false;
+    // 新增：获取和设置 javaProcess 方法
+    getJavaProcess() {
+        return this.store.get('javaProcess');
     }
 
+    setJavaProcess(processInfo) {
+        this.store.set('javaProcess', processInfo);
+    }
+
+    deleteJavaProcess() {
+        this.store.delete('javaProcess');
+    }
+    
     // 启动状态同步任务
     startStateSyncTask() {
         setInterval(async () => {
@@ -66,19 +66,15 @@ export default class LocalServerManager {
 
     // 修改状态同步逻辑
     async syncState() {
-        try {
-            await this.acquireLock();
+        if(this.portManager.startLock === true) {
+            console.log('[StateManager] Server is starting, please wait...');
+            return;
+        }
+        this.portManager.startLock = true;
 
+        try {
             const serverInfo = await this.getCurrentServerInfo();
             const nextAction = this.determineNextAction(serverInfo);
-
-            // 添加对 startLock 的检查，防止重复启动
-            if (nextAction === 'START' || nextAction === 'RESTART') {
-                if (this.startLock) {
-                    console.log('[StateManager] Server is already starting, skipping action:', nextAction);
-                    return;
-                }
-            }
 
             await this.executeAction(nextAction, serverInfo);
 
@@ -89,21 +85,21 @@ export default class LocalServerManager {
                     data: {
                         isHealthy: serverInfo.processExists,
                         port: serverInfo.port,
-                        desiredState: this.desiredState,
+                        desiredState: this.getDesiredState(),
                         debugPort: serverInfo.debugPort
                     }
                 });
             }
 
         } finally {
-            this.releaseLock();
+            this.portManager.startLock = false;
         }
     }
 
     // 新增：获取当前服务器信息
     async getCurrentServerInfo() {
-        const desiredState = this.desiredState;
-        const savedProcess = this.store.get('javaProcess');
+        const desiredState = this.getDesiredState();
+        const savedProcess = this.getJavaProcess();
         const hasPid = Boolean(savedProcess?.pid);
         let processExists = false;
 
@@ -113,7 +109,7 @@ export default class LocalServerManager {
                 processExists = await this.checkHealth(this.portForDebug);
                 // 如果健康检查成功，保存调试进程信息
                 if (processExists && !savedProcess) {
-                    this.store.set('javaProcess', {
+                    this.setJavaProcess({
                         port: this.portForDebug,
                         pid: 0  // 调试模式下不需要真实PID
                     });
@@ -235,7 +231,7 @@ export default class LocalServerManager {
     // 修改检查进程状态方法
     async checkProcessStatus() {
         if (!this.javaProcess) {
-            const savedProcess = this.store.get('javaProcess');
+            const savedProcess = this.getJavaProcess();
             if (!savedProcess) return false;
 
             try {
@@ -268,36 +264,34 @@ export default class LocalServerManager {
                     }
 
                     // 清理存储的进程信息
-                    this.store.delete('javaProcess');
+                    this.deleteJavaProcess();
                     return false;
                 }
                 this.savedProcess = savedProcess;
 
                 // 进程正常且健康
-                this.currentPort = savedProcess.port;
-                this.isRunning = true;
                 return true;
 
             } catch (e) {
                 console.warn('[ProcessCheck] Process check failed:', e.message);
-                this.store.delete('javaProcess');
+                this.deleteJavaProcess();
                 return false;
             }
         }
 
         // 如果进程已经在运行，也要做健康检查
-        if (this.isRunning && this.currentPort) {
-            const isHealthy = await this.checkHealth(this.currentPort);
+        const savedProcess = this.getJavaProcess();
+        if (savedProcess) {
+            const isHealthy = await this.checkHealth(savedProcess.port);
             if (!isHealthy) {
                 console.warn('[ProcessCheck] Running process health check failed');
-                this.isRunning = false;
                 this.javaProcess = null;
-                this.store.delete('javaProcess');
+                this.deleteJavaProcess();
                 return false;
             }
         }
 
-        return this.isRunning;
+        return true;
     }
 
     // 查找 jar 文件的辅助方法
@@ -335,7 +329,6 @@ export default class LocalServerManager {
             if (!this.jarPath) {
                 const foundJarPath = await this.findJarFile();
                 if (!foundJarPath) {
-                    this.desiredState = false;
                     this.store.set('serverDesiredState', false);
                     return {
                         success: false,
@@ -345,12 +338,10 @@ export default class LocalServerManager {
                 this.jarPath = foundJarPath;
             }
 
-            this.desiredState = true;
             this.store.set('serverDesiredState', true);
             return { success: true, message: '已设置启动指令' };
         } catch (error) {
             console.error('[LocalServer] Start server error:', error);
-            this.desiredState = false;
             this.store.set('serverDesiredState', false);
             return {
                 success: false,
@@ -361,7 +352,6 @@ export default class LocalServerManager {
 
     // 对外的停止接口 - 立即返回
     async stopServer() {
-        this.desiredState = false;
         this.store.set('serverDesiredState', false);
         return { success: true, message: '已设置停止指令' };
     }
@@ -390,11 +380,7 @@ export default class LocalServerManager {
 
     // 修改启动方法
     async _startServer() {
-        if (this.isRunning) return;
-        if (this.startLock) {
-            console.log('[LocalServer] Server is starting, please wait...');
-            return;
-        }
+        if (await this.checkProcessStatus()) return;
 
         // 调试模式下不启动新进程
         if (this.isDebugMode()) {
@@ -418,19 +404,18 @@ export default class LocalServerManager {
 
         let javaProcess;
         try {
-            this.startLock = true;
 
             // 确保没有遗留进程
             await this.cleanupExistingProcesses();
 
             // 优先使用调试端口
-            this.currentPort = this.portForDebug || await this.portManager.findAvailablePort();
-            console.log(`[LocalServer] Using port: ${this.currentPort}${this.portForDebug ? ' (debug mode)' : ''}`);
+            const currentPort = this.portForDebug || await this.portManager.findAvailablePort();
+            console.log(`[LocalServer] Using port: ${currentPort}${this.portForDebug ? ' (debug mode)' : ''}`);
 
             const args = [
                 '-jar',
                 this.jarPath,
-                `--server.port=${this.currentPort}`,
+                `--server.port=${currentPort}`,
                 '--spring.profiles.active=product'
             ];
 
@@ -443,15 +428,14 @@ export default class LocalServerManager {
                 const startTime = Date.now();
                 const checkHealth = async () => {
                     try {
-                        const isHealthy = await this.checkHealth(this.currentPort);
+                        const isHealthy = await this.checkHealth(currentPort);
                         if (isHealthy) {
-                            console.log('[LocalServer] Server is healthy on port:', this.currentPort);
+                            console.log('[LocalServer] Server is healthy on port:', currentPort);
                             // 立即保存进程信息
-                            this.store.set('javaProcess', {
+                            this.setJavaProcess({
                                 pid: javaProcess.pid,
-                                port: this.currentPort
+                                port: currentPort
                             });
-                            this.isRunning = true;
                             resolve();
                             return;
                         } else {
@@ -483,8 +467,8 @@ export default class LocalServerManager {
                     reject(error);
                 });
 
-                javaProcess.on('exit', (code, signal) => {
-                    if (!this.isRunning) {
+                javaProcess.on('exit', async (code, signal) => {
+                    if (!await this.checkProcessStatus()) {
                         reject(new Error(`Process exited with code ${code}`));
                     }
                 });
@@ -496,16 +480,14 @@ export default class LocalServerManager {
 
         } catch (error) {
             console.error('[LocalServer] Start error:', error);
-            this.isRunning = false;
             throw error; // 向上传递错误
         } finally {
-            this.startLock = false;
         }
     }
 
     // 修改清理进程方法
     async cleanupExistingProcesses() {
-        const savedProcess = this.store.get('javaProcess');
+        const savedProcess = this.getJavaProcess();
         if (!savedProcess || !savedProcess.pid) return;
 
         // 调试模式下，如果端口匹配则保留进程
@@ -530,7 +512,7 @@ export default class LocalServerManager {
             }
 
             // 清理存储的进程信息
-            this.store.delete('javaProcess');
+            this.deleteJavaProcess();
             await new Promise(resolve => setTimeout(resolve, 2000));
 
         } catch (e) {
@@ -540,13 +522,12 @@ export default class LocalServerManager {
 
     // 修改停止方法
     async _stopServer() {
-        if (!this.isRunning) return;
+        if (!await this.checkProcessStatus()) return;
 
         // 调试模式下不停止进程
-        const savedProcess = this.store.get('javaProcess');
+        const savedProcess = this.getJavaProcess();
         if (this.isDebugMode() && savedProcess.port === this.portForDebug) {
             console.log('[LocalServer] Debug mode: Skipping server stop');
-            this.isRunning = false;
             return;
         }
 
@@ -562,8 +543,7 @@ export default class LocalServerManager {
             // 等待进程完全停止
             await this.waitForProcessStop(pid);
 
-            this.isRunning = false;
-            this.store.delete('javaProcess');
+            this.deleteJavaProcess();
             console.log('[LocalServer] Server stopped');
         } catch (error) {
             console.error('[LocalServer] Stop error:', error);
