@@ -105,6 +105,7 @@
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
+    position:relative;
 }
 
 /* 路径建议下拉框样式 */
@@ -117,7 +118,10 @@
     border: 1px solid #ccc;
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    z-index: 1000;   
+    bottom: 100%; /* 将下拉框定位到输入框的上方 */
+    margin-bottom: 8px; /* 添加一些间距，使下拉框与输入框之间有一定距离 */
+
 }
 
 .path-suggestion-item {

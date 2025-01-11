@@ -16,11 +16,11 @@
     </appender>
 
     <!-- 设置特定包的日志级别 -->
-    <logger name="org.springframework" level="ERROR"/>
-    <logger name="org.hibernate" level="ERROR"/>
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.hibernate" level="INFO"/>
 
     <!-- root配置需要同时引用两个appender -->
-    <root level="error">
+    <root level="INFO">
         <appender-ref ref="FILE" />
     </root>
 

@@ -35,7 +35,7 @@ public class DirectorySyncService {
 
     private final AtomicInteger processingCount = new AtomicInteger(0);
 
-    @Scheduled(fixedRate = 30000) // 5分钟执行一次
+    @Scheduled(fixedRate = 300000) // 5分钟执行一次
     public synchronized void syncDirectories() {
         logger.info("开始目录同步任务");
         List<UserDirectoryIndexPO> completedTasks = indexRepository
@@ -56,7 +56,7 @@ public class DirectorySyncService {
 
         // 修改获取现有文件记录的逻辑，分离正常文件和被忽略的文件
         List<DocumentDataPO> existingDocs = documentDataRepository.findByFilePathStartingWith(directoryPath);
-        
+
         // 分别处理正常文件和被忽略的文件
         Map<String, DocumentDataPO> normalDocsMap = existingDocs.stream()
                 .filter(doc -> !DocumentDataPO.PROCESSED_STATE_DELETED.equals(doc.getProcessedState())

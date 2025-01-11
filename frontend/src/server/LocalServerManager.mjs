@@ -24,7 +24,7 @@ export default class LocalServerManager {
         this.portManager = new PortManager();
         this.store = new Store();
         this.currentPort = null;
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
         // 从 store 中读取 desiredState，默认为 false
         this.desiredState = this.store.get('serverDesiredState', false);
         this.stateLock = false; // 状态同步锁
@@ -57,7 +57,7 @@ export default class LocalServerManager {
     startStateSyncTask() {
         setInterval(async () => {
             await this.syncState();
-        }, 5000); // 每5秒同步一次状态
+        }, 10000); // 每5秒同步一次状态
     }
 
     // 增加状态检查方法
@@ -196,6 +196,9 @@ export default class LocalServerManager {
 
             case 'NONE':
                 // 完全关闭状态，无需处理
+                break;
+            default:
+                console.warn('[StateManager] Unknown action:', action);
                 break;
         }
     }

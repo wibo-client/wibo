@@ -28,6 +28,7 @@ public class DocumentDataPO {
     public static final String PROCESSED_STATE_FILE_INDEXED = "file_indexed";
     public static final String PROCESSED_ERROR = "error";
     public static final String PROCESSED_STATE_DELETED = "deleted";
+
     public static final String PROCESSED_STATE_IGNORED = "ignored";
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
