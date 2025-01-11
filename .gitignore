@@ -16,3 +16,5 @@ frontend/logs/spring-boot-logger.log
 java-local-server/.settings/org.eclipse.jdt.core.prefs
 **/userData/*
 frontend/userData
+**/.settings/
+java-local-server/.project

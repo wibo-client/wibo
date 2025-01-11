@@ -33,6 +33,7 @@ public class SearchSimpleAPI {
 
     @Autowired
     private DocumentDataRepository documentDataRepository;
+
     /**
      * 完整的搜索方法，支持所有搜索参数
      * 
@@ -49,9 +50,11 @@ public class SearchSimpleAPI {
         List<SearchDocumentResult> results = documentIndexInterface.search(queryStr, pathPrefix, TopN);
 
         return results.stream().map(item -> {
-            Optional<DocumentDataPO> docData = documentDataRepository.findById(item.getMarkdownParagraph().getDocumentDataId());
+            Optional<DocumentDataPO> docData = documentDataRepository
+                    .findById(item.getMarkdownParagraph().getDocumentDataId());
             String url = docData.map(DocumentDataPO::getFilePath).orElse("URL not found");
-            return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(), LocalDateTime.now(), url);
+            return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(),
+                    LocalDateTime.now(), url);
         }).collect(Collectors.toList());
     }
 
@@ -79,19 +82,19 @@ public class SearchSimpleAPI {
     @GetMapping("/getAllPaths")
     public List<String> getAllPaths() {
         List<DocumentDataPO> allDocuments = documentDataRepository.findAll();
-        
+
         // 首先计算每个层级的目录数量
         Map<Integer, Set<String>> levelPaths = new HashMap<>();
-        
+
         for (DocumentDataPO doc : allDocuments) {
             String[] parts = doc.getFilePath().split("/");
             StringBuilder currentPath = new StringBuilder();
-            
+
             for (int i = 0; i < parts.length; i++) {
                 if (!parts[i].isEmpty()) {
                     currentPath.append("/").append(parts[i]);
                     levelPaths.computeIfAbsent(i + 1, k -> new HashSet<>())
-                             .add(currentPath.toString());
+                            .add(currentPath.toString());
                 }
             }
         }
@@ -107,19 +110,19 @@ public class SearchSimpleAPI {
 
         // 使用确定的层级重新生成路径列表
         return allDocuments.stream()
-            .map(doc -> {
-                String[] parts = doc.getFilePath().split("/");
-                StringBuilder processedPath = new StringBuilder();
-                for (int i = 0; i < Math.min(targetLevel.get(), parts.length); i++) {
-                    if (!parts[i].isEmpty()) {
-                        processedPath.append("/").append(parts[i]);
+                .map(doc -> {
+                    String[] parts = doc.getFilePath().split("/");
+                    StringBuilder processedPath = new StringBuilder();
+                    for (int i = 0; i < Math.min(targetLevel.get(), parts.length); i++) {
+                        if (!parts[i].isEmpty()) {
+                            processedPath.append("/").append(parts[i]);
+                        }
                     }
-                }
-                return processedPath.toString();
-            })
-            .filter(path -> !path.isEmpty())
-            .distinct()
-            .collect(Collectors.toList());
+                    return processedPath.toString();
+                })
+                .filter(path -> !path.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     private String generateUrl(Long id) {
