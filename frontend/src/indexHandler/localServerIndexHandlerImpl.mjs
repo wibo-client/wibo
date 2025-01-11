@@ -4,24 +4,21 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     constructor() {
         super();
         this.BASE_URL = null;
-        this.serverManager = null;
     }
 
     async init(globalContext, handlerConfig) {
         this.globalContext = globalContext;
 
-        // 监听服务器状态更新
-        if (process.send) {
-            process.on('message', (message) => {
-                if (message.type === 'serverStateUpdate') {
-                    this.updateBaseUrl(message.data);
-                }
-            });
-        }
-
+        const localServerManager = globalContext.localServerManager;
         // 初始获取服务器信息
-        const serverInfo = await this.serverManager.getCurrentServerInfo();
+        const serverInfo = await localServerManager.getCurrentServerInfo();
         this.updateBaseUrl(serverInfo);
+
+        // 每隔5秒获取一次服务器信息并更新 BASE_URL
+        setInterval(async () => {
+            const serverInfo = await localServerManager.getCurrentServerInfo();
+            this.updateBaseUrl(serverInfo);
+        }, 5000);
     }
 
     updateBaseUrl(serverInfo) {
@@ -113,7 +110,8 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
 
     async getAllPossiblePath() {
         if (!this.BASE_URL) {
-            throw new Error('Local server is not available');
+            console.error('Failed to get paths from plugin /local/: Local server is not available');
+            return [];
         }
         try {
             const response = await fetch(`${this.BASE_URL}/getAllPaths`);
