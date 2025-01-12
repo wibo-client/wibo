@@ -2,14 +2,11 @@ export class PathSuggestionService {
     constructor() {
         // 预配置的关键词到完整路径的映射
         this.keywordPathMap = new Map();
-        // 路径树结构
-        this.pathTree = new Map();
         this.pluginPathMap = new Map(); // 存储路径与插件的映射关系
     }
 
     async initWithPlugins(plugins) {
         this.pluginPathMap.clear();
-        this.pathTree.clear();
         this.keywordPathMap.clear();
 
         // 收集所有插件的路径信息
@@ -19,8 +16,7 @@ export class PathSuggestionService {
                 paths.forEach(path => {
                     // 将 Windows 风格路径转换为 Unix 风格路径
                     const normalizedPath = path.replace(/\\/g, '/');
-                    this.pluginPathMap.set(normalizedPath, plugin);
-                    this.addPathToTree(normalizedPath);
+                    this.addPathToTree(normalizedPath, plugin);
                 });
             } catch (error) {
                 console.error(`Failed to get paths from plugin ${pathPrefix}:`, error);
@@ -28,109 +24,35 @@ export class PathSuggestionService {
         }
     }
 
-    addPathConfig(config) {
-        // 添加关键词到完整路径的映射
-        if (config.keywords) {
-            config.keywords.forEach(keyword => {
-                this.keywordPathMap.set(keyword, config.fullPath);
-            });
-        }
-
-        // 构建路径树
-        const parts = config.fullPath.split('/').filter(Boolean);
-        let currentNode = this.pathTree;
-        for (const part of parts) {
-            if (!currentNode.has(part)) {
-                currentNode.set(part, new Map());
-            }
-            currentNode = currentNode.get(part);
-        }
+    addPathToTree(normalizedPath, plugin) {
+        // 去掉文件，只保留目录
+        const directoryPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath.slice(0, normalizedPath.lastIndexOf('/') + 1);
+        this.pluginPathMap.set(directoryPath, plugin);
     }
 
-    addPathToTree(path) {
-        const parts = path.split('/').filter(Boolean);
-        let currentNode = this.pathTree;
-        for (const part of parts) {
-            if (!currentNode.has(part)) {
-                currentNode.set(part, new Map());
-            }
-            currentNode = currentNode.get(part);
-        }
-    }
-
-    getNextLevelPath(currentPath, searchTerm) {
+    getNextLevelPath(keywords) {
         // 将 Windows 风格路径转换为 Unix 风格路径
-        currentPath = currentPath.replace(/\\/g, '/');
+        keywords = keywords.replace(/\\/g, '/');
+        const result = new Set();
 
-        const parts = currentPath.split('/').filter(Boolean);
-        let currentNode = this.pathTree;
-        for (const part of parts) {
-            if (currentNode.has(part)) {
-                currentNode = currentNode.get(part);
-            } else {
-                return [];
+        for (const path of this.pluginPathMap.keys()) {
+            // 去掉文件名字，只留下目录
+            const directoryPath = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+
+            if (directoryPath.includes(keywords)) {
+                const remainingPath = directoryPath.slice(directoryPath.indexOf(keywords) + keywords.length);
+                const nextSlashIndex = remainingPath.indexOf('/');
+
+                if (nextSlashIndex !== -1) {
+                    const nextLevelPath = directoryPath.slice(0, directoryPath.indexOf(keywords) + keywords.length + nextSlashIndex + 1);
+                    result.add(nextLevelPath);
+                } else if (remainingPath.length > 0) {
+                    result.add(directoryPath);
+                }
             }
         }
 
-        const result = [];
-        const searchLower = searchTerm.toLowerCase();
-
-        // 步骤1：用关键词搜索，找到所有匹配该关键词的路径
-        const matchingPaths = new Map();
-        const traverse = (node, path) => {
-            for (const [key, childNode] of node) {
-                const fullPath = `${path}${key}/`;
-                if (key.toLowerCase().includes(searchLower)) {
-                    const keywordIndex = fullPath.toLowerCase().indexOf(searchLower);
-                    const prefix = fullPath.substring(0, keywordIndex + searchLower.length);
-                    let suffix = fullPath.substring(keywordIndex + searchLower.length);
-                    // 去掉文件，只记录目录部分
-                    if (!suffix.endsWith('/')) {
-                        suffix = suffix.substring(0, suffix.lastIndexOf('/') + 1);
-                    }
-                    if (!matchingPaths.has(prefix)) {
-                        matchingPaths.set(prefix, new Set());
-                    }
-                    matchingPaths.get(prefix).add(suffix);
-                }
-                traverse(childNode, fullPath);
-            }
-        };
-        traverse(currentNode, currentPath.endsWith('/') ? currentPath : `${currentPath}/`);
-
-        // 步骤2：基于已有的前向有限分支+路径当前位置，往下延展直到下一个/
-        const nodeTree = new Map();
-        matchingPaths.forEach((suffixes, prefix) => {
-            suffixes.forEach(suffix => {
-                const fullPath = prefix + suffix;
-                const parts = fullPath.split('/').filter(Boolean);
-                let currentNode = nodeTree;
-                parts.forEach(part => {
-                    if (!currentNode.has(part)) {
-                        currentNode.set(part, new Map());
-                    }
-                    currentNode = currentNode.get(part);
-                });
-            });
-        });
-
-        const traverseNodeTree = (node, path) => {
-            if (node.size === 1) {
-                for (const [key, childNode] of node) {
-                    traverseNodeTree(childNode, `${path}${key}/`);
-                }
-            } else {
-                for (const [key, childNode] of node) {
-                    result.push(`${path}${key}/`);
-                }
-            }
-        };
-
-        nodeTree.forEach((childNode, key) => {
-            traverseNodeTree(childNode, `/${key}/`);
-        });
-
-        return result;
+        return Array.from(result).sort();
     }
 
     selectPluginForPath(pathPrefix = '') {
@@ -165,22 +87,6 @@ export class PathSuggestionService {
         return results;
     }
 
-    async getAllPathSuggestions(searchTerm) {
-        const suggestions = new Set();
-
-        if (searchTerm) {
-            for (const [path, plugin] of this.pluginPathMap) {
-                if (path.toLowerCase().includes(searchTerm.toLowerCase())) {
-                    suggestions.add(path);
-                }
-            }
-        }
-
-        const keywordResults = this.getFullPathByKeyword(searchTerm);
-        keywordResults.forEach(path => suggestions.add(path));
-
-        return Array.from(suggestions);
-    }
 
     // 提供类似原getPossiblePath的功能
     async getPossibleChildPaths(currentPath, searchTerm = '') {

@@ -209,12 +209,7 @@ export class PluginHandlerImpl {
 
     async fetchPathSuggestions(input) {
         await this.ensurePathSuggestionsUpdated();
-
-        if (input.endsWith('/')) {
-            return await this.pathSuggestionService.getPossibleChildPaths(input);
-        } else {
-            return await this.pathSuggestionService.getAllPathSuggestions(input);
-        }
+        return await this.pathSuggestionService.getPossibleChildPaths(input);
     }
 
     /**

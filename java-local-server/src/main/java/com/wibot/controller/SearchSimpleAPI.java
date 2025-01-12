@@ -64,13 +64,21 @@ public class SearchSimpleAPI {
      * @param summaryList 摘要列表
      * @return 聚合后的内容
      */
-    @GetMapping("/fetchAggregatedContent")
-    public List<AggregatedContentVO> fetchAggregatedContent(@RequestParam List<SearchResultVO> summaryList) {
+    @PostMapping("/fetchAggregatedContent")
+    public List<AggregatedContentVO> fetchAggregatedContent(@RequestBody Map<String, Object> requestBody) {
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> summaryList = (List<Map<String, Object>>) requestBody.get("summaryList");
+
         return summaryList.stream().map(item -> {
-            Long id = item.getId();
+            Long id = ((Number) item.get("id")).longValue();
+            String title = (String) item.get("title");
+            String description = (String) item.get("description");
+            LocalDateTime date = LocalDateTime.parse((String) item.get("date"));
+            String url = (String) item.get("url");
+
             MarkdownParagraphPO paragraph = getParagraphById(id);
-            return new AggregatedContentVO(item.getId(), item.getTitle(), item.getDescription(), item.getDate(),
-                    item.getUrl(), paragraph.getContent(), paragraph.getParagraphOrder());
+            return new AggregatedContentVO(id, title, description, date, url, paragraph.getContent(),
+                    paragraph.getParagraphOrder());
         }).collect(Collectors.toList());
     }
 
@@ -79,9 +87,10 @@ public class SearchSimpleAPI {
      * 
      * @return 可能的路径列表
      */
-    @GetMapping("/getAllPaths")
+    @PostMapping("/getAllPaths")
     public List<String> getAllPaths() {
-        List<DocumentDataPO> allDocuments = documentDataRepository.findAll();
+        List<DocumentDataPO> allDocuments = documentDataRepository
+                .findByProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_INDEXED);
 
         // 首先计算每个层级的目录数量
         Map<Integer, Set<String>> levelPaths = new HashMap<>();
@@ -123,10 +132,6 @@ public class SearchSimpleAPI {
                 .filter(path -> !path.isEmpty())
                 .distinct()
                 .collect(Collectors.toList());
-    }
-
-    private String generateUrl(Long id) {
-        return "https://yourdomain.com/doc/" + id;
     }
 
     private MarkdownParagraphPO getParagraphById(Long id) {

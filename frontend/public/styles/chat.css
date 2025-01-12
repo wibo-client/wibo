@@ -133,6 +133,10 @@
     background-color: #f0f0f0;
 }
 
+.path-suggestion-item.hover {
+    background-color: #e0e0e0; /* 高亮颜色 */
+}
+
 /* 前景执行开关样式 */
 #foregroundExecution-container {
     display: flex;

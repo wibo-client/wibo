@@ -101,7 +101,16 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            return await response.json();
+            const results = await response.json();
+            return results.map(item => ({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                date: new Date(item.date),
+                url: item.url,
+                content: item.content,
+                paragraphOrder: item.paragraphOrder
+            }));
         } catch (error) {
             console.error('Fetch aggregated content failed:', error);
             throw error;
@@ -114,7 +123,12 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
             return [];
         }
         try {
-            const response = await fetch(`${this.BASE_URL}/getAllPaths`);
+            const response = await fetch(`${this.BASE_URL}/getAllPaths`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

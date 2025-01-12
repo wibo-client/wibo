@@ -53,12 +53,28 @@ export default class ChatHandler {
     chatInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         if (event.shiftKey) {
-          // Shift + Enter: 插入换行
-          return;
-        } else {
-          // 仅Enter: 发送消息
+          // Shift + Enter: 捡问
           event.preventDefault();
+          typeSelect.value = 'searchAndChat';
           this.sendMessage();
+        } else if (event.altKey) {
+          // Alt + Enter: 搜索直出
+          event.preventDefault();
+          typeSelect.value = 'search';
+          this.sendMessage();
+        } else if (event.ctrlKey || event.metaKey) {
+          // Ctrl + Enter 或 Cmd + Enter: 模型直答
+          event.preventDefault();
+          typeSelect.value = 'chat';
+          this.sendMessage();
+        }
+      } else if (event.key === '/') {
+        // 当 user-input 为空时，将光标移动到 pathInput
+        if (chatInput.value.trim() === '') {
+          event.preventDefault();
+          const pathInput = document.getElementById('pathInput');
+          pathInput.focus();
+          pathInput.value = '/';
         }
       }
     });
@@ -68,7 +84,6 @@ export default class ChatHandler {
       chatInput.style.height = 'auto';
       chatInput.style.height = chatInput.scrollHeight + 'px';
     });
-
   }
 
   setupAutoResizeInput() {
@@ -153,8 +168,7 @@ export default class ChatHandler {
     // 处理建议项的键盘导航
     pathInput.addEventListener('keydown', (e) => {
       const items = suggestionsContainer.getElementsByClassName('path-suggestion-item');
-      const activeItem = suggestionsContainer.querySelector('.path-suggestion-item:hover');
-      let activeIndex = Array.from(items).indexOf(activeItem);
+      let activeIndex = Array.from(items).findIndex(item => item.classList.contains('hover'));
 
       switch (e.key) {
         case 'ArrowDown':
@@ -163,9 +177,12 @@ export default class ChatHandler {
             suggestionsContainer.style.display = 'block';
             activeIndex = -1;
           }
+          if (activeIndex >= 0) {
+            items[activeIndex].classList.remove('hover');
+          }
           activeIndex = (activeIndex + 1) % items.length;
-          items[activeIndex].scrollIntoView({ block: 'nearest' });
           items[activeIndex].classList.add('hover');
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
           break;
 
         case 'ArrowUp':
@@ -174,17 +191,24 @@ export default class ChatHandler {
             suggestionsContainer.style.display = 'block';
             activeIndex = items.length;
           }
+          if (activeIndex >= 0) {
+            items[activeIndex].classList.remove('hover');
+          }
           activeIndex = (activeIndex - 1 + items.length) % items.length;
-          items[activeIndex].scrollIntoView({ block: 'nearest' });
           items[activeIndex].classList.add('hover');
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
           break;
 
         case 'Enter':
-          if (activeItem) {
+          if (activeIndex >= 0) {
             e.preventDefault();
-            pathInput.value = activeItem.textContent;
+            pathInput.value = items[activeIndex].textContent;
             suggestionsContainer.style.display = 'none';
           }
+          // 切换焦点到 user-input 并将光标移动到内容末尾
+          const userInput = document.getElementById('user-input');
+          userInput.focus();
+          userInput.setSelectionRange(userInput.value.length, userInput.value.length);
           break;
 
         case 'Escape':

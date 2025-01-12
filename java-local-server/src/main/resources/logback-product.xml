@@ -21,7 +21,7 @@
 
     <!-- root配置需要同时引用两个appender -->
     <root level="INFO">
-        <appender-ref ref="FILE" />
+        <appender-ref ref="CONSOLE" />
     </root>
 
     <statusListener class="ch.qos.logback.core.status.OnConsoleStatusListener"/>
