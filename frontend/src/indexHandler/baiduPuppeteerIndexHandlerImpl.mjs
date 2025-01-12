@@ -221,9 +221,9 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     getHandlerCategory() {
         return '搜索引擎';
     }
-    
-    getIcon() {
-        return 'icons/baidu.png';
+
+    getBeginPath() {
+        return '/baidu.com/';
     }
 
     getInterfaceDescription() {

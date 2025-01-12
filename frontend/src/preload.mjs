@@ -7,21 +7,21 @@ contextBridge.exposeInMainWorld('electron', {
 
   sendMessage: (message, type, path, context) => {
     const requestId = uuidv4();
-    ipcRenderer.invoke('send-message', message, type, path, requestId)
-      .then(response => {
-        if (context?.callback) {
-          context.callback(response);
-        }
-      })
-      .catch(error => {
-        console.error(`Error occurred: ${error}`);
-      });
+    
+    // 注册系统日志事件监听器
+    ipcRenderer.on('system-log', (event, log, id) => {
+      if (id === requestId && context?.onSystemLog) {
+        context.onSystemLog(log);
+      }
+    });
 
     ipcRenderer.on('llm-stream', (event, chunk, id) => {
       if (id === requestId && context?.onChunk) {
         context.onChunk(chunk);
       }
     });
+
+    return ipcRenderer.invoke('send-message', message, type, path, requestId);
   },
 
   // 知识库相关方法 - 确保命名一致

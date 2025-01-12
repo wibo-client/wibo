@@ -485,4 +485,45 @@ export default class KnowledgeBaseHandler {
       // 不再记录详细错误，因为服务离线时这是预期的行为
     }
   }
+
+  // 添加服务状态检查函数
+  async checkServerStatus() {
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const processPid = document.getElementById('processPid');
+    const processPort = document.getElementById('processPort');
+
+    try {
+      const serverStatus = await electron.getServerDesiredState();
+      //console.log('Server status:', serverStatus); // 添加调试日志
+
+      if (serverStatus.isHealthy && serverStatus.pid && serverStatus.port) {
+        statusDot.classList.remove('offline');
+        statusDot.classList.add('online');
+        statusText.textContent = '在线';
+        processPid.textContent = serverStatus.pid;
+        processPort.textContent = serverStatus.port;
+      } else {
+        statusDot.classList.remove('online');
+        statusDot.classList.add('offline');
+        statusText.textContent = '离线';
+        processPid.textContent = '-';
+        processPort.textContent = '-';
+        // console.log('Server not healthy:', serverStatus); // 添加调试日志
+      }
+    } catch (error) {
+      console.error('服务状态检查失败:', error);
+      statusDot.classList.remove('online');
+      statusDot.classList.add('offline');
+      statusText.textContent = '检查失败';
+      processPid.textContent = '-';
+      processPort.textContent = '-';
+    }
+  }
+
+  // 添加定期检查服务状态的函数
+  startServerStatusCheck() {
+    this.checkServerStatus();
+    setInterval(() => this.checkServerStatus(), 5000);
+  }
 }

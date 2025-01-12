@@ -233,7 +233,8 @@ export class PluginHandlerImpl {
                     // 获取插件信息
                     const name = await Promise.resolve(pluginInstance.getHandlerName());
                     const description = await Promise.resolve(pluginInstance.getInterfaceDescription());
-
+                    const category = await Promise.resolve(pluginInstance.getHandlerCategory());
+                    const beginPath = await Promise.resolve(pluginInstance.getBeginPath());
                     if (!name) {
                         console.warn(`Plugin at ${pathPrefix} returned empty name`);
                         continue;
@@ -242,7 +243,9 @@ export class PluginHandlerImpl {
                     pluginInstanceMap[pathPrefix] = {
                         name,
                         description: description || '',
-                        isDefault: pluginInstance === this.defaultHandler
+                        category: category,
+                        isDefault: pluginInstance === this.defaultHandler,
+                        beginPath: beginPath || pathPrefix
                     };
                 } catch (instanceError) {
                     console.error(`Error getting info for plugin at ${pathPrefix}:`, instanceError);
@@ -256,6 +259,7 @@ export class PluginHandlerImpl {
                 pluginInstanceMap['/'] = {
                     name:  this.defaultHandler.getHandlerName(),
                     description:  this.defaultHandler.getInterfaceDescription(),
+                    category: this.defaultHandler.getHandlerCategory(),
                     isDefault: true
                 };
             }

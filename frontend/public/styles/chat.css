@@ -32,6 +32,45 @@
     color: green;
 }
 
+/* System Message 样式 */
+.message.system {
+    text-align: left;
+    color: #666;
+    font-size: 0.9em;
+    margin: 10px 0;
+}
+
+.system-content {
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    padding: 8px;
+    max-height: 30px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.system-content.expanded {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.system-content .execution-log {
+    margin: 4px 0;
+    font-family: monospace;
+}
+
+.system-toggle {
+    cursor: pointer;
+    color: #2196F3;
+    font-size: 0.8em;
+    margin-top: 4px;
+    display: inline-block;
+}
+
+.system-toggle:hover {
+    text-decoration: underline;
+}
+
 /* 输入区域样式 */
 #input-container {
     display: flex;

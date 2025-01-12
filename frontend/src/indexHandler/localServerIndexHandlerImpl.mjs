@@ -161,9 +161,8 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         return '本地文件检索';
     }
     
-
-    getIcon() {
-        return 'icons/baidu.png';
+    getBeginPath() {
+        return '/local/';
     }
 
     getInterfaceDescription() {

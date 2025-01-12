@@ -236,17 +236,16 @@ export default class ChatHandler {
   }
 
   async sendMessage() {
-    const message = document.getElementById('user-input').value.trim();  // 使用 trim() 去除首尾空格
+    const message = document.getElementById('user-input').value.trim();
     const type = document.getElementById('request-type').value;
     const path = document.getElementById('pathInput').value;
 
-    // 如果消息为空则直接返回
     if (!message) {
       return;
     }
 
     try {
-      const feedbackBox = document.getElementById('messages');          // 改为 messages
+      const feedbackBox = document.getElementById('messages');
 
       // 用户输入信息
       const userMessageElement = document.createElement('div');
@@ -254,35 +253,52 @@ export default class ChatHandler {
       userMessageElement.innerHTML = marked("### 你 : \n\n" + message + "\n\n");
       feedbackBox.appendChild(userMessageElement);
 
-      // 清空用户输入框
-      document.getElementById('user-input').value = '';                 // 改为 user-input
+      // 系统执行信息
+      const systemMessageElement = document.createElement('div');
+      systemMessageElement.className = 'message system';
+      systemMessageElement.innerHTML = `
+        <div class="system-content">
+          <div class="execution-log">🔄 开始处理请求...</div>
+        </div>
+        <span class="system-toggle">展开详情</span>
+      `;
+      feedbackBox.appendChild(systemMessageElement);
 
-      // 系统回复信息
+      const systemContent = systemMessageElement.querySelector('.system-content');
+      const systemToggle = systemMessageElement.querySelector('.system-toggle');
+
+      // 添加展开/折叠功能
+      systemToggle.addEventListener('click', () => {
+        systemContent.classList.toggle('expanded');
+        systemToggle.textContent = systemContent.classList.contains('expanded') ? '收起详情' : '展开详情';
+      });
+
+      // WIBO回复信息
       const wibaMessageElement = document.createElement('div');
       wibaMessageElement.className = 'message wiba';
       wibaMessageElement.innerHTML = '';
       feedbackBox.appendChild(wibaMessageElement);
 
+      // 自动滚动到底部
       feedbackBox.scrollTop = feedbackBox.scrollHeight;
+      
       let wholeMessage = '### WIBO : \n\n';
 
       const requestContext = {
         onChunk: (chunk) => {
-          const feedbackBox = document.getElementById('messages');
-          // 检查用户是否在底部
-          const isAtBottom = Math.abs(
-            feedbackBox.scrollHeight - feedbackBox.scrollTop - feedbackBox.clientHeight
-          ) < 5;
-
           wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);
-
-          // 仅当用户在底部时才自动滚动
-          if (isAtBottom) {
-            feedbackBox.scrollTop = feedbackBox.scrollHeight;
-          }
+        },
+        onSystemLog: (log) => {
+          const logElement = document.createElement('div');
+          logElement.className = 'execution-log';
+          logElement.textContent = log;
+          systemContent.appendChild(logElement);
         }
       };
+
+      // 清空输入框
+      document.getElementById('user-input').value = '';
 
       await window.electron.sendMessage(
         message,
@@ -290,6 +306,7 @@ export default class ChatHandler {
         path,
         requestContext
       );
+
     } catch (error) {
       console.error('发送消息错误:', error);
       alert('发送消息失败: ' + error.message);

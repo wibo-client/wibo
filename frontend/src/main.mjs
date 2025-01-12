@@ -127,41 +127,63 @@ app.whenReady().then(async () => {
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
     console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
 
+    // 发送系统日志的辅助函数
+    const sendSystemLog = (log) => {
+      event.sender.send('system-log', log, requestId);
+    };
+
     try {
+      sendSystemLog('🔍 正在选择合适的插件...');
       const selectedPlugin = await globalContext.pluginHandler.select(path);
+      sendSystemLog(`✅ 已选择插件: ${path}`);
 
       let pageFetchLimit = await globalContext.configHandler.getPageFetchLimit();
+      sendSystemLog(`ℹ️ 页面获取限制: ${pageFetchLimit}`);
 
       if (type === 'search') {
+        sendSystemLog('🔎 执行直接搜索...');
         const searchResult = await selectedPlugin.search(message, path);
         const markdownResult = buildSearchResultsString(searchResult);
         event.sender.send('llm-stream', markdownResult, requestId);
+        sendSystemLog('✅ 搜索完成');
       } else if (type === 'searchWithRerank') {
+        sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await selectedPlugin.rewriteQuery(message);
+        sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
         let searchResults = [];
         for (const query of requeryResult) {
+          sendSystemLog(`🔍 执行查询: ${query}`);
           const result = await selectedPlugin.search(query, path);
           searchResults = searchResults.concat(result);
-          if (searchResults.length >= pageFetchLimit) {
-            break;
-          }
+          if (searchResults.length >= pageFetchLimit) break;
         }
+
+        sendSystemLog('📊 重新排序搜索结果...');
         const rerankResult = await selectedPlugin.rerank(searchResults, message);
         const markdownResult = buildSearchResultsString(rerankResult);
         event.sender.send('llm-stream', markdownResult, requestId);
+        sendSystemLog('✅ 重新排序完成');
       } else if (type === 'searchAndChat') {
+        sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await selectedPlugin.rewriteQuery(message);
+        sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
         let searchResults = [];
         for (const query of requeryResult) {
+          sendSystemLog(`🔍 执行查询: ${query}`);
           const result = await selectedPlugin.search(query, path);
           searchResults = searchResults.concat(result);
-          if (searchResults.length >= pageFetchLimit) {
-            break;
-          }
+          if (searchResults.length >= pageFetchLimit) break;
         }
+
+        sendSystemLog('📊 重新排序搜索结果...');
         const rerankResult = await selectedPlugin.rerank(searchResults, message);
-        // 插入获取相关内容的逻辑
+        
+        sendSystemLog('📑 获取相关内容...');
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(rerankResult);
+        
+        // 插入获取相关内容的逻辑
         const contextBuilder = [];
         let currentLength = 0;
         let partIndex = 1;
@@ -221,12 +243,18 @@ app.whenReady().then(async () => {
         console.info("Final combined output: ", returnStrfinal.value);
         event.sender.send('llm-stream', returnStrfinal.value, requestId);
       } else if (type === 'chat') {
-        await globalContext.llmCaller.callAsync([{ role: 'user', content: message }], true, (chunk) => {
-          event.sender.send('llm-stream', chunk, requestId);
-        });
+        sendSystemLog('💬 启动直接对话模式...');
+        await globalContext.llmCaller.callAsync(
+          [{ role: 'user', content: message }],
+          true,
+          (chunk) => event.sender.send('llm-stream', chunk, requestId)
+        );
+        sendSystemLog('✅ 对话完成');
       }
+
     } catch (error) {
       console.error(`Error occurred in handler for 'send-message': ${error}`, error);
+      sendSystemLog(`❌ 错误: ${error.message}`);
       event.sender.send('error', { message: error.message }, requestId);
     }
   });
