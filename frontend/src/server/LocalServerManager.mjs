@@ -4,6 +4,7 @@ import Store from 'electron-store';
 import fetch from 'node-fetch';
 import path from 'path';
 import fs from 'fs/promises';  // 添加 fs/promises 导入
+import { app } from 'electron';  // 添加这行导入
 /*
 gpt 生成的这个表太漂亮了，我直接贴出来。 
 
@@ -31,7 +32,9 @@ export default class LocalServerManager {
         this.stopTimeout = 30000;    // 停止超时时间设为30秒
         this.healthCheckInterval = 2000; // 健康检查间隔2秒
         this.jarPath = null; // 添加 jarPath 属性
+        this.javaBinPath = null;  // 添加 Java 可执行文件路径
         this.initializeJarPath(); // 在构造函数中调用初始化
+        this.initializeJavaPaths(); // 在构造函数中调用初始化
     }
 
     // 新增：获取 desiredState 方法
@@ -296,7 +299,17 @@ export default class LocalServerManager {
 
     // 查找 jar 文件的辅助方法
     async findJarFile() {
-        const javaLocalServerPath = path.join(__dirname, 'java-local-server');
+        let javaLocalServerPath;
+        if (app.isPackaged) {
+            const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
+            javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
+            console.log('[LocalServer] Using packaged path:', javaLocalServerPath);
+        } else {
+            // 开发环境中的路径
+            javaLocalServerPath = path.join(__dirname, 'java-local-server');
+            console.log('[LocalServer] Using development path:', javaLocalServerPath);
+        }
+
         try {
             const files = await fs.readdir(javaLocalServerPath);
             const jarFile = files.find(file => file.endsWith('.jar'));
@@ -319,6 +332,44 @@ export default class LocalServerManager {
             }
         } catch (error) {
             console.error('[LocalServer] Failed to initialize jar path:', error);
+        }
+    }
+
+    // 新增：初始化 Java 相关路径
+    async initializeJavaPaths() {
+        try {
+            let javaLocalServerPath;
+            if (app.isPackaged) {
+                const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
+                javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
+                console.log('[LocalServer] Using packaged path for JRE:', javaLocalServerPath);
+            } else {
+                // 开发环境中的路径
+                javaLocalServerPath = path.join(__dirname, 'java-local-server');
+                console.log('[LocalServer] Using development path for JRE:', javaLocalServerPath);
+            }
+            
+            // 根据平台找到正确的 Java 可执行文件路径
+            const customJrePath = path.join(javaLocalServerPath, 'custom-jre');
+            if (process.platform === 'win32') {
+                this.javaBinPath = path.join(customJrePath, 'bin', 'java.exe');
+            } else {
+                this.javaBinPath = path.join(customJrePath, 'bin', 'java');
+            }
+
+            // 初始化 jar 文件路径
+            const foundJarPath = await this.findJarFile();
+            if (foundJarPath) {
+                this.jarPath = foundJarPath;
+                console.log('[LocalServer] Paths initialized:', {
+                    java: this.javaBinPath,
+                    jar: this.jarPath
+                });
+            } else {
+                console.warn('[LocalServer] No jar file found during initialization');
+            }
+        } catch (error) {
+            console.error('[LocalServer] Failed to initialize paths:', error);
         }
     }
 
@@ -388,18 +439,25 @@ export default class LocalServerManager {
             return;
         }
 
-        // 确保有 jarPath
-        if (!this.jarPath) {
+        // 确保路径都已初始化
+        if (!this.jarPath || !this.javaBinPath) {
             try {
-                const foundJarPath = await this.findJarFile();
-                if (!foundJarPath) {
-                    throw new Error('No jar file available');
+                await this.initializeJavaPaths();
+                if (!this.jarPath || !this.javaBinPath) {
+                    throw new Error('Required paths not available');
                 }
-                this.jarPath = foundJarPath;
             } catch (error) {
-                console.error('[LocalServer] Failed to get jar path:', error);
-                throw new Error('Cannot start server: jar file not found');
+                console.error('[LocalServer] Failed to initialize paths:', error);
+                throw new Error('Cannot start server: required paths not found');
             }
+        }
+
+        // 确保 Java 可执行文件存在且可执行
+        try {
+            await fs.access(this.javaBinPath, fs.constants.X_OK);
+        } catch (error) {
+            console.error('[LocalServer] Java binary not executable:', error);
+            throw new Error('Java binary not executable');
         }
 
         let javaProcess;
@@ -419,7 +477,8 @@ export default class LocalServerManager {
                 '--spring.profiles.active=product'
             ];
 
-            javaProcess = spawn('java', args, {
+            // 使用 custom-jre 的 java 可执行文件启动进程
+            javaProcess = spawn(this.javaBinPath, args, {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 

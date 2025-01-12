@@ -1,22 +1,54 @@
 {
   "name": "electron-wiba-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "WIBO - Your Personal Knowledge Assistant",
   "main": "dist/main.js",
   "scripts": {
+    "clean": "rm -rf dist && mkdir dist",
+    "clean:win": "rmdir /S /Q dist 2>nul & mkdir dist",
+    
     "build:main": "webpack --config webpack.main.config.js",
     "build:renderer": "webpack --config webpack.renderer.config.js",
-    "build:plugin": "webpack --config webpack.plugin.config.js ",
-    "build:backend": "cd ../java-local-server && mvn package -Pproduct",
-    "copy:backend": "rm -rf dist/java-local-server&&mkdir -p dist/java-local-server && cp ../java-local-server/target/*-product.jar dist/java-local-server/",
-    "build:all": "npm run build:backend && npm run copy:backend && npm run build",
-    "build": "npm run build:main && npm run build:renderer",
-    "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:linux": "npm run build && electron-builder --linux",
-    "test": "mocha 'test/**/*.mjs' --experimental-modules"
+    "build:plugin": "webpack --config webpack.plugin.config.js",
+    "build:frontend": "npm run build:main && npm run build:renderer ",
+    
+    "build:backend": "cd ../java-local-server && mvn clean package -Pproduct",
+    
+    "prepare:dist": "mkdir -p dist/java-local-server",
+    "prepare:dist:win": "mkdir dist\\java-local-server 2>nul",
+    
+    "clean:jre": "rm -rf dist/java-local-server/custom-jre",
+    "clean:jre:win": "rmdir /S /Q dist\\java-local-server\\custom-jre 2>nul || exit 0",
+    
+    "jlink:create": "jlink --module-path $JAVA_HOME/jmods --add-modules java.base,java.logging,java.xml,java.sql,java.naming,java.desktop,java.management,java.security.jgss,java.instrument,jdk.unsupported,java.net.http,jdk.crypto.ec,java.management.rmi,jdk.httpserver,java.scripting,jdk.xml.dom,java.transaction.xa,jdk.crypto.cryptoki --compress=1 --no-header-files --no-man-pages --output dist/java-local-server/custom-jre",
+    "jlink:win": "jlink --module-path %JAVA_HOME%/jmods --add-modules java.base,java.logging,java.xml,java.sql,java.naming,java.desktop,java.management,java.security.jgss,java.instrument,jdk.unsupported,java.net.http,jdk.crypto.ec,java.management.rmi,jdk.httpserver,java.scripting,jdk.xml.dom,java.transaction.xa,jdk.crypto.cryptoki --compress=1 --no-header-files --no-man-pages --output dist/java-local-server/custom-jre",
+    
+    "prepare:java": "npm run clean:jre && npm run jlink:create",
+    "prepare:java:win": "npm run clean:jre:win && npm run jlink:win",
+    
+    "copy:backend": "cp ../java-local-server/target/*-product.jar dist/java-local-server/",
+    "copy:backend:win": "copy ..\\java-local-server\\target\\*-product.jar dist\\java-local-server\\",
+    
+    "build": "npm run clean && npm run prepare:dist && npm run build:frontend",
+    "build:win": "npm run clean:win && npm run prepare:dist:win && npm run build:frontend",
+    
+    "build:all": "npm run clean && npm run prepare:dist && npm run prepare:java && npm run build:backend && npm run copy:backend && npm run build:frontend",
+    "build:all:win": "npm run clean:win && npm run prepare:dist:win && npm run prepare:java:win && npm run build:backend && npm run copy:backend:win && npm run build:frontend",
+    
+    "start": "electron .",
+    "prepack": "node scripts/check-resources.js",
+    "predist": "npm run build:all && npm run prepack",
+    "predist:mac": "npm run build:all && npm run prepack",
+    "predist:win": "npm run build:all:win",
+    "predist:linux": "npm run build:all",
+    
+    "dist": "npx electron-builder",
+    "dist:mac": "npx electron-builder --mac",
+    "dist:win": "npx electron-builder --win",
+    "dist:linux": "npx electron-builder --linux",
+    
+    "test": "mocha 'test/**/*.mjs' --experimental-modules",
+    "postinstall": "npm run prepare:dist"
   },
   "keywords": [],
   "author": "",
@@ -50,32 +82,68 @@
     "webpack": "^5.97.1",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.0",
-    "webpack-node-externals": "^3.0.0"
+    "webpack-node-externals": "^3.0.0",
+    "electron-notarize": "^1.2.2"
   },
   "build": {
     "appId": "com.wibo.wibo-client",
+    "productName": "WIBO",
+    "copyright": "Copyright © 2025",
+    "directories": {
+      "output": "release"
+    },
     "mac": {
-      "category": "public.app-category.productivity"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
     },
     "linux": {
-      "target": "AppImage"
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Development"
     },
     "files": [
       "dist/**/*",
+      "!dist/java-local-server/**/*",
       "node_modules/**/*",
       "package.json"
     ],
     "extraResources": [
       {
-        "from": "path/to/extra/resources",
-        "to": "resources",
-        "filter": [
-          "**/*"
-        ]
+        "from": "dist/java-local-server",
+        "to": "java-local-server",
+        "filter": ["**/*"]
       }
-    ]
+    ],
+    "asarUnpack": [
+      "java-local-server/**/*"
+    ],
+    "asar": true
   }
 }
