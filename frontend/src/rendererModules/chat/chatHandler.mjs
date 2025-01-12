@@ -116,18 +116,23 @@ export default class ChatHandler {
 
     let debounceTimeout;
 
+    const fetchSuggestions = async () => {
+      const input = pathInput.value;
+      try {
+        await window.electron.fetchPathSuggestions(input);
+      } catch (error) {
+        console.error('获取路径建议失败:', error);
+      }
+    };
+
     // 输入处理
     pathInput.addEventListener('input', () => {
       clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(async () => {
-        const input = pathInput.value;
-        try {
-          await window.electron.fetchPathSuggestions(input);
-        } catch (error) {
-          console.error('获取路径建议失败:', error);
-        }
-      }, 200);
+      debounceTimeout = setTimeout(fetchSuggestions, 200);
     });
+
+    // 当用户光标在 pathInput 框时获取后端建议
+    pathInput.addEventListener('focus', fetchSuggestions);
 
     // 监听后端返回的建议
     window.electron.onPathSuggestions((suggestions) => {
@@ -213,6 +218,18 @@ export default class ChatHandler {
 
         case 'Escape':
           suggestionsContainer.style.display = 'none';
+          break;
+
+        case 'Tab':
+          if (items.length > 0) {
+            e.preventDefault();
+            pathInput.value = items[0].textContent;
+            suggestionsContainer.style.display = 'none';
+            // 切换焦点到 user-input 并将光标移动到内容末尾
+            const userInput = document.getElementById('user-input');
+            userInput.focus();
+            userInput.setSelectionRange(userInput.value.length, userInput.value.length);
+          }
           break;
       }
     });
