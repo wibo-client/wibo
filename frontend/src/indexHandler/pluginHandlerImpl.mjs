@@ -254,8 +254,8 @@ export class PluginHandlerImpl {
             // 如果没有找到任何有效的插件，至少包含默认处理器
             if (Object.keys(pluginInstanceMap).length === 0 && this.defaultHandler) {
                 pluginInstanceMap['/'] = {
-                    name: await this.defaultHandler.getHandlerName(),
-                    description: await this.defaultHandler.getInterfaceDescription(),
+                    name:  this.defaultHandler.getHandlerName(),
+                    description:  this.defaultHandler.getInterfaceDescription(),
                     isDefault: true
                 };
             }

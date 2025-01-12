@@ -151,12 +151,23 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         return documentPartList;
     }
 
+ 
     getHandlerName() {
-        return 'LocalServerIndexHandlerImpl';
+        return '本机文件检索';
+    }
+
+
+    getHandlerCategory() {
+        return '本地文件检索';
+    }
+    
+
+    getIcon() {
+        return 'icons/baidu.png';
     }
 
     getInterfaceDescription() {
-        return '本地搜索服务';
+        return '对本机的目录构建索引，您可以让大模型依托于本地文件来回答问题，比较方便可以下载一些pdf文件或网页到本地来依托这些内容回答问题';
     }
 }
 

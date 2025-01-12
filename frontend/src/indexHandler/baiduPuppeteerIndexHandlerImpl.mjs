@@ -15,9 +15,6 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         this.globalContext = globalContext;
     }
 
-    getInterfaceDescription() {
-        return '百度 Puppeteer 索引处理器';
-    }
 
     async getBrowserConfig(headless) {
         return {
@@ -218,7 +215,19 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     }
 
     getHandlerName() {
-        return 'BaiduPuppeteerIndexHandlerImpl';
+        return '百度';
+    }
+
+    getHandlerCategory() {
+        return '搜索引擎';
+    }
+    
+    getIcon() {
+        return 'icons/baidu.png';
+    }
+
+    getInterfaceDescription() {
+        return '百度搜索引擎支持下的问题检索回答引擎，你的问题会直接通过百度搜索引擎找到相关文档以后再依托文档回答问题。';
     }
 }
 
