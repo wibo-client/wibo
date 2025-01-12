@@ -179,10 +179,11 @@ app.whenReady().then(async () => {
 
         sendSystemLog('📊 重新排序搜索结果...');
         const rerankResult = await selectedPlugin.rerank(searchResults, message);
-        
-        sendSystemLog('📑 获取相关内容...');
+        sendSystemLog('✅  重新排序完成');
+
+        sendSystemLog('📑 获取详细网页内容...');
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(rerankResult);
-        
+        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细网页内容，开始依托内容回应问题。`);
         // 插入获取相关内容的逻辑
         const contextBuilder = [];
         let currentLength = 0;
@@ -228,20 +229,29 @@ app.whenReady().then(async () => {
           event.sender.send('llm-stream', chunk, requestId);
         });
 
-        // 添加参考文档部分
-        const combinedOutput = [];
-        combinedOutput.push("\n\n## Reference Documents:\n");
-        let index = 1;
-        for (const doc of aggregatedContent) {
-          combinedOutput.push(`doc ${index}: [${doc.title}](${doc.url})\n`);
-          combinedOutput.push("\n");
-          if ((index++) > 3) {
-            break;
-          }
-        }
-        returnStrfinal.value += combinedOutput.join('');
-        console.info("Final combined output: ", returnStrfinal.value);
-        event.sender.send('llm-stream', returnStrfinal.value, requestId);
+        // 移除 DOM 操作相关代码，改为构建数据对象
+        const referenceData = {
+            fullContent: aggregatedContent.map((doc, index) => ({
+                index: index + 1,
+                title: doc.title,
+                url: doc.url,
+                date: doc.date,
+                description: doc.description
+            })),
+            displayedContent: aggregatedContent.slice(0, 3).map((doc, index) => ({
+                index: index + 1,
+                title: doc.title,
+                url: doc.url,
+                date: doc.date,
+                description: doc.description
+            })),
+            totalCount: aggregatedContent.length
+        };
+
+        // 发送引用数据到渲染进程
+        sendSystemLog('📚 添加参考文档...');
+        event.sender.send('add-reference', referenceData, requestId);
+
       } else if (type === 'chat') {
         sendSystemLog('💬 启动直接对话模式...');
         await globalContext.llmCaller.callAsync(

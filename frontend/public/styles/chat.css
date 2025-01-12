@@ -44,9 +44,9 @@
     background-color: #f5f5f5;
     border-radius: 4px;
     padding: 8px;
-    max-height: 30px;
+    max-height: 48px; /* 调整为两行消息的高度 */
     overflow: hidden;
-    transition: max-height 0.3s ease-out;
+    transition: all 0.3s ease-out;
 }
 
 .system-content.expanded {
@@ -54,20 +54,90 @@
     overflow-y: auto;
 }
 
-.system-content .execution-log {
-    margin: 4px 0;
-    font-family: monospace;
+.system-actions {
+    margin-top: 4px;
 }
 
 .system-toggle {
     cursor: pointer;
     color: #2196F3;
     font-size: 0.8em;
-    margin-top: 4px;
     display: inline-block;
+    user-select: none;
+    padding: 2px 4px;
 }
 
 .system-toggle:hover {
+    text-decoration: underline;
+    background-color: #f0f8ff;
+    border-radius: 3px;
+}
+
+.system-content .execution-log {
+    margin: 4px 0;
+    font-family: monospace;
+    transition: opacity 0.3s ease;
+}
+
+.system-content:not(.expanded) .execution-log {
+    margin: 0;
+}
+
+/* Reference Message 样式 */
+.message.reference {
+    text-align: left;
+    color: #555;
+    font-size: 0.9em;
+    margin: 10px 0;
+    background-color: #f8f9fa;
+    border-left: 3px solid #6c757d;
+    padding: 8px;
+}
+
+.reference-content {
+    background-color: #fff;
+    border-radius: 4px;
+    padding: 8px;
+    max-height: 100px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.reference-content.expanded {
+    max-height: 1000px;
+    overflow-y: auto;
+}
+
+.reference-content a {
+    color: #2196F3;
+    text-decoration: none;
+    position: relative;
+}
+
+.reference-content a:hover {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.reference-content a:active {
+    color: #1976D2;
+}
+
+.reference-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.reference-toggle, .reference-follow-up {
+    cursor: pointer;
+    color: #2196F3;
+    font-size: 0.8em;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.reference-toggle:hover, .reference-follow-up:hover {
     text-decoration: underline;
 }
 

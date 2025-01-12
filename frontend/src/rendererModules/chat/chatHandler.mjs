@@ -260,18 +260,33 @@ export default class ChatHandler {
         <div class="system-content">
           <div class="execution-log">🔄 开始处理请求...</div>
         </div>
-        <span class="system-toggle">展开详情</span>
+        <div class="system-actions">
+          <span class="system-toggle">展开详情</span>
+        </div>
       `;
       feedbackBox.appendChild(systemMessageElement);
 
       const systemContent = systemMessageElement.querySelector('.system-content');
       const systemToggle = systemMessageElement.querySelector('.system-toggle');
 
-      // 添加展开/折叠功能
-      systemToggle.addEventListener('click', () => {
+      // 修改展开/折叠功能的绑定方式
+      const toggleSystemContent = () => {
         systemContent.classList.toggle('expanded');
-        systemToggle.textContent = systemContent.classList.contains('expanded') ? '收起详情' : '展开详情';
-      });
+        const isExpanded = systemContent.classList.contains('expanded');
+        systemToggle.textContent = isExpanded ? '收起详情' : '展开详情';
+        
+        // 控制日志显示
+        const logs = systemContent.querySelectorAll('.execution-log');
+        if (!isExpanded) {
+            Array.from(logs).forEach((log, index) => {
+                log.style.display = index < logs.length - 2 ? 'none' : 'block';
+            });
+        } else {
+            logs.forEach(log => log.style.display = 'block');
+        }
+      };
+
+      systemToggle.addEventListener('click', toggleSystemContent);
 
       // WIBO回复信息
       const wibaMessageElement = document.createElement('div');
@@ -293,8 +308,104 @@ export default class ChatHandler {
           const logElement = document.createElement('div');
           logElement.className = 'execution-log';
           logElement.textContent = log;
+          
+          // 将新日志添加到系统内容区域
           systemContent.appendChild(logElement);
-        }
+          
+          // 获取所有日志
+          const logs = systemContent.querySelectorAll('.execution-log');
+          
+          // 如果不是展开状态，只显示最新的两条日志
+          if (!systemContent.classList.contains('expanded')) {
+              Array.from(logs).forEach((log, index) => {
+                  if (index < logs.length - 2) {
+                      log.style.display = 'none';
+                  } else {
+                      log.style.display = 'block';
+                  }
+              });
+          }
+        },
+        onReference: (referenceData) => {
+          const referenceMessageElement = document.createElement('div');
+          referenceMessageElement.className = 'message reference';
+
+          // 构建初始显示内容
+          let initialContent = '### 参考文档\n\n';
+          referenceData.displayedContent.forEach(doc => {
+              initialContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
+              if (doc.date) {
+                  initialContent += `   日期: ${doc.date}\n`;
+              }
+              initialContent += `   描述: ${doc.description}\n\n`;
+          });
+
+          // 构建完整内容
+          let fullContent = '### 参考文档\n\n';
+          referenceData.fullContent.forEach(doc => {
+              fullContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
+              if (doc.date) {
+                  fullContent += `   日期: ${doc.date}\n`;
+              }
+              fullContent += `   描述: ${doc.description}\n\n`;
+          });
+
+          referenceMessageElement.innerHTML = `
+              <div class="reference-content">
+                  ${marked(initialContent)}
+              </div>
+              <div class="reference-actions">
+                  <a href="#" class="reference-toggle">展开更多参考(${referenceData.totalCount})</a>
+                  <a href="#" class="reference-follow-up">追问</a>
+              </div>
+              <div class="reference-full-content" style="display:none">
+                  ${marked(fullContent)}
+              </div>
+          `;
+
+          feedbackBox.appendChild(referenceMessageElement);
+
+          // 为所有引用文档中的链接添加点击事件
+          const links = referenceMessageElement.querySelectorAll('a');
+          links.forEach(link => {
+              link.addEventListener('click', async (e) => {
+                  e.preventDefault();
+                  const url = link.getAttribute('href');
+                  if (url) {
+                      try {
+                          await window.electron.shell.openExternal(url);
+                      } catch (error) {
+                          console.error('打开链接失败:', error);
+                      }
+                  }
+              });
+          });
+
+          // 添加展开/折叠功能
+          const toggleButton = referenceMessageElement.querySelector('.reference-toggle');
+          const content = referenceMessageElement.querySelector('.reference-content');
+          const fullContentElement = referenceMessageElement.querySelector('.reference-full-content');
+
+          toggleButton.addEventListener('click', (e) => {
+              e.preventDefault();
+              content.classList.toggle('expanded');
+              if (content.classList.contains('expanded')) {
+                  content.innerHTML = fullContentElement.innerHTML;
+                  toggleButton.textContent = '收起参考';
+              } else {
+                  content.innerHTML = marked(initialContent);
+                  toggleButton.textContent = `展开更多参考(${referenceData.totalCount})`;
+              }
+          });
+
+          // 添加追问功能
+          const followUpButton = referenceMessageElement.querySelector('.reference-follow-up');
+          followUpButton.addEventListener('click', (e) => {
+              e.preventDefault();
+              // 这里预留追问功能的实现
+              console.log('追问功能待实现');
+          });
+      }
       };
 
       // 清空输入框

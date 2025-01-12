@@ -21,6 +21,13 @@ contextBridge.exposeInMainWorld('electron', {
       }
     });
 
+    // 添加参考文档事件监听器
+    ipcRenderer.on('add-reference', (event, html, id) => {
+      if (id === requestId && context?.onReference) {
+        context.onReference(html);
+      }
+    });
+
     return ipcRenderer.invoke('send-message', message, type, path, requestId);
   },
 
