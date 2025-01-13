@@ -19,10 +19,10 @@ class ChromeService {
     findChromePath(baseDir) {
         const platform = os.platform();
         const possibleBasePaths = [
+            path.join(process.resourcesPath, 'chrome'),
             path.join(baseDir, '..', '..', 'chrome'),
             path.join(baseDir, '..', '..', '..', 'chrome'),
             path.join(process.cwd(), 'chrome'),
-            path.join(process.resourcesPath, 'chrome'),
         ];
 
         const platformPaths = {
