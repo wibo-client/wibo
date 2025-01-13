@@ -1,9 +1,5 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PuppeteerIndexHandler } from './puppeteerIndexHandler.mjs';
-
-
-puppeteer.use(StealthPlugin());
+import ChromeService from '../server/chromeService.mjs';
 
 export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     constructor() {
@@ -121,16 +117,18 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
     async search(query, pathPrefix = '', recordDescription = true) {
         console.info("开始处理任务");
-        let browser = null;
         let page = null;
+        let browser = null;
 
         try {
             const configHandler = this.globalContext.configHandler;
-            const headless = await configHandler.getHeadless();
             const browserTimeout = await configHandler.getBrowserTimeout();
             const searchItemNumbers = await configHandler.getSearchItemNumbers();
+            const headless = await configHandler.getHeadless();
 
-            browser = await puppeteer.launch(await this.getBrowserConfig(headless));
+            // 使用 ChromeService 获取浏览器实例，传入自定义配置
+            const browserConfig = await this.getBrowserConfig(headless);
+            browser = await ChromeService.getBrowser(browserConfig);
             page = await browser.newPage();
 
             // 设置页面错误处理
@@ -188,9 +186,8 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 if (page && !page.isClosed()) {
                     await page.close();
                 }
-                if (browser) {
-                    await browser.close();
-                }
+                // 确保在任务完成后关闭浏览器
+                await ChromeService.closeBrowser();
             } catch (closeError) {
                 console.error("关闭资源时出错:", closeError);
             }
