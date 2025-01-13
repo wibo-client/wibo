@@ -21,3 +21,4 @@ java-local-server/.project
 frontend/release
 frontend/*-audit.json
 frontend/chrome
+chrome/
