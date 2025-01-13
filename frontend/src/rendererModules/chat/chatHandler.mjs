@@ -247,12 +247,16 @@ export default class ChatHandler {
 
     try {
       const feedbackBox = document.getElementById('messages');
+      
+      // 创建消息组容器
+      const messageGroup = document.createElement('div');
+      messageGroup.className = 'message-group';
 
       // 用户输入信息
       const userMessageElement = document.createElement('div');
       userMessageElement.className = 'message user';
       userMessageElement.innerHTML = marked("### 你 : \n\n" + message + "\n\n");
-      feedbackBox.appendChild(userMessageElement);
+      messageGroup.appendChild(userMessageElement);
 
       // 系统执行信息
       const systemMessageElement = document.createElement('div');
@@ -265,7 +269,7 @@ export default class ChatHandler {
           <span class="system-toggle">展开详情</span>
         </div>
       `;
-      feedbackBox.appendChild(systemMessageElement);
+      messageGroup.appendChild(systemMessageElement);
 
       const systemContent = systemMessageElement.querySelector('.system-content');
       const systemToggle = systemMessageElement.querySelector('.system-toggle');
@@ -289,11 +293,18 @@ export default class ChatHandler {
 
       systemToggle.addEventListener('click', toggleSystemContent);
 
-      // WIBO回复信息
+      // WIBO回复信息和引用信息容器
+      const wiboContainer = document.createElement('div');
+      wiboContainer.className = 'wibo-container';
+      
       const wibaMessageElement = document.createElement('div');
       wibaMessageElement.className = 'message wiba';
       wibaMessageElement.innerHTML = '';
-      feedbackBox.appendChild(wibaMessageElement);
+      wiboContainer.appendChild(wibaMessageElement);
+      messageGroup.appendChild(wiboContainer);
+
+      // 将整个消息组添加到反馈框
+      feedbackBox.appendChild(messageGroup);
 
       // 自动滚动到底部
       feedbackBox.scrollTop = feedbackBox.scrollHeight;
@@ -358,29 +369,38 @@ export default class ChatHandler {
               </div>
               <div class="reference-actions">
                   <a href="#" class="reference-toggle">展开更多参考(${referenceData.totalCount})</a>
-                  <a href="#" class="reference-follow-up">追问</a>
+               
               </div>
               <div class="reference-full-content" style="display:none">
                   ${marked(fullContent)}
               </div>
           `;
 
-          feedbackBox.appendChild(referenceMessageElement);
+          // 将引用消息添加到同一个 wibo-container 中
+          wiboContainer.appendChild(referenceMessageElement);
 
-          // 为所有引用文档中的链接添加点击事件
-          const links = referenceMessageElement.querySelectorAll('a');
-          links.forEach(link => {
-              link.addEventListener('click', async (e) => {
-                  e.preventDefault();
-                  const url = link.getAttribute('href');
-                  if (url) {
-                      try {
-                          await window.electron.shell.openExternal(url);
-                      } catch (error) {
-                          console.error('打开链接失败:', error);
-                      }
-                  }
-              });
+          // 修改链接处理逻辑
+          referenceMessageElement.addEventListener('click', async (e) => {
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            e.preventDefault();
+            const url = link.getAttribute('href');
+            
+            // 检查是否是控制按钮
+            if (link.classList.contains('reference-toggle') || 
+                link.classList.contains('reference-follow-up')) {
+                return;
+            }
+
+            // 处理普通链接
+            if (url && !url.startsWith('#')) {
+                try {
+                    await window.electron.shell.openExternal(url);
+                } catch (error) {
+                    console.error('打开链接失败:', error);
+                }
+            }
           });
 
           // 添加展开/折叠功能

@@ -5,6 +5,7 @@ import fetch from 'node-fetch';
 import path from 'path';
 import fs from 'fs/promises';  // 添加 fs/promises 导入
 import { app } from 'electron';  // 添加这行导入
+import logger from '../utils/loggerUtils.mjs';  // 添加 logger 导入
 /*
 gpt 生成的这个表太漂亮了，我直接贴出来。 
 
@@ -70,7 +71,7 @@ export default class LocalServerManager {
     // 修改状态同步逻辑
     async syncState() {
         if(this.portManager.startLock === true) {
-            console.log('[StateManager] Server is starting, please wait...');
+            logger.info('[StateManager] Server is starting, please wait...');
             return;
         }
         this.portManager.startLock = true;
@@ -173,7 +174,7 @@ export default class LocalServerManager {
 
     // 新增：执行对应动作
     async executeAction(action, serverInfo) {
-        console.log(`[StateManager] Executing action: ${action}`);
+        logger.info(`[StateManager] Executing action: ${action}`);
 
         switch (action) {
             case 'CONTINUE':
@@ -198,14 +199,14 @@ export default class LocalServerManager {
                 break;
 
             case 'WAIT':
-                console.log('[StateManager] Debug mode: Waiting for manual process management');
+                logger.info('[StateManager] Debug mode: Waiting for manual process management');
                 break;
 
             case 'NONE':
                 // 完全关闭状态，无需处理
                 break;
             default:
-                console.warn('[StateManager] Unknown action:', action);
+                logger.warn('[StateManager] Unknown action:', action);
                 break;
         }
     }
@@ -245,7 +246,7 @@ export default class LocalServerManager {
                 const isHealthy = await this.checkHealth(savedProcess.port);
 
                 if (!isHealthy) {
-                    console.warn('[ProcessCheck] Process exists but health check failed');
+                    logger.warn('[ProcessCheck] Process exists but health check failed');
 
                     // 尝试终止进程
                     try {
@@ -263,7 +264,7 @@ export default class LocalServerManager {
                             }
                         }
                     } catch (killError) {
-                        console.error('[ProcessCheck] Failed to kill unhealthy process:', killError);
+                        logger.error('[ProcessCheck] Failed to kill unhealthy process:', killError);
                     }
 
                     // 清理存储的进程信息
@@ -276,7 +277,7 @@ export default class LocalServerManager {
                 return true;
 
             } catch (e) {
-                console.warn('[ProcessCheck] Process check failed:', e.message);
+                logger.warn('[ProcessCheck] Process check failed:', e.message);
                 this.deleteJavaProcess();
                 return false;
             }
@@ -287,7 +288,7 @@ export default class LocalServerManager {
         if (savedProcess) {
             const isHealthy = await this.checkHealth(savedProcess.port);
             if (!isHealthy) {
-                console.warn('[ProcessCheck] Running process health check failed');
+                logger.warn('[ProcessCheck] Running process health check failed');
                 this.javaProcess = null;
                 this.deleteJavaProcess();
                 return false;
@@ -303,11 +304,11 @@ export default class LocalServerManager {
         if (app.isPackaged) {
             const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
             javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
-            console.log('[LocalServer] Using packaged path:', javaLocalServerPath);
+            logger.info('[LocalServer] Using packaged path:', javaLocalServerPath);
         } else {
             // 开发环境中的路径
             javaLocalServerPath = path.join(__dirname, 'java-local-server');
-            console.log('[LocalServer] Using development path:', javaLocalServerPath);
+            logger.info('[LocalServer] Using development path:', javaLocalServerPath);
         }
 
         try {
@@ -315,7 +316,7 @@ export default class LocalServerManager {
             const jarFile = files.find(file => file.endsWith('.jar'));
             return jarFile ? path.join(javaLocalServerPath, jarFile) : null;
         } catch (error) {
-            console.error('[LocalServer] Error finding jar file:', error);
+            logger.error('[LocalServer] Error finding jar file:', error);
             return null;
         }
     }
@@ -326,12 +327,12 @@ export default class LocalServerManager {
             const foundJarPath = await this.findJarFile();
             if (foundJarPath) {
                 this.jarPath = foundJarPath;
-                console.log('[LocalServer] Jar file initialized:', this.jarPath);
+                logger.info('[LocalServer] Jar file initialized:', this.jarPath);
             } else {
-                console.warn('[LocalServer] No jar file found during initialization');
+                logger.warn('[LocalServer] No jar file found during initialization');
             }
         } catch (error) {
-            console.error('[LocalServer] Failed to initialize jar path:', error);
+            logger.error('[LocalServer] Failed to initialize jar path:', error);
         }
     }
 
@@ -342,14 +343,14 @@ export default class LocalServerManager {
             if (app.isPackaged) {
                 const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
                 javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
-                console.log('[LocalServer] Using packaged path for JRE:', javaLocalServerPath);
+                logger.info('[LocalServer] Using packaged path for JRE:', javaLocalServerPath);
             } else {
                 // 开发环境中的路径
                 javaLocalServerPath = path.join(__dirname, 'java-local-server');
-                console.log('[LocalServer] Using development path for JRE:', javaLocalServerPath);
+                logger.info('[LocalServer] Using development path for JRE:', javaLocalServerPath);
             }
             
-            // 根据平台找到正确的 Java 可执行文件路径
+            // 首先尝试使用自定义 JRE
             const customJrePath = path.join(javaLocalServerPath, 'custom-jre');
             if (process.platform === 'win32') {
                 this.javaBinPath = path.join(customJrePath, 'bin', 'java.exe');
@@ -357,19 +358,29 @@ export default class LocalServerManager {
                 this.javaBinPath = path.join(customJrePath, 'bin', 'java');
             }
 
+            // 检查自定义 Java 是否可用
+            try {
+                await fs.access(this.javaBinPath, fs.constants.X_OK);
+                logger.info('[LocalServer] Using custom JRE:', this.javaBinPath);
+            } catch (error) {
+                // 如果自定义 Java 不可用,使用系统 Java
+                this.javaBinPath = process.platform === 'win32' ? 'java.exe' : 'java';
+                logger.info('[LocalServer] Custom JRE not found, falling back to system Java:', this.javaBinPath);
+            }
+
             // 初始化 jar 文件路径
             const foundJarPath = await this.findJarFile();
             if (foundJarPath) {
                 this.jarPath = foundJarPath;
-                console.log('[LocalServer] Paths initialized:', {
+                logger.info('[LocalServer] Paths initialized:', {
                     java: this.javaBinPath,
                     jar: this.jarPath
                 });
             } else {
-                console.warn('[LocalServer] No jar file found during initialization');
+                logger.warn('[LocalServer] No jar file found during initialization');
             }
         } catch (error) {
-            console.error('[LocalServer] Failed to initialize paths:', error);
+            logger.error('[LocalServer] Failed to initialize paths:', error);
         }
     }
 
@@ -392,7 +403,7 @@ export default class LocalServerManager {
             this.store.set('serverDesiredState', true);
             return { success: true, message: '已设置启动指令' };
         } catch (error) {
-            console.error('[LocalServer] Start server error:', error);
+            logger.error('[LocalServer] Start server error:', error);
             this.store.set('serverDesiredState', false);
             return {
                 success: false,
@@ -435,7 +446,7 @@ export default class LocalServerManager {
 
         // 调试模式下不启动新进程
         if (this.isDebugMode()) {
-            console.log('[LocalServer] Debug mode: Skipping server start');
+            logger.info('[LocalServer] Debug mode: Skipping server start');
             return;
         }
 
@@ -447,17 +458,19 @@ export default class LocalServerManager {
                     throw new Error('Required paths not available');
                 }
             } catch (error) {
-                console.error('[LocalServer] Failed to initialize paths:', error);
+                logger.error('[LocalServer] Failed to initialize paths:', error);
                 throw new Error('Cannot start server: required paths not found');
             }
         }
 
-        // 确保 Java 可执行文件存在且可执行
-        try {
-            await fs.access(this.javaBinPath, fs.constants.X_OK);
-        } catch (error) {
-            console.error('[LocalServer] Java binary not executable:', error);
-            throw new Error('Java binary not executable');
+        // 如果使用系统 Java,不需要检查文件权限
+        if (this.javaBinPath !== 'java' && this.javaBinPath !== 'java.exe') {
+            try {
+                await fs.access(this.javaBinPath, fs.constants.X_OK);
+            } catch (error) {
+                logger.error('[LocalServer] Java binary not executable:', error);
+                throw new Error('Java binary not executable');
+            }
         }
 
         let javaProcess;
@@ -468,7 +481,7 @@ export default class LocalServerManager {
 
             // 优先使用调试端口
             const currentPort = this.portForDebug || await this.portManager.findAvailablePort();
-            console.log(`[LocalServer] Using port: ${currentPort}${this.portForDebug ? ' (debug mode)' : ''}`);
+            logger.info(`[LocalServer] Using port: ${currentPort}${this.portForDebug ? ' (debug mode)' : ''}`);
 
             const args = [
                 '-jar',
@@ -489,7 +502,7 @@ export default class LocalServerManager {
                     try {
                         const isHealthy = await this.checkHealth(currentPort);
                         if (isHealthy) {
-                            console.log('[LocalServer] Server is healthy on port:', currentPort);
+                            logger.info('[LocalServer] Server is healthy on port:', currentPort);
                             // 立即保存进程信息
                             this.setJavaProcess({
                                 pid: javaProcess.pid,
@@ -498,10 +511,10 @@ export default class LocalServerManager {
                             resolve();
                             return;
                         } else {
-                            console.log('[LocalServer] Health check failed, retrying...');
+                            logger.info('[LocalServer] Health check failed, retrying...');
                         }
                     } catch (e) {
-                        console.log('[LocalServer] Health check error:', e.message);
+                        logger.info('[LocalServer] Health check error:', e.message);
                     }
 
                     if (Date.now() - startTime > this.startTimeout) {
@@ -514,12 +527,12 @@ export default class LocalServerManager {
 
                 javaProcess.stdout.on('data', (data) => {
                     const output = data.toString();
-                    console.log(`[LocalServer] ${output}`);
+                    logger.info(`[LocalServer] ${output}`);
                     // 不再依赖输出判断启动状态，完全依赖健康检查
                 });
 
                 javaProcess.stderr.on('data', (data) => {
-                    console.error(`[LocalServer Error] ${data}`);
+                    logger.error(`[LocalServer Error] ${data}`);
                 });
 
                 javaProcess.on('error', (error) => {
@@ -531,14 +544,14 @@ export default class LocalServerManager {
                         reject(new Error(`Process exited with code ${code}`));
                     }
                 });
-                console.log('[LocalServer] Server starting ');
+                logger.info('[LocalServer] Server starting ');
                 // 开始健康检查
                 checkHealth();
 
             });
 
         } catch (error) {
-            console.error('[LocalServer] Start error:', error);
+            logger.error('[LocalServer] Start error:', error);
             throw error; // 向上传递错误
         } finally {
         }
@@ -551,7 +564,7 @@ export default class LocalServerManager {
 
         // 调试模式下，如果端口匹配则保留进程
         if (this.isDebugMode() && savedProcess.port === this.portForDebug) {
-            console.log('[LocalServer] Debug mode: Keeping debug process alive');
+            logger.info('[LocalServer] Debug mode: Keeping debug process alive');
             return;
         }
 
@@ -566,7 +579,7 @@ export default class LocalServerManager {
                     await this.waitForProcessStop(savedProcess.pid);
                 } catch (e) {
                     // 如果进程已经不存在，忽略错误
-                    console.log('[LocalServer] Process already terminated:', e.message);
+                    logger.info('[LocalServer] Process already terminated:', e.message);
                 }
             }
 
@@ -575,7 +588,7 @@ export default class LocalServerManager {
             await new Promise(resolve => setTimeout(resolve, 2000));
 
         } catch (e) {
-            console.error('[LocalServer] Error cleaning up process:', e);
+            logger.error('[LocalServer] Error cleaning up process:', e);
         }
     }
 
@@ -586,13 +599,13 @@ export default class LocalServerManager {
         // 调试模式下不停止进程
         const savedProcess = this.getJavaProcess();
         if (this.isDebugMode() && savedProcess.port === this.portForDebug) {
-            console.log('[LocalServer] Debug mode: Skipping server stop');
+            logger.info('[LocalServer] Debug mode: Skipping server stop');
             return;
         }
 
         try {
             const pid = savedProcess.pid;
-            console.log('[LocalServer] Stopping server... PID:', pid);
+            logger.info('[LocalServer] Stopping server... PID:', pid);
             if (process.platform === 'win32') {
                 spawn('taskkill', ['/pid', pid, '/f', '/t']);
             } else {
@@ -603,9 +616,9 @@ export default class LocalServerManager {
             await this.waitForProcessStop(pid);
 
             this.deleteJavaProcess();
-            console.log('[LocalServer] Server stopped');
+            logger.info('[LocalServer] Server stopped');
         } catch (error) {
-            console.error('[LocalServer] Stop error:', error);
+            logger.error('[LocalServer] Stop error:', error);
         }
     }
 }

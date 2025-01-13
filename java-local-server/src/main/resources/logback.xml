@@ -20,7 +20,6 @@
     <!-- root配置需要同时引用两个appender -->
     <root level="debug">
         <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
     </root>
 
     <statusListener class="ch.qos.logback.core.status.OnConsoleStatusListener"/>

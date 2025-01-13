@@ -19,7 +19,7 @@ class ContentAggregator {
     const promises = limitedSummaryList.map(async (summary, index) => {
       await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 301)));
 
-      const crawler = this.contentCrawler;
+      const crawler = this.globalContext.contentCrawler;
       const content = await crawler.fetchPageContent(summary.url);
       summary.content = this.extractRelevantContent(content, summary);
       summary.paragraphOrder = index + 1;

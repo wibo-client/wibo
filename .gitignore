@@ -19,3 +19,4 @@ frontend/userData
 **/.settings/
 java-local-server/.project
 frontend/release
+frontend/*-audit.json
