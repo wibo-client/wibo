@@ -1,8 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import path from 'path';
 import PluginHandlerImpl from './indexHandler/pluginHandlerImpl.mjs';
 import LLMCall from './llmCaller/LLMCall.mjs';
-import { fileURLToPath } from 'url';
 import MainWindow from './mainWindow.mjs';
 import ConfigHandler from './config/configHandler.mjs';
 import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
@@ -11,17 +9,10 @@ import LLMBasedQueryRewriter from './requery/llmBasedRewriteQueryImpl.mjs'; // �
 import LocalServerManager from './server/LocalServerManager.mjs'; // 添加 LocalServerManager 的导入
 import ContentCrawler from './contentHandler/contentCrawler.mjs'; // 添加 ContentCrawler 的导入
 
-
-const __filename = fileURLToPath(import.meta.url);
-let __dirname = path.dirname(__filename);
-if (__dirname.endsWith(path.join('src'))) {
-  __dirname = path.resolve(__dirname, '..', 'dist');
-}
-
 let mainWindow;
 let globalContext; // 声明全局变量
 
-async function init(createWindow = true) {
+async function init() {
   console.log('Initializing application...');
 
   const configHandler = new ConfigHandler(); // 不再传递 store 实例
@@ -31,7 +22,7 @@ async function init(createWindow = true) {
   const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
   const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
   const llmCaller = new LLMCall();
-  const contentCrawler = new ContentCrawler(this.globalContext);
+  const contentCrawler = new ContentCrawler();
 
   globalContext = { // 初始化全局变量
     pluginHandler,
@@ -51,14 +42,10 @@ async function init(createWindow = true) {
   await pluginHandler.init(globalContext);
   await contentCrawler.init(globalContext);
 
-
-  if (createWindow) {
-    mainWindow = new MainWindow(__dirname);
-    mainWindow.create();
-  }
+  mainWindow = new MainWindow();
+  mainWindow.init();
+  mainWindow.create();
 }
-
-let javaProcess = null; // 存储 Java 进程的引用
 
 app.whenReady().then(async () => {
   console.log('App is ready.');

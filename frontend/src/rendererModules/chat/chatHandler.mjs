@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import { v4 as uuidv4 } from 'uuid'; // 添加导入
 
 export default class ChatHandler {
   constructor() {
@@ -298,8 +299,9 @@ export default class ChatHandler {
       feedbackBox.scrollTop = feedbackBox.scrollHeight;
       
       let wholeMessage = '### WIBO : \n\n';
-
+      const requestId = uuidv4(); // 生成 UUID
       const requestContext = {
+        requestId, // 传递生成的 UUID
         onChunk: (chunk) => {
           wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);

@@ -103,22 +103,22 @@ export class ContentCrawler {
     }
 }
 
-// 独立运行的示例
-if (require.main === module) {
-    const url = process.argv[2] || "https://blog.csdn.net/csdnnews/article/details/144706402?spm=1000.2115.3001.5927";
-    const headless = process.argv[3] !== 'false'; // 默认 true，传 'false' 则为 false
+// // 独立运行的示例
+// if (require.main === module) {
+//     const url = process.argv[2] || "https://blog.csdn.net/csdnnews/article/details/144706402?spm=1000.2115.3001.5927";
+//     const headless = process.argv[3] !== 'false'; // 默认 true，传 'false' 则为 false
 
-    if (!url) {
-        console.error("请提供一个 URL 地址");
-        process.exit(1);
-    }
+//     if (!url) {
+//         console.error("请提供一个 URL 地址");
+//         process.exit(1);
+//     }
 
-    const crawler = new ContentCrawler({ headless: false });
-    crawler.fetchPageContent(url).then(({ markdownText, currentUrl }) => {
-        console.log("Current URL:", currentUrl);
-    }).catch(error => {
-        console.error("处理任务时出错:", error);
-    });
-}
+//     const crawler = new ContentCrawler({ headless: false });
+//     crawler.fetchPageContent(url).then(({ markdownText, currentUrl }) => {
+//         console.log("Current URL:", currentUrl);
+//     }).catch(error => {
+//         console.error("处理任务时出错:", error);
+//     });
+// }
 
 export default ContentCrawler;

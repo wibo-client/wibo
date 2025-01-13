@@ -1,12 +1,11 @@
 import { contextBridge, ipcRenderer, shell } from 'electron';
-import { v4 as uuidv4 } from 'uuid';
 
 // 暴露 electron API 到渲染进程
 contextBridge.exposeInMainWorld('electron', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
   sendMessage: (message, type, path, context) => {
-    const requestId = uuidv4();
+    const requestId = context.requestId; // 使用传递的 UUID
     
     // 注册系统日志事件监听器
     ipcRenderer.on('system-log', (event, log, id) => {
