@@ -131,9 +131,9 @@
     },
     "files": [
       "dist/**/*",
-      "!dist/java-local-server/**/*",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "chrome/**/*"
     ],
     "extraResources": [
       {

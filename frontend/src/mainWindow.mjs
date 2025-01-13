@@ -1,6 +1,7 @@
 import { BrowserWindow, app } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from './utils/loggerUtils.mjs';
 
 class MainWindow {
   constructor() {
@@ -22,12 +23,12 @@ class MainWindow {
       this.baseDir = __dirnameLocal;
       // this.preloadPath = path.join(this.baseDir, 'preload.js');
     }
-    console.log('Base directory:', this.baseDir);
-    // console.log('Preload script:', this.preloadPath);
+    logger.info(`Base directory: ${this.baseDir}`);
+    // logger.info(`Preload script: ${this.preloadPath}`);
   }
 
   create() {
-    console.log('Creating main window...');
+    logger.info('Creating main window...');
     const preloadPath = path.join(this.baseDir, 'preload.js');
     this.window = new BrowserWindow({
       width: 1000,
@@ -41,14 +42,14 @@ class MainWindow {
       },
     });
 
-    console.log('Loading main window...');
+    logger.info('Loading main window...');
     const url = path.join(this.baseDir, 'index.html');
     this.window.loadFile(url)
       .then(() => {
-        console.log('Main window loaded successfully.');
+        logger.info('Main window loaded successfully.');
       })
       .catch((err) => {
-        console.error('Failed to load main window:', err);
+        logger.error(`Failed to load main window: ${err}`);
       });
   }
 }

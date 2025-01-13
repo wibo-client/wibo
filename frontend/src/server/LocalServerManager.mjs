@@ -304,11 +304,10 @@ export default class LocalServerManager {
         if (app.isPackaged) {
             const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
             javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
-            logger.info('[LocalServer] Using packaged path:', javaLocalServerPath);
+            logger.info(`[LocalServer] Using packaged path: ${javaLocalServerPath}`);
         } else {
-            // 开发环境中的路径
             javaLocalServerPath = path.join(__dirname, 'java-local-server');
-            logger.info('[LocalServer] Using development path:', javaLocalServerPath);
+            logger.info(`[LocalServer] Using development path: ${javaLocalServerPath}`);
         }
 
         try {
@@ -316,7 +315,7 @@ export default class LocalServerManager {
             const jarFile = files.find(file => file.endsWith('.jar'));
             return jarFile ? path.join(javaLocalServerPath, jarFile) : null;
         } catch (error) {
-            logger.error('[LocalServer] Error finding jar file:', error);
+            logger.error(`[LocalServer] Error finding jar file: ${error}`);
             return null;
         }
     }
@@ -327,12 +326,12 @@ export default class LocalServerManager {
             const foundJarPath = await this.findJarFile();
             if (foundJarPath) {
                 this.jarPath = foundJarPath;
-                logger.info('[LocalServer] Jar file initialized:', this.jarPath);
+                logger.info(`[LocalServer] Jar file initialized: ${this.jarPath}`);
             } else {
                 logger.warn('[LocalServer] No jar file found during initialization');
             }
         } catch (error) {
-            logger.error('[LocalServer] Failed to initialize jar path:', error);
+            logger.error(`[LocalServer] Failed to initialize jar path: ${error}`);
         }
     }
 
@@ -343,11 +342,11 @@ export default class LocalServerManager {
             if (app.isPackaged) {
                 const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
                 javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
-                logger.info('[LocalServer] Using packaged path for JRE:', javaLocalServerPath);
+                logger.info(`[LocalServer] Using packaged path for JRE: ${javaLocalServerPath}`);
             } else {
                 // 开发环境中的路径
                 javaLocalServerPath = path.join(__dirname, 'java-local-server');
-                logger.info('[LocalServer] Using development path for JRE:', javaLocalServerPath);
+                logger.info(`[LocalServer] Using development path for JRE: ${javaLocalServerPath}`);
             }
             
             // 首先尝试使用自定义 JRE
@@ -361,26 +360,23 @@ export default class LocalServerManager {
             // 检查自定义 Java 是否可用
             try {
                 await fs.access(this.javaBinPath, fs.constants.X_OK);
-                logger.info('[LocalServer] Using custom JRE:', this.javaBinPath);
+                logger.info(`[LocalServer] Using custom JRE: ${this.javaBinPath}`);
             } catch (error) {
                 // 如果自定义 Java 不可用,使用系统 Java
                 this.javaBinPath = process.platform === 'win32' ? 'java.exe' : 'java';
-                logger.info('[LocalServer] Custom JRE not found, falling back to system Java:', this.javaBinPath);
+                logger.info(`[LocalServer] Custom JRE not found, falling back to system Java: ${this.javaBinPath}`);
             }
 
             // 初始化 jar 文件路径
             const foundJarPath = await this.findJarFile();
             if (foundJarPath) {
                 this.jarPath = foundJarPath;
-                logger.info('[LocalServer] Paths initialized:', {
-                    java: this.javaBinPath,
-                    jar: this.jarPath
-                });
+                logger.info(`[LocalServer] Paths initialized: { java: ${this.javaBinPath}, jar: ${this.jarPath} }`);
             } else {
                 logger.warn('[LocalServer] No jar file found during initialization');
             }
         } catch (error) {
-            logger.error('[LocalServer] Failed to initialize paths:', error);
+            logger.error(`[LocalServer] Failed to initialize paths: ${error}`);
         }
     }
 
@@ -458,7 +454,7 @@ export default class LocalServerManager {
                     throw new Error('Required paths not available');
                 }
             } catch (error) {
-                logger.error('[LocalServer] Failed to initialize paths:', error);
+                logger.error(`[LocalServer] Failed to initialize paths: ${error}`);
                 throw new Error('Cannot start server: required paths not found');
             }
         }
@@ -468,7 +464,7 @@ export default class LocalServerManager {
             try {
                 await fs.access(this.javaBinPath, fs.constants.X_OK);
             } catch (error) {
-                logger.error('[LocalServer] Java binary not executable:', error);
+                logger.error(`[LocalServer] Java binary not executable: ${error}`);
                 throw new Error('Java binary not executable');
             }
         }
@@ -502,7 +498,7 @@ export default class LocalServerManager {
                     try {
                         const isHealthy = await this.checkHealth(currentPort);
                         if (isHealthy) {
-                            logger.info('[LocalServer] Server is healthy on port:', currentPort);
+                            logger.info(`[LocalServer] Server is healthy on port: ${currentPort}`);
                             // 立即保存进程信息
                             this.setJavaProcess({
                                 pid: javaProcess.pid,
@@ -514,7 +510,7 @@ export default class LocalServerManager {
                             logger.info('[LocalServer] Health check failed, retrying...');
                         }
                     } catch (e) {
-                        logger.info('[LocalServer] Health check error:', e.message);
+                        logger.info(`[LocalServer] Health check error: ${e.message}`);
                     }
 
                     if (Date.now() - startTime > this.startTimeout) {
@@ -544,14 +540,14 @@ export default class LocalServerManager {
                         reject(new Error(`Process exited with code ${code}`));
                     }
                 });
-                logger.info('[LocalServer] Server starting ');
+                logger.info('[LocalServer] Server starting');
                 // 开始健康检查
                 checkHealth();
 
             });
 
         } catch (error) {
-            logger.error('[LocalServer] Start error:', error);
+            logger.error(`[LocalServer] Start error: ${error}`);
             throw error; // 向上传递错误
         } finally {
         }

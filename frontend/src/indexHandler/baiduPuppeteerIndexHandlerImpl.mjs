@@ -11,7 +11,6 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         this.globalContext = globalContext;
     }
 
-
     async getBrowserConfig(headless) {
         return {
             headless: headless,
@@ -66,7 +65,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 return await operation();
             } catch (error) {
                 lastError = error;
-                console.warn(`重试操作失败 (${attempt + 1}/${maxRetries}):`, error.message);
+                console.warn(`重试操作失败 (${attempt + 1}/${maxRetries}): ${error.message}`);
 
                 if (attempt < maxRetries - 1) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -103,12 +102,11 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
                 console.info(`成功导航到页面: ${url} 并等待元素: ${waitForSelector}`);
             } catch (error) {
-                // 如果导航失败，确保页面处于可用状态
                 try {
                     await page.reload({ waitUntil: 'networkidle0' });
                 } catch (reloadError) {
-                    console.error('页面重载失败:', reloadError);
-                    throw error; // 抛出原始错误
+                    console.error(`页面重载失败: ${reloadError}`);
+                    throw error;
                 }
                 throw error;
             }
@@ -126,23 +124,20 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
             const searchItemNumbers = await configHandler.getSearchItemNumbers();
             const headless = await configHandler.getHeadless();
 
-            // 使用 ChromeService 获取浏览器实例，传入自定义配置
             const browserConfig = await this.getBrowserConfig(headless);
             browser = await ChromeService.getBrowser(browserConfig);
             page = await browser.newPage();
 
-            // 设置页面错误处理
             page.on('error', err => {
-                console.error('页面崩溃:', err);
+                console.error(`页面崩溃: ${err}`);
             });
 
             page.on('pageerror', err => {
-                console.error('页面JavaScript错误:', err);
+                console.error(`页面JavaScript错误: ${err}`);
             });
 
             await this.configurePageSettings(page);
 
-            // 修改后的调用方式
             await this.navigateToPage(page, 'https://www.baidu.com', 'input[name="wd"]');
             await page.type('input[name="wd"]', query);
             await page.keyboard.press('Enter');
@@ -176,20 +171,19 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 return result;
             });
 
-            console.info("任务处理完成 , 结果数量:", outputContent.length);
+            console.info(`任务处理完成 , 结果数量: ${outputContent.length}`);
             return outputContent;
         } catch (error) {
-            console.error("处理任务时出错:", error);
+            console.error(`处理任务时出错: ${error}`);
             throw error;
         } finally {
             try {
                 if (page && !page.isClosed()) {
                     await page.close();
                 }
-                // 确保在任务完成后关闭浏览器
                 await ChromeService.closeBrowser();
             } catch (closeError) {
-                console.error("关闭资源时出错:", closeError);
+                console.error(`关闭资源时出错: ${closeError}`);
             }
         }
     }
@@ -207,7 +201,6 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     }
 
     async getAllPossiblePath() {
-        // 返回百度搜索的根路径
         return ['/baidu.com/'];
     }
 
