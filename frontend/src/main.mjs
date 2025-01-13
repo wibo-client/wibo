@@ -9,7 +9,7 @@ import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引�
 import LLMBasedRerankImpl from './rerank/llmbasedRerankImpl.mjs'; // 引入 LLMBasedRerankImpl
 import LLMBasedQueryRewriter from './requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
 import LocalServerManager from './server/LocalServerManager.mjs'; // 添加 LocalServerManager 的导入
-
+import ContentCrawler from './contentHandler/contentCrawler.mjs'; // 添加 ContentCrawler 的导入
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +31,7 @@ async function init(createWindow = true) {
   const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
   const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
   const llmCaller = new LLMCall();
+  const contentCrawler = new ContentCrawler(this.globalContext);
 
   globalContext = { // 初始化全局变量
     pluginHandler,
@@ -39,6 +40,7 @@ async function init(createWindow = true) {
     contentAggregator,
     rerankImpl,
     rewriteQueryer,
+    contentCrawler,
     localServerManager
   };
 
@@ -47,7 +49,7 @@ async function init(createWindow = true) {
   await rerankImpl.init(globalContext); // 调用 init 方法
   await contentAggregator.init(globalContext); // 调用 init 方法
   await pluginHandler.init(globalContext);
-
+  await contentCrawler.init(globalContext);
 
 
   if (createWindow) {

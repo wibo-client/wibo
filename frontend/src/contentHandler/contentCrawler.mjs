@@ -7,9 +7,11 @@ import path from 'path';
 puppeteer.use(StealthPlugin());
 
 export class ContentCrawler {
-    constructor(globalContext) {
-        this.globalContext = globalContext;
+    constructor() {
+    }
 
+    async init(globalContext) {
+        this.globalContext = globalContext;
     }
 
 
