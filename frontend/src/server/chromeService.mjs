@@ -5,6 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import logger from '../utils/loggerUtils.mjs';
+import { app } from 'electron';
 
 puppeteer.use(StealthPlugin());
 
@@ -13,15 +14,22 @@ class ChromeService {
         this.browser = null;
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
-        this.chromePath = this.findChromePath(__dirname);
+        
+        if (app.isPackaged) {
+            this.baseDir = path.join(process.resourcesPath, '');
+        } else {
+            this.baseDir = __dirname;
+        }
+
+        this.chromePath = this.findChromePath(this.baseDir);
     }
 
     findChromePath(baseDir) {
         const platform = os.platform();
         const possibleBasePaths = [
-            path.join(process.resourcesPath, 'chrome'),
-            path.join(baseDir, '..', '..', 'chrome'),
-            path.join(baseDir, '..', '..', '..', 'chrome'),
+            path.join(baseDir, 'chrome'),
+            path.join(baseDir,  '..', 'chrome'),
+            path.join(baseDir, '..','..', 'chrome'),
             path.join(process.cwd(), 'chrome'),
         ];
 
@@ -39,6 +47,7 @@ class ChromeService {
 
         for (const basePath of possibleBasePaths) {
             const fullPath = path.join(basePath, ...platformSubPath);
+            logger.info(`[ChromeService] 尝试查找 Chrome 路径: ${fullPath}`);
             if (fs.existsSync(fullPath)) {
                 logger.info(`[ChromeService] 找到 Chrome 路径: ${fullPath}`);
                 return fullPath;

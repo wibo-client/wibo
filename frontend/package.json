@@ -142,7 +142,15 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "chrome",
+        "to": "chrome",
+        "filter": [
+          "**/*"
+        ]
       }
+
     ],
     "asarUnpack": [
       "java-local-server/**/*"

@@ -601,7 +601,7 @@ export default class LocalServerManager {
 
         try {
             const pid = savedProcess.pid;
-            logger.info('[LocalServer] Stopping server... PID:', pid);
+            logger.info('[LocalServer] Stopping server... PID:  ' + pid);
             if (process.platform === 'win32') {
                 spawn('taskkill', ['/pid', pid, '/f', '/t']);
             } else {
