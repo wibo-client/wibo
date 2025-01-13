@@ -61,14 +61,14 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
                     console.error("Failed to parse JSON response or invalid format:", jsonError);
                     attempts++;
                     if (attempts >= 3) {
-                        throw new Error("Failed to rerank documents after 3 attempts");
+                        throw new Error("Failed to rerank documents after 3 attempts ");
                     }
                 }
             } catch (apiError) {
                 console.error("API call failed:", apiError);
                 attempts++;
                 if (attempts >= 3) {
-                    throw new Error("Failed to rerank documents after 3 attempts");
+                    throw new Error("Failed to rerank documents after 3 attempts, 你需要在配置里面配置APIKEY");
                 }
             }
         }

@@ -69,9 +69,3 @@ contextBridge.exposeInMainWorld('auth', {
   setToken: (token) => ipcRenderer.invoke('set-token', token),
   removeToken: () => ipcRenderer.invoke('remove-token')
 });
-
-// 错误处理
-ipcRenderer.on('error', (event, error) => {
-  console.error('IPC Error:', error);
-  alert(error.message || '操作失败');
-});

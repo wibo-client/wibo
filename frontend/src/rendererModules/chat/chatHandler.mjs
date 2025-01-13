@@ -420,7 +420,6 @@ export default class ChatHandler {
 
     } catch (error) {
       console.error('发送消息错误:', error);
-      alert('发送消息失败: ' + error.message);
     }
   }
 
