@@ -2,27 +2,57 @@ import ChromeService from '../server/chromeService.mjs';
 import CookieUtils from '../utils/cookieUtils.mjs';
 import path from 'path';
 
+// 添加 Semaphore 类实现
+class Semaphore {
+    constructor(max) {
+        this.max = max;
+        this.count = 0;
+        this.queue = [];
+    }
+
+    setMax(newMax) {
+        const diff = newMax - this.max;
+        this.max = newMax;
+        // 如果增加了可用数量，释放等待的请求
+        if (diff > 0) {
+            for (let i = 0; i < Math.min(diff, this.queue.length); i++) {
+                const next = this.queue.shift();
+                next();
+            }
+        }
+    }
+
+    async acquire() {
+        if (this.count < this.max) {
+            this.count++;
+            return;
+        }
+
+        // 如果已达到最大值，则等待
+        await new Promise(resolve => this.queue.push(resolve));
+        this.count++;
+    }
+
+    release() {
+        this.count--;
+        if (this.queue.length > 0) {
+            const next = this.queue.shift();
+            next();
+        }
+    }
+}
+
 export class ContentCrawler {
     constructor() {
-        this.activeRequests = 0;
-        this.requestQueue = [];
+        this.semaphore = null;
     }
 
     async init(globalContext) {
         this.globalContext = globalContext;
-    }
-
-    async getBrowserConfig(headless) {
-        return {
-            headless: headless,
-            args: [
-                '--window-size=833x731',
-                '--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure',
-                '--disable-features=BlockThirdPartyCookies',
-                '--no-sandbox',
-                '--disable-setuid-sandbox'
-            ]
-        };
+        await ChromeService.init(globalContext);
+        // 初始化信号量
+        const browserConcurrency = await this.globalContext.configHandler.getBrowserConcurrency();
+        this.semaphore = new Semaphore(browserConcurrency);
     }
 
     async configurePageSettings(page) {
@@ -60,20 +90,21 @@ export class ContentCrawler {
     async fetchPageContent(url) {
         const configHandler = this.globalContext.configHandler;
         const userDataDirString = await configHandler.getUserDataDir();
-        const browserConcurrency = await configHandler.getBrowserConcurrency();
         const userDataDir = path.resolve(userDataDirString || './user_data');
         const cookieUtils = new CookieUtils(userDataDir);
-        const headless = await this.globalContext.configHandler.getHeadless();
 
-        // 等待队列中的请求
-        await this.waitForAvailableSlot(browserConcurrency);
+        // 检查并更新并发数
+        const currentBrowserConcurrency = await configHandler.getBrowserConcurrency();
+        if (this.semaphore.max !== currentBrowserConcurrency) {
+            this.semaphore.setMax(currentBrowserConcurrency);
+        }
 
         let page = null;
         try {
-            this.activeRequests++;
-            const browserConfig = await this.getBrowserConfig(headless);
-            const browser = await ChromeService.getBrowser(browserConfig);
-            page = await browser.newPage();
+            // 获取信号量
+            await this.semaphore.acquire();
+
+            page = await ChromeService.createPage();  // 移除 headless 参数
 
             await this.configurePageSettings(page);
             await cookieUtils.loadCookies(page, new URL(url).hostname);
@@ -92,27 +123,10 @@ export class ContentCrawler {
             return '';
         } finally {
             if (page && !page.isClosed()) {
-                await page.close();
+                await ChromeService.closePage(page);
             }
-            await ChromeService.closeBrowser();
-            this.activeRequests--;
-            this.processQueue();
-        }
-    }
-
-    async waitForAvailableSlot(browserConcurrency) {
-        if (this.activeRequests < browserConcurrency) {
-            return;
-        }
-        return new Promise(resolve => {
-            this.requestQueue.push(resolve);
-        });
-    }
-
-    processQueue() {
-        if (this.requestQueue.length > 0 && this.activeRequests < this.globalContext.configHandler.getBrowserConcurrency()) {
-            const resolve = this.requestQueue.shift();
-            resolve();
+            // 释放信号量
+            this.semaphore.release();
         }
     }
 

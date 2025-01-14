@@ -9,19 +9,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     async init(globalContext, handlerConfig) {
         await super.init(globalContext, handlerConfig);
         this.globalContext = globalContext;
-    }
-
-    async getBrowserConfig(headless) {
-        return {
-            headless: headless,
-            args: [
-                '--window-size=833x731',
-                '--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure',
-                '--disable-features=BlockThirdPartyCookies',
-                '--no-sandbox',
-                '--disable-setuid-sandbox'
-            ]
-        };
+        await ChromeService.init(globalContext);  // 添加这一行
     }
 
     async configurePageSettings(page) {
@@ -116,17 +104,14 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
     async search(query, pathPrefix = '', recordDescription = true) {
         console.info("开始处理任务");
         let page = null;
-        let browser = null;
 
         try {
             const configHandler = this.globalContext.configHandler;
             const browserTimeout = await configHandler.getBrowserTimeout();
             const searchItemNumbers = await configHandler.getSearchItemNumbers();
-            const headless = await configHandler.getHeadless();
+            // 移除 headless 获取
 
-            const browserConfig = await this.getBrowserConfig(headless);
-            browser = await ChromeService.getBrowser(browserConfig);
-            page = await browser.newPage();
+            page = await ChromeService.createPage();  // 移除 headless 参数
 
             page.on('error', err => {
                 console.error(`页面崩溃: ${err}`);
@@ -138,22 +123,21 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
             await this.configurePageSettings(page);
 
+            // 执行搜索操作
             await this.navigateToPage(page, 'https://www.baidu.com', 'input[name="wd"]');
             await page.type('input[name="wd"]', query);
             await page.keyboard.press('Enter');
             await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
 
             const results = [];
-            const seenUrls = new Set(); // 用于去重的URL集合
+            const seenUrls = new Set();
             let totalResults = 0;
 
+            // 搜索结果处理循环
             while (totalResults < searchItemNumbers) {
                 const pageResults = await this.processSearchResults(page);
-                // 过滤广告并去重
                 const filteredResults = pageResults.filter(result => {
-                    if (result.isAd || seenUrls.has(result.url)) {
-                        return false;
-                    }
+                    if (result.isAd || seenUrls.has(result.url)) return false;
                     seenUrls.add(result.url);
                     return true;
                 });
@@ -168,8 +152,8 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 if (!nextPageExists) break;
 
                 await page.click(nextPageSelector);
-                const randomWaitTime = Math.floor(Math.random() * 500) + 500;
-                await new Promise(resolve => setTimeout(resolve, randomWaitTime));
+                // 替换 waitForTimeout 为 Promise timeout
+                await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 500) + 500));
                 await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
             }
 
@@ -180,20 +164,15 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 return result;
             });
 
-            console.info(`任务处理完成 , 结果数量: ${outputContent.length}`);
+            console.info(`任务处理完成, 结果数量: ${outputContent.length}`);
             return outputContent;
 
         } catch (error) {
             console.error(`处理任务时出错: ${error}`);
             throw error;
         } finally {
-            try {
-                if (page && !page.isClosed()) {
-                    await page.close();
-                }
-                await ChromeService.closeBrowser();
-            } catch (closeError) {
-                console.error(`关闭资源时出错: ${closeError}`);
+            if (page) {
+                await ChromeService.closePage(page);
             }
         }
     }

@@ -12,10 +12,11 @@ puppeteer.use(StealthPlugin());
 class ChromeService {
     constructor() {
         this.browser = null;
-        this.isConnected = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 3;
         this.closeTimeout = 5000; // 设置关闭超时时间为5秒
+        this.activePages = new Set();
+        this.idleTimeout = 5 * 60 * 1000; // 5分钟无活动后关闭浏览器
+        this.idleTimer = null;
+        this.globalContext = null;
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
 
@@ -32,6 +33,11 @@ class ChromeService {
         process.on('SIGINT', this.forceCloseBrowser.bind(this));
         process.on('SIGTERM', this.forceCloseBrowser.bind(this));
         process.on('uncaughtException', this.forceCloseBrowser.bind(this));
+    }
+
+    async init(globalContext) {
+        this.globalContext = globalContext;
+        logger.info('[ChromeService] 已初始化全局上下文');
     }
 
     findChromePath(baseDir) {
@@ -77,9 +83,39 @@ class ChromeService {
             return true;
         } catch (error) {
             logger.warn('[ChromeService] 浏览器连接检查失败:', error.message);
-            this.isConnected = false;
             return false;
         }
+    }
+
+    async getBrowserConfig(additionalOptions = {}) {
+        let headless = false; // 默认值
+        if (this.globalContext?.configHandler) {
+            try {
+                headless = await this.globalContext.configHandler.getHeadless();
+            } catch (error) {
+                logger.warn('[ChromeService] 获取 headless 配置失败，使用默认值:', error.message);
+            }
+        }
+
+        const defaultConfig = {
+            headless: headless,
+            args: [
+                '--window-size=833x731',
+                '--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure',
+                '--disable-features=BlockThirdPartyCookies',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
+            ],
+            waitForInitialPage: true,
+            pipe: true
+        };
+
+        if (this.chromePath && fs.existsSync(this.chromePath)) {
+            defaultConfig.executablePath = this.chromePath;
+        }
+
+        return { ...defaultConfig, ...additionalOptions };
     }
 
     async getBrowser(userOptions = {}) {
@@ -98,79 +134,76 @@ class ChromeService {
                 }
             }
 
-            const defaultOptions = {
-                ignoreDefaultArgs: false,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage'
-                ],
-                waitForInitialPage: true,
-                pipe: true  // 使用管道而不是 WebSocket 连接
-            };
-
-            if (this.chromePath && fs.existsSync(this.chromePath)) {
-                defaultOptions.executablePath = this.chromePath;
-            }
-
-            const options = { ...defaultOptions, ...userOptions };
+            const options = await this.getBrowserConfig(userOptions);
             this.browser = await puppeteer.launch(options);
-            this.isConnected = true;
 
-            // 监听浏览器事件
-            this.browser.on('disconnected', async () => {
-                logger.warn('[ChromeService] 浏览器已断开连接');
-                this.isConnected = false;
-                this.browser = null;
-
-                // 尝试重新连接
-                if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                    this.reconnectAttempts++;
-                    logger.info(`[ChromeService] 尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-                    await this.getBrowser(userOptions);
-                }
-            });
-
-            this.reconnectAttempts = 0; // 重置重连计数
             logger.info('[ChromeService] 成功启动浏览器');
             return this.browser;
         } catch (error) {
-            this.isConnected = false;
             logger.error('[ChromeService] 启动浏览器失败:', error);
             throw new Error(`启动浏览器失败: ${error.message}`);
         }
     }
 
+    async createPage() {
+        const browser = await this.getBrowser();
+        const page = await browser.newPage();
+        this.activePages.add(page);
+        this.resetIdleTimer();
+        return page;
+    }
+
+    async closePage(page) {
+        if (page && !page.isClosed()) {
+            await page.close();
+            this.activePages.delete(page);
+
+            // 当没有活动页面时，启动空闲计时器
+            if (this.activePages.size === 0) {
+                this.startIdleTimer();
+            }
+        }
+    }
+
+    resetIdleTimer() {
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = null;
+        }
+    }
+
+    startIdleTimer() {
+        this.resetIdleTimer();
+        this.idleTimer = setTimeout(async () => {
+            if (this.activePages.size === 0) {
+                logger.info('[ChromeService] 浏览器空闲超时，正在关闭...');
+                await this.closeBrowser();
+            }
+        }, this.idleTimeout);
+    }
+
+    getActivePageCount() {
+        return this.activePages.size;
+    }
+
     async closeBrowser() {
         if (this.browser) {
+            // Close all active pages first
+            for (const page of this.activePages) {
+                await this.closePage(page);
+            }
+            this.activePages.clear();
+
+            // Only close browser if explicitly requested
             try {
-                // 设置关闭超时
-                const closePromise = new Promise(async (resolve, reject) => {
-                    try {
-                        if (await this.checkBrowserConnection()) {
-                            await this.browser.close();
-                        }
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                });
-
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('关闭浏览器超时')), this.closeTimeout);
-                });
-
-                await Promise.race([closePromise, timeoutPromise]).catch(async (error) => {
-                    logger.error('[ChromeService] 正常关闭浏览器失败，尝试强制关闭:', error.message);
-                    await this.forceCloseBrowser();
-                });
+                await this.browser.close();
+                this.browser = null;
+                logger.info('[ChromeService] 浏览器已关闭');
             } catch (error) {
                 logger.error('[ChromeService] 关闭浏览器时出错:', error.message);
                 await this.forceCloseBrowser();
             } finally {
                 this.browser = null;
-                this.isConnected = false;
-                this.reconnectAttempts = 0;
                 logger.info('[ChromeService] 浏览器已关闭');
             }
         }
@@ -194,8 +227,6 @@ class ChromeService {
                 logger.error('[ChromeService] 强制关闭浏览器失败:', error.message);
             } finally {
                 this.browser = null;
-                this.isConnected = false;
-                this.reconnectAttempts = 0;
             }
         }
     }
