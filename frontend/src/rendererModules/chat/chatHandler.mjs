@@ -316,6 +316,21 @@ export default class ChatHandler {
         onChunk: (chunk) => {
           wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);
+          
+          // 为 WIBO 消息中的链接添加点击处理
+          wibaMessageElement.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', async (e) => {
+              e.preventDefault();
+              const url = link.getAttribute('href');
+              if (url && !url.startsWith('#')) {
+                try {
+                  await window.electron.shell.openExternal(url);
+                } catch (error) {
+                  console.error('打开链接失败:', error);
+                }
+              }
+            });
+          });
         },
         onSystemLog: (log) => {
           const logElement = document.createElement('div');
