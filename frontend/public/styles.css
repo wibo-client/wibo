@@ -1,9 +1,10 @@
 /* 基础样式 */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  height: 83vh;
+  height: 95vh;
+  /* 修改为100vh */
   margin: 0;
-  padding: 20px;
+  padding: 0px 20px;
   display: flex;
   flex-direction: column;
   background-color: #f0f2f5;
@@ -40,6 +41,10 @@ body {
   border-radius: 0 0 5px 5px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   margin-top: -1px;
+  flex: 1;
+  /* 修改 */
+  overflow: auto;
+  /* 新增 */
 }
 
 .tab-content.active {
@@ -200,7 +205,6 @@ input:checked+.slider:before {
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, .25);
 }
 
-/* ...existing code... */
 
 .index-settings-actions {
   margin-top: 20px;
@@ -211,5 +215,3 @@ input:checked+.slider:before {
 .index-settings-actions .btn {
   min-width: 120px;
 }
-
-/* ...existing code... */

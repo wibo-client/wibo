@@ -7,11 +7,16 @@
     border: 1px solid #ccc;
     border-radius: 10px;
     background-color: #f9f9f9;
+    display: flex; /* 新增 */
+    flex-direction: column; /* 新增 */
+    flex: 1; /* 新增 */
+    min-height: 0; /* 新增 */
 }
 
 #messages {
-    height: 400px;
-    overflow-y: scroll;
+    flex: 1; /* 修改 */
+    min-height: 0; /* 新增 */
+    overflow-y: auto;
     border: 1px solid #ccc;
     padding: 10px;
     margin-bottom: 20px;
@@ -44,7 +49,8 @@
     background-color: #f5f5f5;
     border-radius: 4px;
     padding: 8px;
-    max-height: 48px; /* 调整为两行消息的高度 */
+    max-height: 48px;
+    /* 调整为两行消息的高度 */
     overflow: hidden;
     transition: all 0.3s ease-out;
 }
@@ -92,7 +98,8 @@
     background-color: #f8f9fa;
     border-left: 3px solid #6c757d;
     padding: 8px;
-    margin-top: 0;  /* 移除引用消息的顶部边距 */
+    margin-top: 0;
+    /* 移除引用消息的顶部边距 */
 }
 
 .reference-content {
@@ -130,7 +137,8 @@
     margin-top: 8px;
 }
 
-.reference-toggle, .reference-follow-up {
+.reference-toggle,
+.reference-follow-up {
     cursor: pointer;
     color: #2196F3;
     font-size: 0.8em;
@@ -138,7 +146,8 @@
     text-decoration: none;
 }
 
-.reference-toggle:hover, .reference-follow-up:hover {
+.reference-toggle:hover,
+.reference-follow-up:hover {
     text-decoration: underline;
 }
 
@@ -147,6 +156,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-height: 150px; /* 新增：给输入区域一个最小高度 */
 }
 
 #user-input {
@@ -215,7 +225,7 @@
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    position:relative;
+    position: relative;
 }
 
 /* 路径建议下拉框样式 */
@@ -228,9 +238,11 @@
     border: 1px solid #ccc;
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 1000;   
-    bottom: 100%; /* 将下拉框定位到输入框的上方 */
-    margin-bottom: 8px; /* 添加一些间距，使下拉框与输入框之间有一定距离 */
+    z-index: 1000;
+    bottom: 100%;
+    /* 将下拉框定位到输入框的上方 */
+    margin-bottom: 8px;
+    /* 添加一些间距，使下拉框与输入框之间有一定距离 */
 
 }
 
@@ -244,7 +256,8 @@
 }
 
 .path-suggestion-item.hover {
-    background-color: #e0e0e0; /* 高亮颜色 */
+    background-color: #e0e0e0;
+    /* 高亮颜色 */
 }
 
 /* 前景执行开关样式 */
@@ -255,11 +268,11 @@
 }
 
 .message-group {
-  display: flex;
-  flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }
 
 .wibo-container {
-  display: flex;
-  flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }

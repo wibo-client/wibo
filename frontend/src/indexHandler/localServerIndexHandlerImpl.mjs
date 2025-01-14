@@ -143,7 +143,10 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
 
     async rewriteQuery(query) {
         // 本地服务器不需要重写查询
-        return [query];
+        const reWriteQuerys = await this.globalContext.rewriteQueryer.rewriteQuery(query);
+
+        return [query, ...reWriteQuerys];
+
     }
 
     async rerank(documentPartList, queryString) {
@@ -151,7 +154,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         return documentPartList;
     }
 
- 
+
     getHandlerName() {
         return '本机文件检索';
     }
@@ -160,7 +163,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     getHandlerCategory() {
         return '本地文件检索';
     }
-    
+
     getBeginPath() {
         return '/local/';
     }

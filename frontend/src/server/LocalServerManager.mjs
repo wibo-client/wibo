@@ -42,7 +42,7 @@ export default class LocalServerManager {
         if (app.isPackaged) {
             this.baseDir = path.join(process.resourcesPath, '');
         } else {
-            this.baseDir = __dirname;
+            this.baseDir = app.getAppPath();
         }
 
         this.initializePaths(); // 在构造函数中调用合并后的初始化方法
@@ -458,7 +458,7 @@ export default class LocalServerManager {
         // 确保路径都已初始化
         if (!this.jarPath || !this.javaBinPath) {
             try {
-                await this.initializeJavaPaths();
+                await this.initializePaths();
                 if (!this.jarPath || !this.javaBinPath) {
                     throw new Error('Required paths not available');
                 }
