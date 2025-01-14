@@ -1,59 +1,44 @@
-# wibo 
-围脖 wibo 个人提效工具。
+# 围脖(WIBO) - 你的个人知识助手
 
-一个完全开放的，客户端的，检索增强工具。
+## 简介
+围脖是一个完全开放的客户端检索增强工具，帮助你更快、更准确地获取所需信息。
 
-你只需要通过wibo来提问，会由大模型在你的本机构建搜索语句并查询对应的网站平台，获取信息后总结。
-解决现有的 检索增强 比如豆包 智谱等网站 内容范围过窄和不准确的问题。
+## 主要功能
+1. **本地检问（检索问答）**：基于本地文件（如Word、PDF、PPT、代码等）回答问题。
+2. **网站检问**：通过内置浏览器从特定网站（如百度、Bing、知乎）检索信息并汇总回答。
 
+## 产品特色
+- **强大的文档解析能力**：支持解析多种格式的本地文档及图片中的文字（需消耗tokens），提高回答准确性。
 
-已经接入 百度 ， 必应 等既有的搜索引擎。
+- **高质量网页检索**：依赖高质量网站内容，确保答案的精准性。
+- **原始链接提供**：每次回答附带原始链接，便于验证信息的真实性。
 
---
-Wibo: Personal Efficiency Tool
+# 使用说明
 
-A completely open, client-side, search enhancement tool.
+## 下载与安装
 
-You just need to ask questions through Wibo, and the large model will construct search queries on your local machine, query the corresponding websites, and summarize the information.
-This solves the problem of narrow and inaccurate content range in existing search enhancement tools like Doubao and Zhipu.
+1. **下载最新版本**：
+   - **GitHub**: [点击这里](https://github.com/your-repo/releases)
+   - **百度网盘**: [链接](https://pan.baidu.com/s/1YZILuhbZbK5dWAQ2v5-R_A?pwd=wibo) 提取码: `wibo`
 
-It has already integrated existing search engines like Baidu and Bing.
+## 配置与使用
 
-# 怎么用？
-目前是一个Node electron 客户端。
+2. **配置阿里云 AK**：在系统配置界面中填写阿里云的访问密钥（AK）。
 
-二进制下载
+阿里云的通义千问有100w的免费额度，搞定账号就行。  非免费额度一万字差不多2分钱，也很便宜。
+[点我查看具体怎么获取阿里云访问AK](./docs/getAliyunAK.md)
 
-或
+3. **本地内容检索**（可选）：
+   - 打开本地知识库开关。
+   - 选择一个目录，提交并等待索引完成率显示为100%。
+   - 在快捷导航中选择“本地文件检索”或使用`/local/`命令快速启动。
 
-下载源码 
-前端是一个Electron代码。
-
-进入frontend:
-
-npm install build 
-npm run 即可。
-
-
-后端是java代码。
-
-进入java-local-server
-mvn package 
+4. **网站检索**：
+   - 直接在对话框中输入问题，按`Shift + Enter`即可获取答案。
+   - 或者/baidu.com/ 然后输入问题，再按`Shift + Enter` 。
 
 
-启动等我链接一下
 
-
--- 
-Currently, this is a Node Electron client.
-
-Binary Download
-
-or
-
-Download the source code
-npm install build
-npm run
 
 ## License
 
