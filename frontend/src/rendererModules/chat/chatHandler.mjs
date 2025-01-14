@@ -6,6 +6,155 @@ export default class ChatHandler {
     this.setupMessageHooks();
     this.setupAutoResizeInput();
     this.setupPathInput();
+    this.currentOffset = 0;
+    this.loadingHistory = false;
+    this.setupScrollHandler();
+    this.loadInitialHistory();
+  }
+
+  async loadInitialHistory() {
+    try {
+      const feedbackBox = document.getElementById('messages');
+      const messages = await window.electron.chatHistory.getMessages(0, 5);
+      
+      if (messages.length > 0) {
+        // 添加历史记录分隔符
+        const divider = document.createElement('div');
+        divider.className = 'history-divider';
+        divider.textContent = '历史消息';
+        feedbackBox.appendChild(divider);
+        
+        messages.forEach(msg => {
+          const messageGroup = this.createMessageGroupFromData(msg);
+          messageGroup.classList.add('history');
+          feedbackBox.appendChild(messageGroup);
+        });
+
+        // 添加链接处理
+        this.setupHistoryLinks(feedbackBox);
+        
+        // 添加延时以确保DOM更新后再滚动
+        setTimeout(() => {
+          feedbackBox.scrollTop = feedbackBox.scrollHeight;
+        }, 100);
+      }
+    } catch (error) {
+      console.error('加载历史记录失败:', error);
+    }
+  }
+
+  setupScrollHandler() {
+    const feedbackBox = document.getElementById('messages');
+    let lastScrollTop = 0;
+    
+    feedbackBox.addEventListener('scroll', async () => {
+      const currentScrollTop = feedbackBox.scrollTop;
+      
+      // 检测是否向上滚动到接近顶部
+      if (currentScrollTop < lastScrollTop && currentScrollTop < 50 && !this.loadingHistory) {
+        await this.loadMoreHistory(feedbackBox);
+      }
+      
+      lastScrollTop = currentScrollTop;
+    });
+  }
+
+  async loadMoreHistory(feedbackBox) {
+    try {
+      this.loadingHistory = true;
+      
+      // 添加加载提示
+      const loadingIndicator = document.createElement('div');
+      loadingIndicator.className = 'loading-history';
+      loadingIndicator.textContent = '加载更多历史记录...';
+      feedbackBox.insertBefore(loadingIndicator, feedbackBox.firstChild);
+      
+      this.currentOffset += 5;
+      const messages = await window.electron.chatHistory.getMessages(this.currentOffset, 5);
+      
+      // 记录原始高度
+      const originalHeight = feedbackBox.scrollHeight;
+      
+      // 移除加载提示
+      loadingIndicator.remove();
+      
+      if (messages.length > 0) {
+        messages.reverse().forEach(msg => {
+          const messageGroup = this.createMessageGroupFromData(msg);
+          messageGroup.classList.add('history');
+          feedbackBox.insertBefore(messageGroup, feedbackBox.firstChild);
+        });
+        
+        // 添加时间分隔线
+        const divider = document.createElement('div');
+        divider.className = 'history-divider';
+        divider.textContent = this.formatHistoryDate(messages[0].timestamp);
+        feedbackBox.insertBefore(divider, feedbackBox.firstChild);
+        
+        // 设置滚动位置以保持视图稳定
+        feedbackBox.scrollTop = feedbackBox.scrollHeight - originalHeight;
+        
+        // 处理新加载消息中的链接
+        this.setupHistoryLinks(feedbackBox);
+      }
+    } catch (error) {
+      console.error('加载更多历史记录失败:', error);
+    } finally {
+      this.loadingHistory = false;
+    }
+  }
+
+  formatHistoryDate(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return '今天';
+    } else if (diffDays === 1) {
+      return '昨天';
+    } else if (diffDays < 7) {
+      return `${diffDays}天前`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  }
+
+  setupHistoryLinks(container) {
+    container.querySelectorAll('a').forEach(link => {
+      if (!link.hasAttribute('data-handled')) {
+        link.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const url = link.getAttribute('href');
+          if (url && !url.startsWith('#')) {
+            try {
+              await window.electron.shell.openExternal(url);
+            } catch (error) {
+              console.error('打开链接失败:', error);
+            }
+          }
+        });
+        link.setAttribute('data-handled', 'true');
+      }
+    });
+  }
+
+  appendHistoricalMessage(messageData, prepend = false) {
+    const messageGroup = this.createMessageGroupFromData(messageData);
+    const feedbackBox = document.getElementById('messages');
+    
+    if (prepend && feedbackBox.firstChild) {
+      feedbackBox.insertBefore(messageGroup, feedbackBox.firstChild);
+    } else {
+      feedbackBox.appendChild(messageGroup);
+    }
+  }
+
+  createMessageGroupFromData(messageData) {
+    const messageGroup = document.createElement('div');
+    messageGroup.className = 'message-group';
+    messageGroup.innerHTML = messageData.html;
+    return messageGroup;
   }
 
   async setupMessageHooks() {
@@ -454,6 +603,16 @@ export default class ChatHandler {
         path,
         requestContext
       );
+
+      // 在创建消息组后，保存到历史记录
+      const messageData = {
+        timestamp: Date.now(),
+        type: type,
+        path: path,
+        html: messageGroup.innerHTML
+      };
+      
+      await window.electron.chatHistory.saveMessage(messageData);
 
     } catch (error) {
       console.error('发送消息错误:', error);

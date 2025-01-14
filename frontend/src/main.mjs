@@ -8,6 +8,7 @@ import LLMBasedRerankImpl from './rerank/llmbasedRerankImpl.mjs'; // 引入 LLMB
 import LLMBasedQueryRewriter from './requery/llmBasedRewriteQueryImpl.mjs'; // 引入 LLMBasedQueryRewriter
 import LocalServerManager from './server/LocalServerManager.mjs'; // 添加 LocalServerManager 的导入
 import ContentCrawler from './contentHandler/contentCrawler.mjs'; // 添加 ContentCrawler 的导入
+import ChatStore from './config/chatStore.mjs'; // 添加 ChatStore 的导入
 
 let mainWindow;
 let globalContext; // 声明全局变量
@@ -23,6 +24,7 @@ async function init() {
   const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
   const llmCaller = new LLMCall();
   const contentCrawler = new ContentCrawler();
+  const chatStore = new ChatStore(); // 实例化 ChatStore
 
   globalContext = { // 初始化全局变量
     pluginHandler,
@@ -32,7 +34,8 @@ async function init() {
     rerankImpl,
     rewriteQueryer,
     contentCrawler,
-    localServerManager
+    localServerManager,
+    chatStore
   };
 
   await llmCaller.init(globalContext);
@@ -321,6 +324,15 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('set-global-config', async (event, value) => {
     await globalContext.configHandler.setGlobalConfig(value);
+  });
+
+  // 添加IPC处理器
+  ipcMain.handle('save-chat-message', async (event, message) => {
+    globalContext.chatStore.addMessage(message);
+  });
+
+  ipcMain.handle('get-chat-messages', async (event, offset, limit) => {
+    return globalContext.chatStore.getMessages(offset, limit);
   });
 
   // 确保在应用退出时清理 Java 进程

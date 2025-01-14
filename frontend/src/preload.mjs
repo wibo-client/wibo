@@ -59,7 +59,14 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 全局配置相关方法
   getGlobalConfig: () => ipcRenderer.invoke('get-global-config'),
-  setGlobalConfig: (value) => ipcRenderer.invoke('set-global-config', value)
+  setGlobalConfig: (value) => ipcRenderer.invoke('set-global-config', value),
+
+  // 添加聊天记录相关方法
+  chatHistory: {
+    saveMessage: (message) => ipcRenderer.invoke('save-chat-message', message),
+    getMessages: (offset, limit) => ipcRenderer.invoke('get-chat-messages', offset, limit),
+    getMessageCount: () => ipcRenderer.invoke('get-chat-message-count')
+  }
 });
 
 // 认证相关 API
