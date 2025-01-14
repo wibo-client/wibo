@@ -4,6 +4,8 @@ import path from 'path';
 
 export class ContentCrawler {
     constructor() {
+        this.activeRequests = 0;
+        this.requestQueue = [];
     }
 
     async init(globalContext) {
@@ -56,13 +58,19 @@ export class ContentCrawler {
     }
 
     async fetchPageContent(url) {
-        const userDataDirString = await this.globalContext.configHandler.getUserDataDir();
+        const configHandler = this.globalContext.configHandler;
+        const userDataDirString = await configHandler.getUserDataDir();
+        const browserConcurrency = await configHandler.getBrowserConcurrency();
         const userDataDir = path.resolve(userDataDirString || './user_data');
         const cookieUtils = new CookieUtils(userDataDir);
         const headless = await this.globalContext.configHandler.getHeadless();
 
+        // 等待队列中的请求
+        await this.waitForAvailableSlot(browserConcurrency);
+
         let page = null;
         try {
+            this.activeRequests++;
             const browserConfig = await this.getBrowserConfig(headless);
             const browser = await ChromeService.getBrowser(browserConfig);
             page = await browser.newPage();
@@ -87,6 +95,24 @@ export class ContentCrawler {
                 await page.close();
             }
             await ChromeService.closeBrowser();
+            this.activeRequests--;
+            this.processQueue();
+        }
+    }
+
+    async waitForAvailableSlot(browserConcurrency) {
+        if (this.activeRequests < browserConcurrency) {
+            return;
+        }
+        return new Promise(resolve => {
+            this.requestQueue.push(resolve);
+        });
+    }
+
+    processQueue() {
+        if (this.requestQueue.length > 0 && this.activeRequests < this.globalContext.configHandler.getBrowserConcurrency()) {
+            const resolve = this.requestQueue.shift();
+            resolve();
         }
     }
 

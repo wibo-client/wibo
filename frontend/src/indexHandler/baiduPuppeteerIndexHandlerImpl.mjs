@@ -144,13 +144,22 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
             await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
 
             const results = [];
+            const seenUrls = new Set(); // 用于去重的URL集合
             let totalResults = 0;
 
             while (totalResults < searchItemNumbers) {
                 const pageResults = await this.processSearchResults(page);
-                const filteredResults = pageResults.filter(result => !result.isAd);
+                // 过滤广告并去重
+                const filteredResults = pageResults.filter(result => {
+                    if (result.isAd || seenUrls.has(result.url)) {
+                        return false;
+                    }
+                    seenUrls.add(result.url);
+                    return true;
+                });
+
                 results.push(...filteredResults);
-                totalResults += filteredResults.length;
+                totalResults = results.length;
 
                 if (totalResults >= searchItemNumbers) break;
 
@@ -173,6 +182,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
             console.info(`任务处理完成 , 结果数量: ${outputContent.length}`);
             return outputContent;
+
         } catch (error) {
             console.error(`处理任务时出错: ${error}`);
             throw error;

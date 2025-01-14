@@ -1,4 +1,3 @@
-
 import MarkdownSplitUtil from '../spliter/markdownSpliter.mjs';
 import stringSimilarity from 'string-similarity';
 
@@ -13,7 +12,6 @@ class ContentAggregator {
   async aggregateContent(summaryList) {
     const configHandler = this.globalContext.configHandler;
     const pageFetchLimit = await configHandler.getPageFetchLimit();
-    const browserConcurrency = await configHandler.getBrowserConcurrency();
 
     const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
     const promises = limitedSummaryList.map(async (summary, index) => {
@@ -26,12 +24,7 @@ class ContentAggregator {
       return summary;
     });
 
-    const results = [];
-    for (let i = 0; i < promises.length; i += browserConcurrency) {
-      const chunk = promises.slice(i, i + browserConcurrency);
-      results.push(...await Promise.all(chunk));
-    }
-
+    const results = await Promise.all(promises);
     return results;
   }
 

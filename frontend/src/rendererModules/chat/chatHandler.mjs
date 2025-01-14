@@ -208,9 +208,9 @@ export default class ChatHandler {
           typeSelect.value = 'searchAndChat';
           this.sendMessage();
         } else if (event.altKey) {
-          // Alt + Enter: 搜索直出
+          // Alt + Enter: 深问
           event.preventDefault();
-          typeSelect.value = 'search';
+          typeSelect.value = 'highQuilityRAGChat';
           this.sendMessage();
         } else if (event.ctrlKey || event.metaKey) {
           // Ctrl + Enter 或 Cmd + Enter: 模型直答
@@ -218,6 +218,11 @@ export default class ChatHandler {
           typeSelect.value = 'chat';
           this.sendMessage();
         }
+      } else if ((event.ctrlKey || event.metaKey) && event.key === '\\') {
+        // Ctrl + \ 或 Cmd + \: 搜索直出
+        event.preventDefault();
+        typeSelect.value = 'search';
+        this.sendMessage();
       } else if (event.key === '/') {
         // 当 user-input 为空时，将光标移动到 pathInput
         if (chatInput.value.trim() === '') {

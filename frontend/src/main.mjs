@@ -10,6 +10,9 @@ import LocalServerManager from './server/LocalServerManager.mjs'; // 添加 Loca
 import ContentCrawler from './contentHandler/contentCrawler.mjs'; // 添加 ContentCrawler 的导入
 import ChatStore from './config/chatStore.mjs'; // 添加 ChatStore 的导入
 
+// 添加常量定义
+const MAX_BATCH_SIZE_5000 = 28720;
+
 let mainWindow;
 let globalContext; // 声明全局变量
 
@@ -138,24 +141,128 @@ app.whenReady().then(async () => {
         const markdownResult = buildSearchResultsString(searchResult);
         event.sender.send('llm-stream', markdownResult, requestId);
         sendSystemLog('✅ 搜索完成');
-      } else if (type === 'searchWithRerank') {
+      } else if (type === 'highQuilityRAGChat') {
         sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await selectedPlugin.rewriteQuery(message);
         sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
 
+        const searchItemNumbers = await globalContext.configHandler.getSearchItemNumbers();
+        const seenUrls = new Set();
         let searchResults = [];
+
         for (const query of requeryResult) {
+          if (searchResults.length >= searchItemNumbers) {
+            sendSystemLog(`📊 已达到搜索结果数量限制: ${searchItemNumbers}`);
+            break;
+          }
+
           sendSystemLog(`🔍 执行查询: ${query}`);
           const result = await selectedPlugin.search(query, path);
-          searchResults = searchResults.concat(result);
-          if (searchResults.length >= pageFetchLimit) break;
+
+          // 去重并添加结果
+          for (const item of result) {
+            if (!seenUrls.has(item.url)) {
+              seenUrls.add(item.url);
+              searchResults.push(item);
+
+              if (searchResults.length >= searchItemNumbers) {
+                break;
+              }
+            }
+          }
         }
 
-        sendSystemLog('📊 重新排序搜索结果...');
-        const rerankResult = await selectedPlugin.rerank(searchResults, message);
-        const markdownResult = buildSearchResultsString(rerankResult);
-        event.sender.send('llm-stream', markdownResult, requestId);
-        sendSystemLog('✅ 重新排序完成');
+        sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
+
+        sendSystemLog('📊 进行任务并行分发...');
+        // 根据 pageFetchLimit 将结果分组
+        const groups = [];
+        for (let i = 0; i < searchResults.length; i += pageFetchLimit) {
+          groups.push(searchResults.slice(i, i + pageFetchLimit));
+        }
+
+        let groupAnswers = [];
+        try {
+          const groupPromises = groups.map(async (group, groupIndex) => {
+            sendSystemLog(`📑 开始处理第 ${groupIndex + 1}/${groups.length} 组内容...`);
+
+            const aggregatedContent = await selectedPlugin.fetchAggregatedContent(group);
+
+            const contextBuilder = [];
+            let currentLength = 0;
+            let partIndex = 1;
+
+            for (const doc of aggregatedContent) {
+              const partHeader = doc.date
+                ? `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`
+                : `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
+
+              const combinedContent = `${partHeader} \n ## title :${doc.title}\n\n${doc.description}\n\n ## 详细内容：\n${doc.content}`;
+
+              if (currentLength + combinedContent.length > MAX_BATCH_SIZE_5000) {
+                break;
+              }
+
+              contextBuilder.push(combinedContent);
+              currentLength += combinedContent.length;
+            }
+
+            const suggestionContext = contextBuilder.join('');
+            const prompt = `请基于以下参考信息回答问题。要求：1. 回答中保留所有的详细数据和连接 2. 回答字数限制在2000字内 \n参考信息：\n${suggestionContext}\n\n问题：\n${message}`;
+
+            sendSystemLog(`🤖 分析第 ${groupIndex + 1} 组内容...`);
+            let groupAnswer = '';
+            await globalContext.llmCaller.callAsync([{ role: 'user', content: prompt }], false, (chunk) => {
+              groupAnswer += chunk;
+            });
+            return groupAnswer;
+          });
+
+          // 等待所有组处理完成
+          groupAnswers = await Promise.all(groupPromises);
+          sendSystemLog('✅ 所有组并行处理完成');
+
+        } catch (error) {
+          sendSystemLog(`❌ 并行处理过程中出现错误: ${error.message}`);
+          throw error;
+        }
+
+        // 合并所有回答并进行最终总结
+        sendSystemLog('🔄 正在整合所有分析结果...');
+        const finalAnalysis = [];
+        for (let i = 0; i < groupAnswers.length; i += Math.ceil(MAX_BATCH_SIZE_5000 / 5000)) {
+          const batch = groupAnswers.slice(i, i + Math.ceil(MAX_BATCH_SIZE_5000 / 5000));
+          const batchContent = batch.join('\n\n--- 分割线 ---\n\n');
+
+          const finalPrompt = `请对以下多组分析结果进行整合总结，形成一个完整、连贯的回答。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n${batchContent}\n\n请基于以上内容，回答问题：${message}`;
+
+          await globalContext.llmCaller.callAsync([{ role: 'user', content: finalPrompt }], true, (chunk) => {
+            event.sender.send('llm-stream', chunk, requestId);
+          });
+        }
+
+        // 发送引用数据到渲染进程
+        const referenceData = {
+          fullContent: searchResults.map((doc, index) => ({
+            index: index + 1,
+            title: doc.title,
+            url: doc.url,
+            date: doc.date,
+            description: doc.description
+          })),
+          displayedContent: searchResults.slice(0, 3).map((doc, index) => ({
+            index: index + 1,
+            title: doc.title,
+            url: doc.url,
+            date: doc.date,
+            description: doc.description
+          })),
+          totalCount: searchResults.length
+        };
+
+        sendSystemLog('📚 添加参考文档...');
+        event.sender.send('add-reference', referenceData, requestId);
+
       } else if (type === 'searchAndChat') {
         sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await selectedPlugin.rewriteQuery(message);
@@ -180,7 +287,6 @@ app.whenReady().then(async () => {
         const contextBuilder = [];
         let currentLength = 0;
         let partIndex = 1;
-        const MAX_BATCH_SIZE_5000 = 28720;
 
         for (const doc of aggregatedContent) {
           if (partIndex > 10) break;
@@ -223,21 +329,21 @@ app.whenReady().then(async () => {
 
         // 移除 DOM 操作相关代码，改为构建数据对象
         const referenceData = {
-            fullContent: aggregatedContent.map((doc, index) => ({
-                index: index + 1,
-                title: doc.title,
-                url: doc.url,
-                date: doc.date,
-                description: doc.description
-            })),
-            displayedContent: aggregatedContent.slice(0, 3).map((doc, index) => ({
-                index: index + 1,
-                title: doc.title,
-                url: doc.url,
-                date: doc.date,
-                description: doc.description
-            })),
-            totalCount: aggregatedContent.length
+          fullContent: aggregatedContent.map((doc, index) => ({
+            index: index + 1,
+            title: doc.title,
+            url: doc.url,
+            date: doc.date,
+            description: doc.description
+          })),
+          displayedContent: aggregatedContent.slice(0, 3).map((doc, index) => ({
+            index: index + 1,
+            title: doc.title,
+            url: doc.url,
+            date: doc.date,
+            description: doc.description
+          })),
+          totalCount: aggregatedContent.length
         };
 
         // 发送引用数据到渲染进程
@@ -311,7 +417,7 @@ app.whenReady().then(async () => {
 
   // 添加 IPC 事件处理器
   ipcMain.handle('get-server-desired-state', async () => {
-  
+
     const ret = await globalContext.localServerManager.getCurrentServerInfo();
 
     return ret;
