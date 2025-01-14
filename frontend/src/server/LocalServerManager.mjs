@@ -3,6 +3,7 @@ import PortManager from './PortManager.mjs';
 import Store from 'electron-store';
 import fetch from 'node-fetch';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs/promises';  // 添加 fs/promises 导入
 import { app } from 'electron';  // 添加这行导入
 import logger from '../utils/loggerUtils.mjs';  // 添加 logger 导入
@@ -28,14 +29,23 @@ export default class LocalServerManager {
         // 启动状态同步任务
         this.startStateSyncTask();
         this.MAX_HEALTH_RETRIES = 5;  // 添加最大重试次数
-       
+
         this.startTimeout = 180000;  // 启动超时时间改为3分钟
         this.stopTimeout = 30000;    // 停止超时时间设为30秒
         this.healthCheckInterval = 2000; // 健康检查间隔2秒
         this.jarPath = null; // 添加 jarPath 属性
         this.javaBinPath = null;  // 添加 Java 可执行文件路径
-        this.initializeJarPath(); // 在构造函数中调用初始化
-        this.initializeJavaPaths(); // 在构造函数中调用初始化
+
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+
+        if (app.isPackaged) {
+            this.baseDir = path.join(process.resourcesPath, '');
+        } else {
+            this.baseDir = __dirname;
+        }
+
+        this.initializePaths(); // 在构造函数中调用合并后的初始化方法
     }
 
     // 新增：获取 desiredState 方法
@@ -55,7 +65,7 @@ export default class LocalServerManager {
     deleteJavaProcess() {
         this.store.delete('javaProcess');
     }
-    
+
     // 启动状态同步任务
     startStateSyncTask() {
         setInterval(async () => {
@@ -70,7 +80,7 @@ export default class LocalServerManager {
 
     // 修改状态同步逻辑
     async syncState() {
-        if(this.portManager.startLock === true) {
+        if (this.portManager.startLock === true) {
             logger.info('[StateManager] Server is starting, please wait...');
             return;
         }
@@ -300,74 +310,73 @@ export default class LocalServerManager {
 
     // 查找 jar 文件的辅助方法
     async findJarFile() {
-        let javaLocalServerPath;
-        if (app.isPackaged) {
-            const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
-            javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
-            logger.info(`[LocalServer] Using packaged path: ${javaLocalServerPath}`);
-        } else {
-            javaLocalServerPath = path.join(__dirname, 'java-local-server');
-            logger.info(`[LocalServer] Using development path: ${javaLocalServerPath}`);
-        }
+        const possibleBasePaths = [
+            path.join(this.baseDir, 'java-local-server'),
+            path.join(this.baseDir, '..', 'java-local-server'),
+            path.join(this.baseDir, '..', '..', 'java-local-server'),
+            path.join(process.cwd(), 'java-local-server'),
+        ];
 
-        try {
-            const files = await fs.readdir(javaLocalServerPath);
-            const jarFile = files.find(file => file.endsWith('.jar'));
-            return jarFile ? path.join(javaLocalServerPath, jarFile) : null;
-        } catch (error) {
-            logger.error(`[LocalServer] Error finding jar file: ${error}`);
-            return null;
-        }
-    }
-
-    // 新增：初始化 jarPath 方法
-    async initializeJarPath() {
-        try {
-            const foundJarPath = await this.findJarFile();
-            if (foundJarPath) {
-                this.jarPath = foundJarPath;
-                logger.info(`[LocalServer] Jar file initialized: ${this.jarPath}`);
-            } else {
-                logger.warn('[LocalServer] No jar file found during initialization');
-            }
-        } catch (error) {
-            logger.error(`[LocalServer] Failed to initialize jar path: ${error}`);
-        }
-    }
-
-    // 新增：初始化 Java 相关路径
-    async initializeJavaPaths() {
-        try {
-            let javaLocalServerPath;
-            if (app.isPackaged) {
-                const resourcesDir = path.join(path.dirname(process.execPath), '..', 'Resources');
-                javaLocalServerPath = path.join(resourcesDir, 'java-local-server');
-                logger.info(`[LocalServer] Using packaged path for JRE: ${javaLocalServerPath}`);
-            } else {
-                // 开发环境中的路径
-                javaLocalServerPath = path.join(__dirname, 'java-local-server');
-                logger.info(`[LocalServer] Using development path for JRE: ${javaLocalServerPath}`);
-            }
-            
-            // 首先尝试使用自定义 JRE
-            const customJrePath = path.join(javaLocalServerPath, 'custom-jre');
-            if (process.platform === 'win32') {
-                this.javaBinPath = path.join(customJrePath, 'bin', 'java.exe');
-            } else {
-                this.javaBinPath = path.join(customJrePath, 'bin', 'java');
-            }
-
-            // 检查自定义 Java 是否可用
+        for (const basePath of possibleBasePaths) {
+            logger.info(`[LocalServer] 尝试查找 jar 文件路径: ${basePath}`);
             try {
-                await fs.access(this.javaBinPath, fs.constants.X_OK);
-                logger.info(`[LocalServer] Using custom JRE: ${this.javaBinPath}`);
+                const files = await fs.readdir(basePath);
+                const jarFile = files.find(file => file.endsWith('.jar'));
+                if (jarFile) {
+                    const fullPath = path.join(basePath, jarFile);
+                    logger.info(`[LocalServer] 找到 jar 文件: ${fullPath}`);
+                    return fullPath;
+                }
             } catch (error) {
-                // 如果自定义 Java 不可用,使用系统 Java
-                this.javaBinPath = process.platform === 'win32' ? 'java.exe' : 'java';
-                logger.info(`[LocalServer] Custom JRE not found, falling back to system Java: ${this.javaBinPath}`);
+                logger.debug(`[LocalServer] jar 文件路径不存在: ${basePath}`);
+            }
+        }
+
+        logger.warn('[LocalServer] 未找到 jar 文件');
+        return null;
+    }
+
+    // 合并后的初始化方法
+    async initializePaths() {
+        try {
+            const platform = process.platform;
+            const possibleBasePaths = [
+                path.join(this.baseDir, 'java-local-server'),
+                path.join(this.baseDir, '..', 'java-local-server'),
+                path.join(this.baseDir, '..', '..', 'java-local-server'),
+                path.join(process.cwd(), 'java-local-server'),
+            ];
+
+            const platformPaths = {
+                win32: ['custom-jre', 'bin', 'java.exe'],
+                darwin: ['custom-jre', 'bin', 'java'],
+                linux: ['custom-jre', 'bin', 'java'],
+            };
+
+            const platformSubPath = platformPaths[platform];
+            if (!platformSubPath) {
+                logger.warn(`[LocalServer] 不支持的操作系统平台: ${platform}`);
+                return;
             }
 
-            // 初始化 jar 文件路径
+            for (const basePath of possibleBasePaths) {
+                const fullPath = path.join(basePath, ...platformSubPath);
+                logger.info(`[LocalServer] 尝试查找 Java 路径: ${fullPath}`);
+                try {
+                    await fs.access(fullPath, fs.constants.X_OK);
+                    this.javaBinPath = fullPath;
+                    logger.info(`[LocalServer] 找到 Java 路径: ${fullPath}`);
+                    break;
+                } catch (error) {
+                    logger.debug(`[LocalServer] Java 路径不存在: ${fullPath}`);
+                }
+            }
+
+            if (!this.javaBinPath) {
+                this.javaBinPath = platform === 'win32' ? 'java.exe' : 'java';
+                logger.warn('[LocalServer] 未找到本地 Java，将使用系统默认 Java');
+            }
+
             const foundJarPath = await this.findJarFile();
             if (foundJarPath) {
                 this.jarPath = foundJarPath;

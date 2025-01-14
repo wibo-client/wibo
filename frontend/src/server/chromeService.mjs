@@ -35,8 +35,7 @@ class ChromeService {
 
         const platformPaths = {
             darwin: ['mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'],
-            win32: ['win', 'Google Chrome for Testing.exe'],
-            linux: ['linux', 'Google Chrome for Testing']
+            win32: ['win', 'chrome.exe'],
         };
 
         const platformSubPath = platformPaths[platform];
