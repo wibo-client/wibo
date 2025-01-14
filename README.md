@@ -9,17 +9,22 @@
 
 ## 产品特色
 - **强大的文档解析能力**：支持解析多种格式的本地文档及图片中的文字（需消耗tokens），提高回答准确性。
-
 - **高质量网页检索**：依赖高质量网站内容，确保答案的精准性。
 - **原始链接提供**：每次回答附带原始链接，便于验证信息的真实性。
+- **数据完全本地安全**：除了发给大模型的请求外，所有请求全部在本地完成
+
 
 # 使用说明
+
+
 
 ## 下载与安装
 
 1. **下载最新版本**：
-   - **GitHub**: [点击这里](https://github.com/your-repo/releases)
+   - **GitHub**: [点击这里](https://github.com/wibo-client/wibo/releases)
    - **百度网盘**: [链接](https://pan.baidu.com/s/1YZILuhbZbK5dWAQ2v5-R_A?pwd=wibo) 提取码: `wibo`
+
+
 
 ## 配置与使用
 
