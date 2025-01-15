@@ -24,7 +24,7 @@ export default class LocalServerManager {
     constructor() {
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
 
         // 启动状态同步任务
         this.startStateSyncTask();

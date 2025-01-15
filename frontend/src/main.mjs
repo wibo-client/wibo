@@ -161,8 +161,8 @@ app.whenReady().then(async () => {
 
           // 去重并添加结果
           for (const item of result) {
-            if (!seenUrls.has(item.url)) {
-              seenUrls.add(item.url);
+            if (!seenUrls.has(item.id)) {
+              seenUrls.add(item.id);
               searchResults.push(item);
 
               if (searchResults.length >= searchItemNumbers) {
@@ -175,55 +175,65 @@ app.whenReady().then(async () => {
         sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
 
         sendSystemLog('📊 进行任务并行分发...');
-        // 根据 pageFetchLimit 将结果分组
-        const groups = [];
-        for (let i = 0; i < searchResults.length; i += pageFetchLimit) {
-          groups.push(searchResults.slice(i, i + pageFetchLimit));
-        }
-
         let groupAnswers = [];
         try {
-          const groupPromises = groups.map(async (group, groupIndex) => {
-            sendSystemLog(`📑 开始处理第 ${groupIndex + 1}/${groups.length} 组内容...`);
+          const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
 
-            const aggregatedContent = await selectedPlugin.fetchAggregatedContent(group);
+          const contextBuilder = [];
+          let currentLength = 0;
+          let partIndex = 1;
+          const tasks = [];
+          const maxConcurrentTasks = 2;
 
-            const contextBuilder = [];
-            let currentLength = 0;
-            let partIndex = 1;
+          for (const doc of aggregatedContent) {
+            const partHeader = doc.date
+              ? `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`
+              : `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
 
-            for (const doc of aggregatedContent) {
-              const partHeader = doc.date
-                ? `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`
-                : `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
+            const combinedContent = `${partHeader} \n ## title :${doc.title}\n\n${doc.description}\n\n ## 详细内容：\n${doc.content}`;
 
-              const combinedContent = `${partHeader} \n ## title :${doc.title}\n\n${doc.description}\n\n ## 详细内容：\n${doc.content}`;
+            if (currentLength + combinedContent.length > MAX_BATCH_SIZE_5000) {
+              const suggestionContext = contextBuilder.join('');
+              const prompt = `请基于以下参考信息提取有助于回答问题的关键事实，不需要你的判断和解释 。要求：1. 尽全力保留所有的详细数据和连接 2. 回答字数限制在2000字内 3.使用参考信息里的原文内容 \n参考信息：\n${suggestionContext}\n\n问题：\n${message}`;
 
-              if (currentLength + combinedContent.length > MAX_BATCH_SIZE_5000) {
-                break;
+              tasks.push(async () => {
+                sendSystemLog(`🤖 分析内容...`);
+                const groupAnswer = await globalContext.llmCaller.callSync([{ role: 'user', content: prompt }]);
+                groupAnswers.push(groupAnswer.join(''));
+                sendSystemLog('✅ 内容分析完成');
+              });
+
+              if (tasks.length >= maxConcurrentTasks) {
+                await Promise.all(tasks.map(task => task()));
+                tasks.length = 0; // 清空任务数组
               }
 
-              contextBuilder.push(combinedContent);
-              currentLength += combinedContent.length;
+              contextBuilder.length = 0; // 清空内容构建器
+              currentLength = 0;
             }
 
+            contextBuilder.push(combinedContent);
+            currentLength += combinedContent.length;
+          }
+
+          // 处理剩余的内容
+          if (contextBuilder.length > 0) {
             const suggestionContext = contextBuilder.join('');
-            const prompt = `请基于以下参考信息回答问题。要求：1. 回答中保留所有的详细数据和连接 2. 回答字数限制在2000字内 \n参考信息：\n${suggestionContext}\n\n问题：\n${message}`;
+            const prompt = `请基于以下参考信息提取有助于回答问题的关键事实，不需要你的判断和解释 。要求：1. 回答中尽可能使用详细数据和与url连接，不要漏掉数据和连接 2. 回答字数限制在3000字内 3.使用参考信息里的原文内容来回答问题 \n参考信息：\n${suggestionContext}\n\n问题：\n${message}`;
 
-            sendSystemLog(`🤖 分析第 ${groupIndex + 1} 组内容...`);
-            let groupAnswer = '';
-            await globalContext.llmCaller.callAsync([{ role: 'user', content: prompt }], false, (chunk) => {
-              groupAnswer += chunk;
+            tasks.push(async () => {
+              sendSystemLog(`🤖 分析内容...`);
+              const groupAnswer = await globalContext.llmCaller.callSync([{ role: 'user', content: prompt }]);
+              groupAnswers.push(groupAnswer.join(''));
+              sendSystemLog('✅ 内容分析完成');
             });
-            return groupAnswer;
-          });
+          }
 
-          // 等待所有组处理完成
-          groupAnswers = await Promise.all(groupPromises);
-          sendSystemLog('✅ 所有组并行处理完成');
+          // 等待所有任务完成
+          await Promise.all(tasks.map(task => task()));
 
         } catch (error) {
-          sendSystemLog(`❌ 并行处理过程中出现错误: ${error.message}`);
+          sendSystemLog(`❌ 分析过程中出现错误: ${error.message}`);
           throw error;
         }
 
@@ -302,13 +312,13 @@ app.whenReady().then(async () => {
 
           if (currentLength + combinedContent.length > MAX_BATCH_SIZE_5000) {
             contextBuilder.push(combinedContent.substring(0, MAX_BATCH_SIZE_5000 - currentLength));
-            console.info(`Reached max batch size limit at document ${doc.title}`);
-            break;
+            currentLength = combinedContent.length - (MAX_BATCH_SIZE_5000 - currentLength);
+            contextBuilder.push(combinedContent.substring(MAX_BATCH_SIZE_5000 - currentLength));
+          } else {
+            contextBuilder.push(combinedContent);
+            currentLength += combinedContent.length;
+            console.debug(`Added content from document ${doc.title}, current length: ${currentLength}`);
           }
-
-          contextBuilder.push(combinedContent);
-          currentLength += combinedContent.length;
-          console.debug(`Added content from document ${doc.title}, current length: ${currentLength}`);
         }
 
         const suggestionContext = contextBuilder.join('');

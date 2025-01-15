@@ -6,7 +6,10 @@ import com.wibot.index.DocumentIndexInterface;
 import com.wibot.index.SearchDocumentResult;
 import com.wibot.pathHandler.PathBasedIndexHandlerSelector;
 import com.wibot.persistence.DocumentDataRepository;
+import com.wibot.persistence.MarkdownBasedContentRepository;
+import com.wibot.persistence.MarkdownParagraphRepository;
 import com.wibot.persistence.entity.DocumentDataPO;
+import com.wibot.persistence.entity.MarkdownBasedContentPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,11 +31,16 @@ import java.util.HashSet;
 @RestController
 public class SearchSimpleAPI {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SearchSimpleAPI.class);
+
     @Autowired
     private PathBasedIndexHandlerSelector pathBasedIndexHandlerSelector;
 
     @Autowired
     private DocumentDataRepository documentDataRepository;
+
+    @Autowired
+    private MarkdownParagraphRepository markdownParagraphRepository;
 
     /**
      * 完整的搜索方法，支持所有搜索参数
@@ -135,7 +143,13 @@ public class SearchSimpleAPI {
     }
 
     private MarkdownParagraphPO getParagraphById(Long id) {
-        // 假设有一个方法可以通过ID获取MarkdownParagraphPO
-        return new MarkdownParagraphPO();
+        Optional<MarkdownParagraphPO> paragraph = markdownParagraphRepository.findById(id);
+        if (paragraph.isPresent()) {
+            return paragraph.get();
+        } else {
+            logger.error("Paragraph not found: " + id);
+            return new MarkdownParagraphPO();
+        }
+
     }
 }

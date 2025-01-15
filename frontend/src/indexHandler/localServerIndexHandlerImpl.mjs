@@ -88,13 +88,13 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
             const configHandler = this.globalContext.configHandler;
             const pageFetchLimit = await configHandler.getPageFetchLimit();
 
-            const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
+            // const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
             const response = await fetch(`${this.BASE_URL}/fetchAggregatedContent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ summaryList: limitedSummaryList }),
+                body: JSON.stringify({ summaryList: summaryList }),
             });
 
             if (!response.ok) {

@@ -57,7 +57,7 @@ export class LLMCall {
     try {
       await this.updateClientIfNeeded();
       const messages = userPrompts.map(prompt => ({ role: prompt.role, content: prompt.content }));
-      const completion = this.openai.chat.completions.create({
+      const completion = await this.openai.chat.completions.create({
         messages: messages,
         model: this.currentModel
       });

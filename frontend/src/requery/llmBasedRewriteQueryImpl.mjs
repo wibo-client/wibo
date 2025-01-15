@@ -26,7 +26,7 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
             try {
                 const userPrompts = [{
                     role: 'user',
-                    content: `请根据以下查询生成关键词列表，你觉得越重要的词，放在越前面 ：${query} \n 。示例输出：\n ["关键词1", "关键词2", "关键词3"]`
+                    content: `请根据以下查询生成关键词列表，你觉得越重要的词，放在越前面 ：${query} \n 。要求：严格按照示例输出的规范输出，不要输出其他内容 。 \n 示例输出：\n ["关键词1", "关键词2", "关键词3"] 。 `
                 }];
 
                 const response = await this.globalContext.llmCaller.callAsync(userPrompts);
@@ -34,9 +34,10 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
                 console.info(`Attempt ${attempt + 1} succeeded. Received JSON result from LLM:`, keywords);
 
                 const keywordLists = [];
+                keywordLists.push('"'+query+'"');
                 for (let i = keywords.length; i > 0; i--) {
                     const subKeywords = keywords.slice(0, i);
-                    keywordLists.push(subKeywords.join(' ')); // 将数组转换为空格分隔的字符串
+                    keywordLists.push('"' + subKeywords.join('" "') + '"');
                 }
                 console.info("Generated keyword lists:", keywordLists);
                 return keywordLists;

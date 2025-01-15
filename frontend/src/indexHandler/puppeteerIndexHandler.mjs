@@ -82,7 +82,7 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
     }
 
     async fetchAggregatedContent(summaryList) {
-        return await this.contentAggregator.aggregateContent(summaryList.slice(0, this.pageFetchLimit));
+        return await this.contentAggregator.aggregateContent(summaryList);
     }
 }
 
