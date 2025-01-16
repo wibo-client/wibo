@@ -33,7 +33,9 @@ import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.xml.builders.DisjunctionMaxQueryBuilder;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
@@ -52,7 +54,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-import com.wibot.index.analyzer.CompositeAnalyzer;
+// import com.wibot.index.analyzer.CompositeAnalyzer;
 import com.wibot.index.analyzerKW.SearchEngineAnalyzer;
 import com.wibot.index.search.SearchQuery;
 import com.wibot.persistence.DocumentDataRepository;
@@ -61,6 +63,8 @@ import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BoostQuery;
+import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.PrefixQuery;
 
@@ -123,10 +127,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         try {
             directory = FSDirectory.open(Paths.get(indexDir));
             // 修改：使用组合分析器替代单一的StandardAnalyzer
-            analyzer = new CompositeAnalyzer(
-                    new SmartChineseAnalyzer(), // 中文分词
-                    new StandardAnalyzer() // 英文和数字分词
-            );
+            analyzer = new SmartChineseAnalyzer();
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setRAMBufferSizeMB(256.0);
             config.setMaxBufferedDocs(1000);
@@ -228,10 +229,6 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             Field contentField = new Field("content", cleanedContent, contentFieldType);
             doc.add(contentField);
 
-            // 添加未经分词的原始字段，用于精确匹配
-            Field rawContentField = new Field("raw_content", cleanedContent, contentFieldType);
-            doc.add(rawContentField);
-
             // 添加分词调试
             logger.debug("Building index for content: {} with raw content: {}", cleanedContent, content);
             logger.debug("Document ID: {}, Path: {}", docId, filePath);
@@ -300,12 +297,12 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         String cleanedQuery = cleanText(queryStr);
 
         // 替换现有的 TermQuery 或 BooleanQuery 构建逻辑，使用多字段解析器:
-        String[] fields = { "content", "raw_content" };
+        String[] fields = { "content" }; // 去掉 "raw_content" 字段
         MultiFieldQueryParser parser = new MultiFieldQueryParser(fields, analyzer);
         // 可选：添加模糊搜索参数（例如模糊度 2）
         parser.setFuzzyMinSim(0.7f);
         parser.setPhraseSlop(2); // 根据需要调整
-        Query query = parser.parse(queryStr + "~2"); // "~2" 表示模糊度或者短语搜索可选
+        Query query = parser.parse(cleanedQuery + "~2"); // "~2" 表示模糊度或者短语搜索可选
 
         logger.debug("MultiField fuzzy query: {}", query);
         return query;
@@ -334,10 +331,11 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
                 TopDocs topDocs = searcher.search(booleanQuery.build(), TopN);
 
                 // 设置高亮
-                SimpleHTMLFormatter formatter = new SimpleHTMLFormatter();
+                SimpleHTMLFormatter formatter = new SimpleHTMLFormatter("<em>", "</em>");
                 QueryScorer scorer = new QueryScorer(contentQuery);
                 Highlighter highlighter = new Highlighter(formatter, scorer);
                 highlighter.setTextFragmenter(new SimpleFragmenter(300));
+                highlighter.setMaxDocCharsToAnalyze(50000);
 
                 int index = 0;
                 // 修改这里：删除 StoredFields 的使用
@@ -372,7 +370,17 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
                     part.setScore(scoreDoc.score);
 
                     String content = doc.get("content");
-                    String snippet = highlighter.getBestFragment(analyzer, "content", content);
+                    String snippet;
+                    if (content != null && !content.isEmpty()) {
+                        try {
+                            snippet = highlighter.getBestFragment(analyzer, "content", content);
+                        } catch (Exception e) {
+                            snippet = content.substring(0, Math.min(content.length(), 150));
+                            logger.warn("高亮处理失败，使用默认片段: {}", e.getMessage());
+                        }
+                    } else {
+                        snippet = "No content available";
+                    }
                     part.setHighLightContentPart(snippet != null ? snippet : "No match found");
 
                     results.add(part);
@@ -387,52 +395,87 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         }
     }
 
+    private static final float EXACT_BOOST = 4.0f;
+    private static final float REQUIRED_BOOST = 2.0f;
+    private static final float OPTIONAL_BOOST = 1.0f;
+
+    @Override
     public List<SearchDocumentResult> searchWithStrategy(SearchQuery searchQuery) {
+        String field = "content";
         try {
             int searchTopN = searchQuery.getTopN() > 0 ? searchQuery.getTopN() : MAX_SEARCH;
             String currentPathPrefix = searchQuery.getPathPrefix();
+            List<Query> dmqQueries = new ArrayList<>();
 
-            // 用于存储所有结果和去重
-            Set<Long> foundIds = new HashSet<>();
-            List<SearchDocumentResult> accumulatedResults = new ArrayList<>();
-
+            // List<SearchDocumentResult> accumulatedResults = new ArrayList<>();
+            List<String> exactPhrases = searchQuery.getExactPhrases();
             // 1. 精确短语匹配
-            if (searchQuery.getExactPhrases() != null && !searchQuery.getExactPhrases().isEmpty()) {
-                BooleanQuery.Builder exactBuilder = new BooleanQuery.Builder();
-                for (String phrase : searchQuery.getExactPhrases()) {
-                    Query termQuery = new TermQuery(new Term("content", phrase));
-                    exactBuilder.add(termQuery, BooleanClause.Occur.SHOULD);
+            if (exactPhrases != null && !exactPhrases.isEmpty()) {
+                // BooleanQuery.Builder exactBuilder = new BooleanQuery.Builder();
+                for (String phrase : exactPhrases) {
+
+                    // 添加短语查询（严格按顺序）
+                    PhraseQuery.Builder phraseBuilder = new PhraseQuery.Builder();
+                    phraseBuilder.setSlop(2);
+                    TokenStream tokenStream = analyzer.tokenStream(field, phrase);
+                    CharTermAttribute termAttr = tokenStream.addAttribute(CharTermAttribute.class);
+                    int position = 0;
+                    tokenStream.reset();
+                    while (tokenStream.incrementToken()) {
+                        String term = termAttr.toString();
+                        logger.debug("Adding term {} to phrase query", term);
+                        phraseBuilder.add(new Term(field, term), position++);
+                    }
+                    tokenStream.end();
+                    tokenStream.close();
+                    dmqQueries.add(new BoostQuery(phraseBuilder.build(), EXACT_BOOST));
                 }
-                exactBuilder.setMinimumNumberShouldMatch(1);
-                List<SearchDocumentResult> exactResults = search(exactBuilder.build(), currentPathPrefix, searchTopN);
-                addUniqueResults(accumulatedResults, exactResults, foundIds);
             }
 
+            List<String> requiredTerms = searchQuery.getRequiredTerms();
             // 如果结果不够，继续搜索必需关键词
-            if (accumulatedResults.size() < searchTopN && searchQuery.getRequiredTerms() != null
-                    && !searchQuery.getRequiredTerms().isEmpty()) {
-                int remainingCount = searchTopN - accumulatedResults.size();
+            if (requiredTerms != null
+                    && !requiredTerms.isEmpty()) {
+
                 BooleanQuery.Builder requiredBuilder = new BooleanQuery.Builder();
-                for (String term : searchQuery.getRequiredTerms()) {
-                    Query termQuery = new TermQuery(new Term("content", term));
+                for (String term : requiredTerms) {
+                    Query termQuery = new TermQuery(new Term(field, term));
                     requiredBuilder.add(termQuery, BooleanClause.Occur.MUST);
                 }
-                List<SearchDocumentResult> requiredResults = search(requiredBuilder.build(), currentPathPrefix,
-                        remainingCount);
-                addUniqueResults(accumulatedResults, requiredResults, foundIds);
+                dmqQueries.add(new BoostQuery(requiredBuilder.build(), REQUIRED_BOOST));
             }
-
+            List<String> optionalTerms = searchQuery.getOptionalTerms();
             // 如果结果还不够，使用可选关键词
-            if (accumulatedResults.size() < searchTopN && searchQuery.getOptionalTerms() != null
-                    && !searchQuery.getOptionalTerms().isEmpty()) {
-                int remainingCount = searchTopN - accumulatedResults.size();
-                String optionalQuery = String.join(" ", searchQuery.getOptionalTerms());
-                List<SearchDocumentResult> optionalResults = search(optionalQuery, currentPathPrefix, remainingCount);
-                addUniqueResults(accumulatedResults, optionalResults, foundIds);
+            if (optionalTerms != null
+                    && !optionalTerms.isEmpty()) {
+                BooleanQuery.Builder optionalBuilder = new BooleanQuery.Builder();
+
+                for (String term : optionalTerms) {
+                    Query termQuery = new TermQuery(new Term(field, term));
+                    optionalBuilder.add(termQuery, BooleanClause.Occur.SHOULD);
+                }
+                dmqQueries.add(new BoostQuery(optionalBuilder.build(), OPTIONAL_BOOST));
             }
 
-            // 按相关度分数排序
-            accumulatedResults.sort((a, b) -> Float.compare(b.getScore(), a.getScore()));
+            DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(dmqQueries, 0.1f); // 0.1为tie breaker
+
+            List<SearchDocumentResult> accumulatedResults = search(dmq, currentPathPrefix, searchTopN);
+
+            // 如果还不够，用原始查询再补救一下，如果够了，就不不久了。
+            if (accumulatedResults.size() < searchTopN && searchQuery.getOriginalQuery() != null
+                    && !searchQuery.getOriginalQuery().isEmpty()) {
+                int remainingCount = searchTopN - accumulatedResults.size();
+                Query originalLuceneQuery = parseQuery(searchQuery.getOriginalQuery());
+                List<SearchDocumentResult> originalResults = search(originalLuceneQuery, currentPathPrefix,
+                        remainingCount);
+                // 将内容补到remainCount个
+                for (SearchDocumentResult result : originalResults) {
+                    if (accumulatedResults.size() >= searchTopN) {
+                        break;
+                    }
+                    accumulatedResults.add(result);
+                }
+            }
 
             return accumulatedResults;
 
@@ -454,6 +497,11 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
 
     // 添加一个新的重载方法用于处理 Query 对象的搜索
     private List<SearchDocumentResult> search(Query query, String pathPrefix, int topN) throws IOException {
+        // 确保 topN 大于 0
+        if (topN <= 0) {
+            throw new IllegalArgumentException("topN must be greater than 0");
+        }
+
         try (DirectoryReader reader = DirectoryReader.open(directory)) {
             IndexSearcher searcher = new IndexSearcher(reader);
 

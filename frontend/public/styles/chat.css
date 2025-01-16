@@ -1,7 +1,7 @@
 /* 聊天容器样式 */
 #chat-container {
     width: 80%;
-    max-width: 800px;
+    max-width: 2000px;
     margin: 0 auto;
     padding: 20px;
     border: 1px solid #ccc;

@@ -138,12 +138,17 @@ public class SearchSimpleAPI {
             @SuppressWarnings("unchecked")
             List<String> optionalTerms = (List<String>) searchParams.get("optionalTerms");
             String pathPrefix = (String) searchParams.get("pathPrefix");
-            Integer topN = (Integer) searchParams.get("TopN");
+
+            String originalQuery = (String) searchParams.get("originalQuery");
+            String topNStr = String.valueOf(searchParams.get("TopN"));
+            Integer topN = Integer.valueOf(topNStr == null ? "0" : topNStr);
 
             searchQuery.setExactPhrases(exactPhrases);
             searchQuery.setRequiredTerms(requiredTerms);
             searchQuery.setOptionalTerms(optionalTerms);
             searchQuery.setPathPrefix(pathPrefix);
+            searchQuery.setOriginalQuery(originalQuery);
+
             if (topN != null) {
                 searchQuery.setTopN(topN);
             }
@@ -151,24 +156,18 @@ public class SearchSimpleAPI {
             // 获取索引处理器
             DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
                     .selectIndexHandler(pathPrefix);
+            List<SearchDocumentResult> results = documentIndexInterface
+                    .searchWithStrategy(searchQuery);
 
-            // 执行多策略搜索
-            if (documentIndexInterface instanceof SimpleLocalLucenceIndex) {
-                List<SearchDocumentResult> results = ((SimpleLocalLucenceIndex) documentIndexInterface)
-                        .searchWithStrategy(searchQuery);
+            // 转换结果
+            return results.stream().map(item -> {
+                Optional<DocumentDataPO> docData = documentDataRepository
+                        .findById(item.getMarkdownParagraph().getDocumentDataId());
+                String url = docData.map(DocumentDataPO::getFilePath).orElse("URL not found");
+                return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(),
+                        LocalDateTime.now(), url);
+            }).collect(Collectors.toList());
 
-                // 转换结果
-                return results.stream().map(item -> {
-                    Optional<DocumentDataPO> docData = documentDataRepository
-                            .findById(item.getMarkdownParagraph().getDocumentDataId());
-                    String url = docData.map(DocumentDataPO::getFilePath).orElse("URL not found");
-                    return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(),
-                            LocalDateTime.now(), url);
-                }).collect(Collectors.toList());
-            }
-
-            logger.warn("当前索引处理器不支持多策略搜索");
-            return new ArrayList<>();
         } catch (Exception e) {
             logger.error("多策略搜索失败", e);
             return new ArrayList<>();

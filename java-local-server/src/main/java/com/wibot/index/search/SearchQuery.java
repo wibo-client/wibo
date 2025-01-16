@@ -6,8 +6,17 @@ public class SearchQuery {
     private List<String> exactPhrases;
     private List<String> requiredTerms;
     private List<String> optionalTerms;
+    private String originalQuery;
     private String pathPrefix;
     private int topN = 30; // 默认值
+
+    public String getOriginalQuery() {
+        return originalQuery;
+    }
+
+    public void setOriginalQuery(String originalQuery) {
+        this.originalQuery = originalQuery;
+    }
 
     public List<String> getExactPhrases() {
         return exactPhrases;

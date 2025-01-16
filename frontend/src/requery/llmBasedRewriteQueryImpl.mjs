@@ -1,4 +1,4 @@
-import LLMCall from '../llmCaller/LLMCall.mjs';
+
 import { QueryRewriter } from './rewriteQueryInter.mjs';
 
 export class LLMBasedQueryRewriter extends QueryRewriter {
@@ -27,9 +27,10 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
                 const userPrompts = [{
                     role: 'user',
                     content: `您是一个搜索专家。请将用户的问题分解为以下三个部分：
-                                1. 精确匹配短语：需要完全匹配的词组（用引号括起来）
-                                2. 必需关键词：必须出现在结果中的单词（用加号标记）
+                                1. 精确匹配短语：需要完全匹配的词组
+                                2. 必需关键词：必须出现在结果中的单词，必须关键词里可以包含精确匹配短语中的必须词组
                                 3. 可选关键词：可以出现在结果中的相关词（普通列表）
+                                4. 你必须按标准输出格式输出，不要输出其他任何信息。
 
                                 输出格式：
                                 {
@@ -48,7 +49,8 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
                 return {
                     exactPhrases: parsedResponse.exact_phrases,
                     requiredTerms: parsedResponse.required_terms,
-                    optionalTerms: parsedResponse.optional_terms
+                    optionalTerms: parsedResponse.optional_terms,
+                    originalQuery : query
                 };
 
             } catch (error) {

@@ -136,11 +136,41 @@ app.whenReady().then(async () => {
       sendSystemLog(`ℹ️ 页面获取限制: ${pageFetchLimit}`);
 
       if (type === 'search') {
-        sendSystemLog('🔎 执行直接搜索...');
-        const searchResult = await selectedPlugin.search(message, path);
-        const markdownResult = buildSearchResultsString(searchResult);
+        sendSystemLog('🔄 开始重写查询...');
+        const requeryResult = await selectedPlugin.rewriteQuery(message);
+        sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
+        const searchItemNumbers = await globalContext.configHandler.getSearchItemNumbers();
+        const seenUrls = new Set();
+        let searchResults = [];
+
+        for (const query of requeryResult) {
+          if (searchResults.length >= searchItemNumbers) {
+            sendSystemLog(`📊 已达到搜索结果数量限制: ${searchItemNumbers}`);
+            break;
+          }
+
+          sendSystemLog(`🔍 执行查询: ${query}`);
+          const result = await selectedPlugin.search(query, path);
+
+          // 去重并添加结果
+          for (const item of result) {
+            if (!seenUrls.has(item.id)) {
+              seenUrls.add(item.id);
+              searchResults.push(item);
+
+              if (searchResults.length >= searchItemNumbers) {
+                break;
+              }
+            }
+          }
+        }
+
+        sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
+        const markdownResult = buildSearchResultsString(searchResults);
         event.sender.send('llm-stream', markdownResult, requestId);
         sendSystemLog('✅ 搜索完成');
+
       } else if (type === 'highQuilityRAGChat') {
         sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await selectedPlugin.rewriteQuery(message);
@@ -197,7 +227,7 @@ app.whenReady().then(async () => {
               const prompt = `请基于以下参考信息提取有助于回答问题的关键事实，不需要你的判断和解释 。要求：1. 尽全力保留所有的详细数据和连接 2. 回答字数限制在2000字内 3.使用参考信息里的原文内容 \n参考信息：\n${suggestionContext}\n\n问题：\n${message}`;
 
               tasks.push(async () => {
-                sendSystemLog(`🤖 分析内容...`);
+                sendSystemLog(`🤖 分析内容(本步骤是依托大模型的较慢，多等一下）...`);
                 const groupAnswer = await globalContext.llmCaller.callSync([{ role: 'user', content: prompt }]);
                 groupAnswers.push(groupAnswer.join(''));
                 sendSystemLog('✅ 内容分析完成');

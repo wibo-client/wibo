@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 @Service
 public class FileTypeConfigurationService {
     private static final Logger logger = LoggerFactory.getLogger(FileTypeConfigurationService.class);
@@ -35,21 +36,21 @@ public class FileTypeConfigurationService {
         DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_PDF_RECOGNITION, false);
         DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_PPT_RECOGNITION, false);
 
-        DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, 
-        "**/node_modules/**\n" +     // 任意目录下的 node_modules
-        "**/.git/**\n" +            // 任意目录下的 .git
-        "**/.idea/**\n" +           // 任意目录下的 .idea
-        "**/.vscode/**\n" +         // 任意目录下的 .vscode
-        "**/target/**\n" +          // 任意目录下的 target
-        "**/build/**\n" +           // 任意目录下的 build
-        "**/*.class\n" +            // 所有 .class 文件
-        "**/*.log\n" +              // 所有 .log 文件
-        "**/.DS_Store\n" +          // macOS 系统文件
-        "**/Thumbs.db\n" +          // Windows 系统文件
-        "**/*.swp\n" +              // Vim 临时文件
-        "**/__pycache__/**\n" +     // Python 缓存
-        "**/*.pyc"                  // Python 编译文件
-    );
+        DEFAULT_CONFIGS.put(SystemConfigService.CONFIG_IGNORED_DIRECTORIES,
+                "**/node_modules/**\n" + // 任意目录下的 node_modules
+                        "**/.git/**\n" + // 任意目录下的 .git
+                        "**/.idea/**\n" + // 任意目录下的 .idea
+                        "**/.vscode/**\n" + // 任意目录下的 .vscode
+                        "**/target/**\n" + // 任意目录下的 target
+                        "**/build/**\n" + // 任意目录下的 build
+                        "**/*.class\n" + // 所有 .class 文件
+                        "**/*.log\n" + // 所有 .log 文件
+                        "**/.DS_Store\n" + // macOS 系统文件
+                        "**/Thumbs.db\n" + // Windows 系统文件
+                        "**/*.swp\n" + // Vim 临时文件
+                        "**/__pycache__/**\n" + // Python 缓存
+                        "**/*.pyc" // Python 编译文件
+        );
     }
 
     public void initializeDefaultConfigs() {
@@ -70,14 +71,12 @@ public class FileTypeConfigurationService {
         }
     }
 
-
-
     public Map<String, Object> updateIndexSettings(Map<String, Object> config) {
         initializeDefaultConfigs();
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> fileTypes = (Map<String, Object>) config.get("fileTypes");
-            
+
             // 处理简单文件类型
             processSimpleFileType(fileTypes, "text");
             processSimpleFileType(fileTypes, "spreadsheet");
@@ -94,8 +93,8 @@ public class FileTypeConfigurationService {
             // 处理忽略目录
             List<String> ignoredDirs = (List<String>) config.get("ignoredDirectories");
             if (ignoredDirs != null) {
-                systemConfigService.saveConfig(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, 
-                    String.join("\n", ignoredDirs));
+                systemConfigService.saveConfig(SystemConfigService.CONFIG_IGNORED_DIRECTORIES,
+                        String.join("\n", ignoredDirs));
             }
 
             response.put("success", true);
@@ -132,17 +131,17 @@ public class FileTypeConfigurationService {
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> effectiveConfig = new HashMap<>();
-            
+
             // 获取所有配置项的当前值
             for (String key : DEFAULT_CONFIGS.keySet()) {
                 Object defaultValue = DEFAULT_CONFIGS.get(key);
                 if (defaultValue instanceof Boolean) {
-                    effectiveConfig.put(key, systemConfigService.getBooleanValue(key, (Boolean)defaultValue));
+                    effectiveConfig.put(key, systemConfigService.getBooleanValue(key, (Boolean) defaultValue));
                 } else if (defaultValue instanceof String) {
-                    effectiveConfig.put(key, systemConfigService.getValue(key, (String)defaultValue));
+                    effectiveConfig.put(key, systemConfigService.getValue(key, (String) defaultValue));
                 }
             }
-            
+
             response.put("success", true);
             response.put("config", effectiveConfig);
         } catch (Exception e) {
@@ -158,7 +157,7 @@ public class FileTypeConfigurationService {
         Map<String, Object> response = new HashMap<>();
         try {
             Map<String, Object> fileTypes = new HashMap<>();
-            
+
             // 获取基础文件类型配置
             fileTypes.put("text", systemConfigService.getBooleanValue("filetype.text.enabled", true));
             fileTypes.put("spreadsheet", systemConfigService.getBooleanValue("filetype.spreadsheet.enabled", true));
@@ -169,24 +168,28 @@ public class FileTypeConfigurationService {
 
             // 获取增强型文件类型配置
             Map<String, Object> presentationConfig = new HashMap<>();
-            presentationConfig.put("enabled", systemConfigService.getBooleanValue("filetype.presentation.enabled", true));
-            presentationConfig.put("enhanced", systemConfigService.getBooleanValue(SystemConfigService.CONFIG_PPT_RECOGNITION, false));
+            presentationConfig.put("enabled",
+                    systemConfigService.getBooleanValue("filetype.presentation.enabled", true));
+            presentationConfig.put("enhanced",
+                    systemConfigService.getBooleanValue(SystemConfigService.CONFIG_PPT_RECOGNITION, false));
             fileTypes.put("presentation", presentationConfig);
 
             Map<String, Object> pdfConfig = new HashMap<>();
             pdfConfig.put("enabled", systemConfigService.getBooleanValue("filetype.pdf.enabled", true));
-            pdfConfig.put("enhanced", systemConfigService.getBooleanValue(SystemConfigService.CONFIG_PDF_RECOGNITION, false));
+            pdfConfig.put("enhanced",
+                    systemConfigService.getBooleanValue(SystemConfigService.CONFIG_PDF_RECOGNITION, false));
             fileTypes.put("pdf", pdfConfig);
 
             Map<String, Object> imageConfig = new HashMap<>();
             imageConfig.put("enabled", systemConfigService.getBooleanValue("filetype.image.enabled", true));
-            imageConfig.put("enhanced", systemConfigService.getBooleanValue(SystemConfigService.CONFIG_IMAGE_RECOGNITION, false));
+            imageConfig.put("enhanced",
+                    systemConfigService.getBooleanValue(SystemConfigService.CONFIG_IMAGE_RECOGNITION, false));
             fileTypes.put("image", imageConfig);
 
             response.put("fileTypes", fileTypes);
             response.put("ignoredDirectories", Arrays.asList(
-                systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, "")
-                    .split("\n")));
+                    systemConfigService.getValue(SystemConfigService.CONFIG_IGNORED_DIRECTORIES, "")
+                            .split("\n")));
             response.put("success", true);
         } catch (Exception e) {
             logger.error("获取索引设置失败", e);
@@ -209,10 +212,10 @@ public class FileTypeConfigurationService {
             Map<String, Object> typeConfig = (Map<String, Object>) value;
             boolean enabled = (Boolean) typeConfig.getOrDefault("enabled", false);
             boolean enhanced = (Boolean) typeConfig.getOrDefault("enhanced", false);
-            
+
             // 保存基础启用状态
             systemConfigService.saveConfig("filetype." + typeName + ".enabled", enabled);
-            
+
             // 根据文件类型使用对应的增强配置常量
             switch (typeName) {
                 case "image":
