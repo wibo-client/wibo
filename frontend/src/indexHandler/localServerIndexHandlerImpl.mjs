@@ -55,13 +55,13 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
                 pathPrefix = pathPrefix.replace(/\//g, '\\');
             }
 
-            const response = await fetch(`${this.BASE_URL}/search`, {
+            const response = await fetch(`${this.BASE_URL}/searchWithStrategy`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    queryStr,
+                    ...queryStr,
                     pathPrefix,
                     TopN: searchItemNumbers
                 }),
@@ -144,9 +144,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     async rewriteQuery(query) {
         // 本地服务器不需要重写查询
         const reWriteQuerys = await this.globalContext.rewriteQueryer.rewriteQuery(query);
-
-        return [query, ...reWriteQuerys];
-
+        return [reWriteQuerys];
     }
 
     async rerank(documentPartList, queryString) {

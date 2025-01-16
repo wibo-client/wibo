@@ -26,21 +26,30 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
             try {
                 const userPrompts = [{
                     role: 'user',
-                    content: `请根据以下查询生成关键词列表，你觉得越重要的词，放在越前面 ：${query} \n 。要求：严格按照示例输出的规范输出，不要输出其他内容 。 \n 示例输出：\n ["关键词1", "关键词2", "关键词3"] 。 `
+                    content: `您是一个搜索专家。请将用户的问题分解为以下三个部分：
+                                1. 精确匹配短语：需要完全匹配的词组（用引号括起来）
+                                2. 必需关键词：必须出现在结果中的单词（用加号标记）
+                                3. 可选关键词：可以出现在结果中的相关词（普通列表）
+
+                                输出格式：
+                                {
+                                    "exact_phrases": ["完整短语1", "完整短语2"],
+                                    "required_terms": ["必需词1", "必需词2"],
+                                    "optional_terms": ["可选词1", "可选词2"]
+                                }
+
+                                用户问题：${query}`
                 }];
 
                 const response = await this.globalContext.llmCaller.callAsync(userPrompts);
-                const keywords = JSON.parse(response[0]);
-                console.info(`Attempt ${attempt + 1} succeeded. Received JSON result from LLM:`, keywords);
+                const parsedResponse = JSON.parse(response[0]);
+                console.info(`Attempt ${attempt + 1} succeeded. Received JSON result from LLM:`, parsedResponse);
 
-                const keywordLists = [];
-                keywordLists.push('"'+query+'"');
-                for (let i = keywords.length; i > 0; i--) {
-                    const subKeywords = keywords.slice(0, i);
-                    keywordLists.push('"' + subKeywords.join('" "') + '"');
-                }
-                console.info("Generated keyword lists:", keywordLists);
-                return keywordLists;
+                return {
+                    exactPhrases: parsedResponse.exact_phrases,
+                    requiredTerms: parsedResponse.required_terms,
+                    optionalTerms: parsedResponse.optional_terms
+                };
 
             } catch (error) {
                 lastError = error;

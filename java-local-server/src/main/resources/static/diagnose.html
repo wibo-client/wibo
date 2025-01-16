@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>索引诊断</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>索引诊断工具</h1>
+    <button onclick="diagnoseIndex()">执行诊断</button>
+    <pre id="result" style="margin-top: 20px; padding: 10px; background: #f5f5f5;"></pre>
+
+    <script>
+        function diagnoseIndex() {
+            fetch('/diagnose')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('result').textContent = 
+                        JSON.stringify(data, null, 2);
+                })
+                .catch(error => {
+                    document.getElementById('result').textContent = 
+                        '诊断失败: ' + error;
+                });
+        }
+    </script>
+</body>
+</html>

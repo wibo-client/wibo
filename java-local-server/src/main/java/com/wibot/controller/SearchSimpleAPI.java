@@ -4,6 +4,8 @@ import com.wibot.controller.vo.SearchResultVO;
 import com.wibot.controller.vo.AggregatedContentVO;
 import com.wibot.index.DocumentIndexInterface;
 import com.wibot.index.SearchDocumentResult;
+import com.wibot.index.SimpleLocalLucenceIndex;
+import com.wibot.index.search.SearchQuery;
 import com.wibot.pathHandler.PathBasedIndexHandlerSelector;
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownBasedContentRepository;
@@ -17,7 +19,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,8 +33,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
 
 @RestController
+@RequestMapping("") // 添加基础路径
 public class SearchSimpleAPI {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SearchSimpleAPI.class);
@@ -64,6 +72,107 @@ public class SearchSimpleAPI {
             return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(),
                     LocalDateTime.now(), url);
         }).collect(Collectors.toList());
+    }
+
+    @GetMapping("/diagnose") // 简化路径
+    @ResponseBody // 确保返回值被正确处理
+    public Map<String, Object> diagnoseIndex(
+            @RequestParam(required = false, defaultValue = "") String pathPrefix // 使参数可选
+    ) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
+                    .selectIndexHandler(pathPrefix);
+            if (documentIndexInterface instanceof SimpleLocalLucenceIndex) {
+                String result = ((SimpleLocalLucenceIndex) documentIndexInterface).diagnoseIndex();
+                response.put("success", true);
+                response.put("data", result);
+            } else {
+                response.put("success", false);
+                response.put("error", "当前索引处理器不支持诊断功能");
+            }
+        } catch (Exception e) {
+            logger.error("索引诊断失败", e);
+            response.put("success", false);
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/search/diagnose")
+    @ResponseBody
+    public Map<String, Object> diagnoseSearch(
+            @RequestParam String query,
+            @RequestParam(required = false) String pathPrefix) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // 添加编码处理
+            String decodedQuery = URLDecoder.decode(query, StandardCharsets.UTF_8.name());
+
+            DocumentIndexInterface indexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(pathPrefix);
+            if (indexInterface instanceof SimpleLocalLucenceIndex) {
+                String diagnosis = ((SimpleLocalLucenceIndex) indexInterface).searchDiagnose(decodedQuery);
+                response.put("success", true);
+                response.put("diagnosis", diagnosis);
+            } else {
+                response.put("success", false);
+                response.put("error", "Unsupported index type");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+
+    @PostMapping("/searchWithStrategy")
+    public List<SearchResultVO> searchWithStrategy(@RequestBody Map<String, Object> searchParams) {
+        try {
+            // 构建 SearchQuery 对象
+            SearchQuery searchQuery = new SearchQuery();
+
+            @SuppressWarnings("unchecked")
+            List<String> exactPhrases = (List<String>) searchParams.get("exactPhrases");
+            @SuppressWarnings("unchecked")
+            List<String> requiredTerms = (List<String>) searchParams.get("requiredTerms");
+            @SuppressWarnings("unchecked")
+            List<String> optionalTerms = (List<String>) searchParams.get("optionalTerms");
+            String pathPrefix = (String) searchParams.get("pathPrefix");
+            Integer topN = (Integer) searchParams.get("TopN");
+
+            searchQuery.setExactPhrases(exactPhrases);
+            searchQuery.setRequiredTerms(requiredTerms);
+            searchQuery.setOptionalTerms(optionalTerms);
+            searchQuery.setPathPrefix(pathPrefix);
+            if (topN != null) {
+                searchQuery.setTopN(topN);
+            }
+
+            // 获取索引处理器
+            DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
+                    .selectIndexHandler(pathPrefix);
+
+            // 执行多策略搜索
+            if (documentIndexInterface instanceof SimpleLocalLucenceIndex) {
+                List<SearchDocumentResult> results = ((SimpleLocalLucenceIndex) documentIndexInterface)
+                        .searchWithStrategy(searchQuery);
+
+                // 转换结果
+                return results.stream().map(item -> {
+                    Optional<DocumentDataPO> docData = documentDataRepository
+                            .findById(item.getMarkdownParagraph().getDocumentDataId());
+                    String url = docData.map(DocumentDataPO::getFilePath).orElse("URL not found");
+                    return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(),
+                            LocalDateTime.now(), url);
+                }).collect(Collectors.toList());
+            }
+
+            logger.warn("当前索引处理器不支持多策略搜索");
+            return new ArrayList<>();
+        } catch (Exception e) {
+            logger.error("多策略搜索失败", e);
+            return new ArrayList<>();
+        }
     }
 
     /**
