@@ -217,8 +217,8 @@ app.whenReady().then(async () => {
 
           for (const doc of aggregatedContent) {
             const partHeader = doc.date
-              ? `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`
-              : `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
+              ? `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.realUrl} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`
+              : `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.realUrl} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
 
             const combinedContent = `${partHeader} \n ## title :${doc.title}\n\n${doc.description}\n\n ## 详细内容：\n${doc.content}`;
 
@@ -286,14 +286,14 @@ app.whenReady().then(async () => {
           fullContent: searchResults.map((doc, index) => ({
             index: index + 1,
             title: doc.title,
-            url: doc.url,
+            url: doc.realUrl,
             date: doc.date,
             description: doc.description
           })),
           displayedContent: searchResults.slice(0, 3).map((doc, index) => ({
             index: index + 1,
             title: doc.title,
-            url: doc.url,
+            url: doc.realUrl,
             date: doc.date,
             description: doc.description
           })),
@@ -333,9 +333,9 @@ app.whenReady().then(async () => {
 
           let partHeader = '';
           if (doc.date) {
-            partHeader = `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`;
+            partHeader = `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.realUrl} 的 第 ${doc.paragraphOrder} 段 ,发布时间是 ${doc.date} ）：\n\n`;
           } else {
-            partHeader = `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.url} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
+            partHeader = `\n# 第${partIndex++}篇参考内容（来自文件路径：${doc.realUrl} 的 第 ${doc.paragraphOrder} 段）：\n\n`;
           }
 
           const combinedContent = `${partHeader} \n ## title :${doc.title}\n\n${doc.description}\n\n ## 详细内容：\n${doc.content}`;
@@ -372,14 +372,14 @@ app.whenReady().then(async () => {
           fullContent: aggregatedContent.map((doc, index) => ({
             index: index + 1,
             title: doc.title,
-            url: doc.url,
+            url: doc.realUrl,
             date: doc.date,
             description: doc.description
           })),
           displayedContent: aggregatedContent.slice(0, 3).map((doc, index) => ({
             index: index + 1,
             title: doc.title,
-            url: doc.url,
+            url: doc.realUrl,
             date: doc.date,
             description: doc.description
           })),

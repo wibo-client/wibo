@@ -4,7 +4,6 @@
   "description": "WIBO - Your Personal Knowledge Assistant",
   "main": "dist/main.js",
   "scripts": {
-    
     "clean:mac": "rm -rf dist && mkdir dist",
     "prepare:dist:mac": "mkdir -p dist/java-local-server",
     "clean:jre:mac": "rm -rf dist/java-local-server/custom-jre",
@@ -15,10 +14,6 @@
     "build:all:mac": "npm run clean:mac && npm run prepare:dist:mac && npm run prepare:java:mac && npm run build:backend && npm run copy:backend:mac && npm run build:frontend",
     "predist:mac": "npm run build:all:mac && npm run prepack",
     "dist:mac": "npx electron-builder --mac",
-
-
-
-    
     "clean:win": "rmdir /S /Q dist 2>nul & mkdir dist",
     "prepare:dist:win": "mkdir dist\\java-local-server 2>nul",
     "clean:jre:win": "rmdir /S /Q dist\\java-local-server\\custom-jre 2>nul || exit 0",
@@ -29,10 +24,6 @@
     "build:all:win": "npm run clean:win && npm run prepare:dist:win && npm run prepare:java:win && npm run build:backend && npm run copy:backend:win && npm run build:frontend",
     "predist:win": "npm run build:all:win && npm run prepack",
     "dist:win": "npx electron-builder --win",
-
-
-
-
     "build:main": "webpack --config webpack.main.config.js",
     "build:renderer": "webpack --config webpack.renderer.config.js",
     "build:plugin": "webpack --config webpack.plugin.config.js",
@@ -50,6 +41,7 @@
   "dependencies": {
     "axios": "^1.7.9",
     "chokidar": "^4.0.3",
+    "electron-context-menu": "^4.0.4",
     "electron-store": "^8.2.0",
     "marked": "^15.0.4",
     "openai": "^4.77.0",
@@ -157,7 +149,6 @@
           "**/*"
         ]
       }
-
     ],
     "asarUnpack": [
       "java-local-server/**/*"

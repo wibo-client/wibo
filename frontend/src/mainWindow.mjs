@@ -2,6 +2,7 @@ import { BrowserWindow, app } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from './utils/loggerUtils.mjs';
+import contextMenu from 'electron-context-menu';
 
 class MainWindow {
   constructor() {
@@ -41,6 +42,13 @@ class MainWindow {
         webSecurity: true,
       },
     });
+
+    // 启用右键菜单
+    contextMenu({
+      window: this.window,
+      showInspectElement: true, // 显示“检查元素”选项
+    });
+
 
     logger.info('Loading main window...');
     const url = path.join(this.baseDir, 'index.html');

@@ -117,10 +117,13 @@ export class ContentCrawler {
                 return this.convertToMarkdown(pageContent);
             });
 
-            return content;
+            // 获取当前网页的真实链接
+            const realUrl = page.url();
+
+            return { content, realUrl };
         } catch (error) {
             console.error("处理任务时出错:", error);
-            return '';
+            return { content: '', realUrl: '' };
         } finally {
             if (page && !page.isClosed()) {
                 await ChromeService.closePage(page);

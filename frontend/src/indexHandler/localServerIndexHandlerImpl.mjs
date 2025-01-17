@@ -108,6 +108,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
                 description: item.description,
                 date: new Date(item.date),
                 url: item.url,
+                realUrl: item.url,
                 content: item.content,
                 paragraphOrder: item.paragraphOrder
             }));

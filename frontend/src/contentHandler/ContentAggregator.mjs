@@ -18,8 +18,9 @@ class ContentAggregator {
       await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 301)));
 
       const crawler = this.globalContext.contentCrawler;
-      const content = await crawler.fetchPageContent(summary.url);
+      const { content, realUrl } = await crawler.fetchPageContent(summary.url);
       summary.content = this.extractRelevantContent(content, summary);
+      summary.realUrl = realUrl;  // 添加真实链接
       summary.paragraphOrder = index + 1;
       return summary;
     });
