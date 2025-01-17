@@ -13,8 +13,8 @@ class ContentAggregator {
     const configHandler = this.globalContext.configHandler;
     const pageFetchLimit = await configHandler.getPageFetchLimit();
 
-    const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
-    const promises = limitedSummaryList.map(async (summary, index) => {
+    //const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
+    const promises = summaryList.map(async (summary, index) => {
       await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 301)));
 
       const crawler = this.globalContext.contentCrawler;

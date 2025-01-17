@@ -148,9 +148,12 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         return [reWriteQuerys];
     }
 
+
     async rerank(documentPartList, queryString) {
-        // 本地服务器不需要重新排序
-        return documentPartList;
+        if (!Array.isArray(documentPartList) || typeof queryString !== 'string') {
+            throw new TypeError('Invalid input types for rerank method');
+        }
+        return await this.globalContext.rerankImpl.rerank(documentPartList, queryString);
     }
 
 

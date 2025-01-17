@@ -10,20 +10,23 @@ export default class ChatHandler {
     this.loadingHistory = false;
     this.setupScrollHandler();
     this.loadInitialHistory();
+    this.inputHistory = [];           // 添加输入历史数组
+    this.historyIndex = -1;          // 添加历史索引
+    this.currentInput = '';          // 添加当前输入缓存
   }
 
   async loadInitialHistory() {
     try {
       const feedbackBox = document.getElementById('messages');
       const messages = await window.electron.chatHistory.getMessages(0, 5);
-      
+
       if (messages.length > 0) {
         // 添加历史记录分隔符
         const divider = document.createElement('div');
         divider.className = 'history-divider';
         divider.textContent = '历史消息';
         feedbackBox.appendChild(divider);
-        
+
         messages.forEach(msg => {
           const messageGroup = this.createMessageGroupFromData(msg);
           messageGroup.classList.add('history');
@@ -32,7 +35,7 @@ export default class ChatHandler {
 
         // 添加链接处理
         this.setupHistoryLinks(feedbackBox);
-        
+
         // 添加延时以确保DOM更新后再滚动
         setTimeout(() => {
           feedbackBox.scrollTop = feedbackBox.scrollHeight;
@@ -46,15 +49,15 @@ export default class ChatHandler {
   setupScrollHandler() {
     const feedbackBox = document.getElementById('messages');
     let lastScrollTop = 0;
-    
+
     feedbackBox.addEventListener('scroll', async () => {
       const currentScrollTop = feedbackBox.scrollTop;
-      
+
       // 检测是否向上滚动到接近顶部
       if (currentScrollTop < lastScrollTop && currentScrollTop < 50 && !this.loadingHistory) {
         await this.loadMoreHistory(feedbackBox);
       }
-      
+
       lastScrollTop = currentScrollTop;
     });
   }
@@ -62,38 +65,38 @@ export default class ChatHandler {
   async loadMoreHistory(feedbackBox) {
     try {
       this.loadingHistory = true;
-      
+
       // 添加加载提示
       const loadingIndicator = document.createElement('div');
       loadingIndicator.className = 'loading-history';
       loadingIndicator.textContent = '加载更多历史记录...';
       feedbackBox.insertBefore(loadingIndicator, feedbackBox.firstChild);
-      
+
       this.currentOffset += 5;
       const messages = await window.electron.chatHistory.getMessages(this.currentOffset, 5);
-      
+
       // 记录原始高度
       const originalHeight = feedbackBox.scrollHeight;
-      
+
       // 移除加载提示
       loadingIndicator.remove();
-      
+
       if (messages.length > 0) {
         messages.reverse().forEach(msg => {
           const messageGroup = this.createMessageGroupFromData(msg);
           messageGroup.classList.add('history');
           feedbackBox.insertBefore(messageGroup, feedbackBox.firstChild);
         });
-        
+
         // 添加时间分隔线
         const divider = document.createElement('div');
         divider.className = 'history-divider';
         divider.textContent = this.formatHistoryDate(messages[0].timestamp);
         feedbackBox.insertBefore(divider, feedbackBox.firstChild);
-        
+
         // 设置滚动位置以保持视图稳定
         feedbackBox.scrollTop = feedbackBox.scrollHeight - originalHeight;
-        
+
         // 处理新加载消息中的链接
         this.setupHistoryLinks(feedbackBox);
       }
@@ -108,7 +111,7 @@ export default class ChatHandler {
     const date = new Date(timestamp);
     const now = new Date();
     const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       return '今天';
     } else if (diffDays === 1) {
@@ -142,7 +145,7 @@ export default class ChatHandler {
   appendHistoricalMessage(messageData, prepend = false) {
     const messageGroup = this.createMessageGroupFromData(messageData);
     const feedbackBox = document.getElementById('messages');
-    
+
     if (prepend && feedbackBox.firstChild) {
       feedbackBox.insertBefore(messageGroup, feedbackBox.firstChild);
     } else {
@@ -201,6 +204,38 @@ export default class ChatHandler {
 
   setupKeyboardShortcuts(chatInput, typeSelect) {
     chatInput.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault();
+
+        if (this.historyIndex === -1) {
+          this.currentInput = chatInput.value;
+        }
+
+        if (event.key === 'ArrowUp') {
+          if (this.historyIndex < this.inputHistory.length - 1) {
+            this.historyIndex++;
+            chatInput.value = this.inputHistory[this.historyIndex];
+          }
+        } else if (event.key === 'ArrowDown') {
+          if (this.historyIndex > -1) {
+            this.historyIndex--;
+            chatInput.value = this.historyIndex === -1
+              ? this.currentInput
+              : this.inputHistory[this.historyIndex];
+          }
+        }
+
+        // 将光标移到末尾
+        setTimeout(() => {
+          chatInput.selectionStart = chatInput.selectionEnd = chatInput.value.length;
+        }, 0);
+
+        // 触发输入事件以调整文本框高度
+        const inputEvent = new Event('input');
+        chatInput.dispatchEvent(inputEvent);
+        return;
+      }
+
       if (event.key === 'Enter') {
         if (event.shiftKey) {
           // Shift + Enter: 捡问
@@ -399,9 +434,17 @@ export default class ChatHandler {
       return;
     }
 
+    // 添加到输入历史
+    this.inputHistory.unshift(message);
+    if (this.inputHistory.length > 50) { // 限制历史记录数量
+      this.inputHistory.pop();
+    }
+    this.historyIndex = -1;
+    this.currentInput = '';
+
     try {
       const feedbackBox = document.getElementById('messages');
-      
+
       // 创建消息组容器
       const messageGroup = document.createElement('div');
       messageGroup.className = 'message-group';
@@ -433,15 +476,15 @@ export default class ChatHandler {
         systemContent.classList.toggle('expanded');
         const isExpanded = systemContent.classList.contains('expanded');
         systemToggle.textContent = isExpanded ? '收起详情' : '展开详情';
-        
+
         // 控制日志显示
         const logs = systemContent.querySelectorAll('.execution-log');
         if (!isExpanded) {
-            Array.from(logs).forEach((log, index) => {
-                log.style.display = index < logs.length - 2 ? 'none' : 'block';
-            });
+          Array.from(logs).forEach((log, index) => {
+            log.style.display = index < logs.length - 2 ? 'none' : 'block';
+          });
         } else {
-            logs.forEach(log => log.style.display = 'block');
+          logs.forEach(log => log.style.display = 'block');
         }
       };
 
@@ -450,7 +493,7 @@ export default class ChatHandler {
       // WIBO回复信息和引用信息容器
       const wiboContainer = document.createElement('div');
       wiboContainer.className = 'wibo-container';
-      
+
       const wibaMessageElement = document.createElement('div');
       wibaMessageElement.className = 'message wiba';
       wibaMessageElement.innerHTML = '';
@@ -462,7 +505,7 @@ export default class ChatHandler {
 
       // 自动滚动到底部
       feedbackBox.scrollTop = feedbackBox.scrollHeight;
-      
+
       let wholeMessage = '### WIBO : \n\n';
       const requestId = uuidv4(); // 生成 UUID
       const requestContext = {
@@ -470,7 +513,7 @@ export default class ChatHandler {
         onChunk: (chunk) => {
           wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);
-          
+
           // 为 WIBO 消息中的链接添加点击处理
           wibaMessageElement.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', async (e) => {
@@ -490,22 +533,22 @@ export default class ChatHandler {
           const logElement = document.createElement('div');
           logElement.className = 'execution-log';
           logElement.textContent = log;
-          
+
           // 将新日志添加到系统内容区域
           systemContent.appendChild(logElement);
-          
+
           // 获取所有日志
           const logs = systemContent.querySelectorAll('.execution-log');
-          
+
           // 如果不是展开状态，只显示最新的两条日志
           if (!systemContent.classList.contains('expanded')) {
-              Array.from(logs).forEach((log, index) => {
-                  if (index < logs.length - 2) {
-                      log.style.display = 'none';
-                  } else {
-                      log.style.display = 'block';
-                  }
-              });
+            Array.from(logs).forEach((log, index) => {
+              if (index < logs.length - 2) {
+                log.style.display = 'none';
+              } else {
+                log.style.display = 'block';
+              }
+            });
           }
         },
         onReference: (referenceData) => {
@@ -515,21 +558,21 @@ export default class ChatHandler {
           // 构建初始显示内容
           let initialContent = '### 参考文档\n\n';
           referenceData.displayedContent.forEach(doc => {
-              initialContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
-              if (doc.date) {
-                  initialContent += `   日期: ${doc.date}\n`;
-              }
-              initialContent += `   描述: ${doc.description}\n\n`;
+            initialContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
+            if (doc.date) {
+              initialContent += `   日期: ${doc.date}\n`;
+            }
+            initialContent += `   描述: ${doc.description}\n\n`;
           });
 
           // 构建完整内容
           let fullContent = '### 参考文档\n\n';
           referenceData.fullContent.forEach(doc => {
-              fullContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
-              if (doc.date) {
-                  fullContent += `   日期: ${doc.date}\n`;
-              }
-              fullContent += `   描述: ${doc.description}\n\n`;
+            fullContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
+            if (doc.date) {
+              fullContent += `   日期: ${doc.date}\n`;
+            }
+            fullContent += `   描述: ${doc.description}\n\n`;
           });
 
           referenceMessageElement.innerHTML = `
@@ -555,20 +598,20 @@ export default class ChatHandler {
 
             e.preventDefault();
             const url = link.getAttribute('href');
-            
+
             // 检查是否是控制按钮
-            if (link.classList.contains('reference-toggle') || 
-                link.classList.contains('reference-follow-up')) {
-                return;
+            if (link.classList.contains('reference-toggle') ||
+              link.classList.contains('reference-follow-up')) {
+              return;
             }
 
             // 处理普通链接
             if (url && !url.startsWith('#')) {
-                try {
-                    await window.electron.shell.openExternal(url);
-                } catch (error) {
-                    console.error('打开链接失败:', error);
-                }
+              try {
+                await window.electron.shell.openExternal(url);
+              } catch (error) {
+                console.error('打开链接失败:', error);
+              }
             }
           });
 
@@ -578,25 +621,25 @@ export default class ChatHandler {
           const fullContentElement = referenceMessageElement.querySelector('.reference-full-content');
 
           toggleButton.addEventListener('click', (e) => {
-              e.preventDefault();
-              content.classList.toggle('expanded');
-              if (content.classList.contains('expanded')) {
-                  content.innerHTML = fullContentElement.innerHTML;
-                  toggleButton.textContent = '收起参考';
-              } else {
-                  content.innerHTML = marked(initialContent);
-                  toggleButton.textContent = `展开更多参考(${referenceData.totalCount})`;
-              }
+            e.preventDefault();
+            content.classList.toggle('expanded');
+            if (content.classList.contains('expanded')) {
+              content.innerHTML = fullContentElement.innerHTML;
+              toggleButton.textContent = '收起参考';
+            } else {
+              content.innerHTML = marked(initialContent);
+              toggleButton.textContent = `展开更多参考(${referenceData.totalCount})`;
+            }
           });
 
           // 添加追问功能
           const followUpButton = referenceMessageElement.querySelector('.reference-follow-up');
           followUpButton.addEventListener('click', (e) => {
-              e.preventDefault();
-              // 这里预留追问功能的实现
-              console.log('追问功能待实现');
+            e.preventDefault();
+            // 这里预留追问功能的实现
+            console.log('追问功能待实现');
           });
-      }
+        }
       };
 
       // 清空输入框
@@ -616,7 +659,7 @@ export default class ChatHandler {
         path: path,
         html: messageGroup.innerHTML
       };
-      
+
       await window.electron.chatHistory.saveMessage(messageData);
 
     } catch (error) {

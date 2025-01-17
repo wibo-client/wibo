@@ -25,6 +25,56 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         });
     }
 
+    async rewriteQuery(query) {
+        try {
+            const prompt = `请将以下问题转换为多个适合百度搜索引擎的关键词组合。要求：
+            1. 每个关键词组合应该突出不同的搜索角度
+            2. 使用精准的专业术语和同义词扩展
+            3. 考虑时效性信息（如适用）
+            4. 去除口语化表达，保留核心概念
+            5. 返回3-5个最相关的搜索词组合
+            6. 直接返回搜索词组合，每行一组 ，无需解释
+
+            原始问题：${query}`;
+
+            const response = await this.globalContext.llmCaller.callSync([
+                { role: 'user', content: prompt }
+            ]);
+
+            if (!response || !response[0]) {
+                console.warn('LLM 响应为空，使用原始查询');
+                return [query];
+            }
+
+            // 将响应文本按行分割，过滤空行
+            const queries = response[0]
+                .split('\n')
+                .map(q => q.trim())
+                .filter(q => q && q.length > 0);
+
+            // 如果没有有效的查询，返回原始查询
+            if (queries.length === 0) {
+                console.warn('未生成有效查询，使用原始查询');
+                return [query];
+            }
+
+            console.log('生成的查询词组：', queries);
+            return [query, ...queries];
+
+        } catch (error) {
+            console.error('查询重写失败:', error);
+            // 发生错误时返回原始查询
+            return [query];
+        }
+    }
+
+    async rerank(documentPartList, queryString) {
+        if (!Array.isArray(documentPartList) || typeof queryString !== 'string') {
+            throw new TypeError('Invalid input types for rerank method');
+        }
+        return await this.globalContext.rerankImpl.rerank(documentPartList, queryString);
+    }
+
     async processSearchResults(page) {
         return await page.$$eval('#content_left > div', blocks => {
             return blocks.map(block => {
@@ -101,6 +151,68 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         });
     }
 
+    async handleNextPage(page, browserTimeout) {
+        const nextPageSelector = 'a.n';
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        while (retryCount < maxRetries) {
+            try {
+                // 检查下一页按钮是否存在
+                const nextPageExists = await page.$(nextPageSelector);
+                if (!nextPageExists) return false;
+
+                // 等待元素可交互
+                await page.waitForSelector(nextPageSelector, {
+                    timeout: browserTimeout * 1000,
+                    visible: true
+                });
+
+                // 点击下一页
+                await Promise.all([
+                    page.waitForNavigation({ timeout: browserTimeout * 1000 }),
+                    page.click(nextPageSelector)
+                ]);
+
+                // 随机延迟
+                await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 500) + 500));
+
+                // 等待新页面加载完成
+                await page.waitForSelector('h3', {
+                    timeout: browserTimeout * 1000,
+                    visible: true
+                });
+
+                return true;
+            } catch (error) {
+                retryCount++;
+                console.warn(`翻页失败 (${retryCount}/${maxRetries}):`, error.message);
+
+                if (error.message.includes('Node is detached')) {
+                    // 对于节点分离错误，尝试刷新页面
+                    try {
+                        await page.reload({ waitUntil: 'networkidle0' });
+                        await page.waitForSelector('h3', {
+                            timeout: browserTimeout * 1000,
+                            visible: true
+                        });
+                    } catch (reloadError) {
+                        console.error('页面刷新失败:', reloadError);
+                    }
+                }
+
+                if (retryCount === maxRetries) {
+                    console.error('翻页重试次数已达上限，停止翻页');
+                    return false;
+                }
+
+                // 在重试前等待一段时间
+                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            }
+        }
+        return false;
+    }
+
     async search(query, pathPrefix = '', recordDescription = true) {
         console.info("开始处理任务");
         let page = null;
@@ -147,20 +259,16 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
                 if (totalResults >= searchItemNumbers) break;
 
-                const nextPageSelector = 'a.n';
-                const nextPageExists = await page.$(nextPageSelector);
-                if (!nextPageExists) break;
-
-                await page.click(nextPageSelector);
-                // 替换 waitForTimeout 为 Promise timeout
-                await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 500) + 500));
-                await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
+                // 使用新的翻页处理方法
+                const nextPageSuccess = await this.handleNextPage(page, browserTimeout);
+                if (!nextPageSuccess) break;
             }
-
+            let resultId = 0;
             const outputContent = results.slice(0, searchItemNumbers).map(result => {
                 if (recordDescription && result.description) {
                     result.description = result.description.replace(/(播报|暂停|||爱企查|\n)/g, '');
                 }
+                result.id = resultId++;
                 return result;
             });
 
@@ -169,6 +277,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
         } catch (error) {
             console.error(`处理任务时出错: ${error}`);
+            console.error(`错误堆栈: ${error.stack}`);
             throw error;
         } finally {
             if (page) {

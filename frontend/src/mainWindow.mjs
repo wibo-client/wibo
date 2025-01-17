@@ -46,28 +46,18 @@ class MainWindow {
     const contextMenu = Menu.buildFromTemplate([
       {
         label: '复制',
-        click: () => {
-          const selectedText = this.window.webContents.getSelectedText();
-          if (selectedText) {
-            clipboard.writeText(selectedText);
-          }
-        }
+        accelerator: 'CmdOrCtrl+C',
+        role: 'copy'
       },
       {
         label: '粘贴',
-        click: () => {
-          const clipboardText = clipboard.readText();
-          this.window.webContents.paste();
-        }
-      },
-
+        accelerator: 'CmdOrCtrl+V',
+        role: 'paste'
+      }
     ]);
 
-    let rightClickPosition = null;
-
-    this.window.webContents.on('context-menu', (event, params) => {
-      rightClickPosition = { x: params.x, y: params.y };
-      contextMenu.popup(this.window);
+    this.window.webContents.on('context-menu', (event) => {
+      contextMenu.popup();
     });
 
     logger.info('Loading main window...');
