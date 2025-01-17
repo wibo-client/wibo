@@ -481,6 +481,15 @@ app.whenReady().then(async () => {
     return globalContext.chatStore.getMessages(offset, limit);
   });
 
+  ipcMain.handle('set-default-handler', async (event, pathPrefix) => {
+    try {
+      await globalContext.pluginHandler.setDefaultHandler(pathPrefix);
+    } catch (error) {
+      console.error('设置默认插件失败:', error);
+      throw error;
+    }
+  });
+
   // 确保在应用退出时清理 Java 进程
   app.on('before-quit', async () => {
     try {

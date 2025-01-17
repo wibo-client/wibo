@@ -31,6 +31,12 @@ export class PluginHandlerImpl {
         // 从配置中获取市场URL，如果未配置则使用默认值
         this.mktplaceUrl = await configHandler.getMktPlace();
         await this.updatePathSuggestions();
+
+        // 设置默认处理器
+        const defaultHandlerPath = await configHandler.getDefaultHandlerPath();
+        if (this.pluginInstanceMap.has(defaultHandlerPath)) {
+            this.defaultHandler = this.pluginInstanceMap.get(defaultHandlerPath);
+        }
     }
 
     async updatePathSuggestions() {
@@ -257,8 +263,8 @@ export class PluginHandlerImpl {
             // 如果没有找到任何有效的插件，至少包含默认处理器
             if (Object.keys(pluginInstanceMap).length === 0 && this.defaultHandler) {
                 pluginInstanceMap['/'] = {
-                    name:  this.defaultHandler.getHandlerName(),
-                    description:  this.defaultHandler.getInterfaceDescription(),
+                    name: this.defaultHandler.getHandlerName(),
+                    description: this.defaultHandler.getInterfaceDescription(),
                     category: this.defaultHandler.getHandlerCategory(),
                     isDefault: true
                 };
@@ -269,6 +275,16 @@ export class PluginHandlerImpl {
             console.error('Failed to get plugin instance map:', error);
             throw new Error('Failed to get plugin information');
         }
+    }
+
+    async setDefaultHandler(pathPrefix) {
+        if (!this.pluginInstanceMap.has(pathPrefix)) {
+            throw new Error(`Plugin with pathPrefix ${pathPrefix} does not exist.`);
+        }
+
+        this.defaultHandler = this.pluginInstanceMap.get(pathPrefix);
+        await this.globalContext.configHandler.setDefaultHandlerPath(pathPrefix); // 更新配置文件中的默认处理器路径
+        console.log(`Default handler set to plugin with pathPrefix ${pathPrefix}`);
     }
 }
 

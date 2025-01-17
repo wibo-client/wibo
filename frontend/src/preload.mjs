@@ -66,7 +66,10 @@ contextBridge.exposeInMainWorld('electron', {
     saveMessage: (message) => ipcRenderer.invoke('save-chat-message', message),
     getMessages: (offset, limit) => ipcRenderer.invoke('get-chat-messages', offset, limit),
     getMessageCount: () => ipcRenderer.invoke('get-chat-message-count')
-  }
+  },
+
+  // 添加 setDefaultHandler 方法
+  setDefaultHandler: (pathPrefix) => ipcRenderer.invoke('set-default-handler', pathPrefix)
 });
 
 // 认证相关 API

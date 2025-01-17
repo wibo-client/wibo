@@ -15,7 +15,8 @@ export default class ConfigHandler {
       modelSK: null,
       modelBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       modelName: 'qwen-plus',
-      authToken: null
+      authToken: null,
+      defaultHandlerPath: '/baidu/' // 新增默认处理器路径配置
     };
   }
 
@@ -96,5 +97,16 @@ export default class ConfigHandler {
   async getModelName() {
     const config = await this.getGlobalConfig();
     return config.modelName || this.defaultConfig.modelName;
+  }
+
+  async getDefaultHandlerPath() {
+    const config = await this.getGlobalConfig();
+    return config.defaultHandlerPath || this.defaultConfig.defaultHandlerPath;
+  }
+
+  async setDefaultHandlerPath(path) {
+    const config = await this.getGlobalConfig();
+    config.defaultHandlerPath = path;
+    await this.setGlobalConfig(config);
   }
 }

@@ -56,6 +56,10 @@ export class PathSuggestionService {
     }
 
     selectPluginForPath(pathPrefix = '') {
+
+        if (pathPrefix === '') {
+            return null;
+        }
         // 查找最匹配的插件
         let longestMatch = '';
         let selectedPlugin = null;

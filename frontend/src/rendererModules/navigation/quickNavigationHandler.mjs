@@ -7,7 +7,7 @@ export default class QuickNavigationHandler {
   switchToTab(tabName) {
     const tabs = document.querySelectorAll('.tab');
     const tabContents = document.querySelectorAll('.tab-content');
-    
+
     tabs.forEach(tab => {
       if (tab.dataset.tab === tabName) {
         tab.classList.add('active');
@@ -15,7 +15,7 @@ export default class QuickNavigationHandler {
         tab.classList.remove('active');
       }
     });
-    
+
     tabContents.forEach(content => {
       if (content.id === tabName) {
         content.classList.add('active');
@@ -23,6 +23,15 @@ export default class QuickNavigationHandler {
         content.classList.remove('active');
       }
     });
+  }
+
+  async setDefaultHandler(pathPrefix) {
+    try {
+      await electron.setDefaultHandler(pathPrefix);
+      this.setupQuickNavigation(); // 重新加载以更新显示
+    } catch (error) {
+      console.error('设置默认插件失败:', error);
+    }
   }
 
   async setupQuickNavigation() {
@@ -49,7 +58,7 @@ export default class QuickNavigationHandler {
       for (const [category, plugins] of Object.entries(categorizedPlugins)) {
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'quick-link-category';
-        
+
         const categoryHeader = document.createElement('h4');
         categoryHeader.textContent = category;
         categoryDiv.appendChild(categoryHeader);
@@ -88,12 +97,7 @@ export default class QuickNavigationHandler {
           setDefaultBtn.textContent = '设为默认';
           setDefaultBtn.onclick = async (e) => {
             e.stopPropagation();
-            try {
-              await electron.setDefaultHandler(plugin.pathPrefix);
-              this.setupQuickNavigation(); // 重新加载以更新显示
-            } catch (error) {
-              console.error('设置默认插件失败:', error);
-            }
+            await this.setDefaultHandler(plugin.pathPrefix);
           };
 
           linkItem.appendChild(textContainer);
@@ -105,7 +109,7 @@ export default class QuickNavigationHandler {
             if (!e.target.classList.contains('set-default-btn')) {
               const pathInput = document.getElementById('pathInput');
               const userInput = document.getElementById('user-input');
-              
+
               // 使用 beginPath 而不是 pathPrefix
               pathInput.value = plugin.beginPath || plugin.pathPrefix;
               this.switchToTab('interaction');
