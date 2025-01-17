@@ -1,8 +1,7 @@
-import { BrowserWindow, app } from 'electron';
+import { BrowserWindow, app, Menu, clipboard } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from './utils/loggerUtils.mjs';
-import contextMenu from 'electron-context-menu';
 
 class MainWindow {
   constructor() {
@@ -43,12 +42,33 @@ class MainWindow {
       },
     });
 
-    // 启用右键菜单
-    contextMenu({
-      window: this.window,
-      showInspectElement: true, // 显示“检查元素”选项
-    });
+    // 创建右键菜单
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: '复制',
+        click: () => {
+          const selectedText = this.window.webContents.getSelectedText();
+          if (selectedText) {
+            clipboard.writeText(selectedText);
+          }
+        }
+      },
+      {
+        label: '粘贴',
+        click: () => {
+          const clipboardText = clipboard.readText();
+          this.window.webContents.paste();
+        }
+      },
 
+    ]);
+
+    let rightClickPosition = null;
+
+    this.window.webContents.on('context-menu', (event, params) => {
+      rightClickPosition = { x: params.x, y: params.y };
+      contextMenu.popup(this.window);
+    });
 
     logger.info('Loading main window...');
     const url = path.join(this.baseDir, 'index.html');
