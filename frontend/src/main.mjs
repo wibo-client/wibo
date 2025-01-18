@@ -214,7 +214,16 @@ app.whenReady().then(async () => {
 
         let searchResults = [];
         for (const query of requeryResult) {
-          sendSystemLog(`🔍 执行查询: ${query}`);
+
+          // 添加更友好的查询日志输出
+          const queryLog = `🔍 执行查询:
+                • 原始查询: ${query.originalQuery}
+                • 精确匹配: ${query.exactPhrases?.join(', ') || '无'}
+                • 必需词: ${query.requiredTerms?.join(', ') || '无'}
+                • 可选词: ${query.optionalTerms?.join(', ') || '无'}
+               `;
+          sendSystemLog(` ${queryLog}`);
+          console.log(queryLog);
           const result = await selectedPlugin.search(query, path);
           searchResults = searchResults.concat(result);
           if (searchResults.length >= pageFetchLimit) break;
@@ -224,9 +233,9 @@ app.whenReady().then(async () => {
         const rerankResult = await selectedPlugin.rerank(searchResults, message);
         sendSystemLog('✅  重新排序完成');
 
-        sendSystemLog('📑 获取详细网页内容...');
+        sendSystemLog('📑 获取详细内容...');
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(rerankResult);
-        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细网页内容，开始依托内容回应问题。`);
+        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始依托内容回应问题。`);
 
         // 使用 ReferenceHandler 构建 prompt
         const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);
@@ -243,14 +252,22 @@ app.whenReady().then(async () => {
             title: doc.title,
             url: doc.realUrl,
             date: doc.date,
-            description: doc.description.replace(/<\/?[^>]+(>|$)/g, "").replace(/<em>/g, "").replace(/<\/em>/g, ""),
+            description: doc.description
+              .replace(/<\/?h[1-6][^>]*>/gi, "") // 去掉所有的 <h1> 到 <h6> 标签
+              .replace(/\n/g, " ") // 去掉所有的换行符
+              .replace(/<br\s*\/?>/gi, " ") // 去掉所有的 <br> 标签
+              .replace(/^#{1,6}\s+/gm, "") // 去掉所有的 # ## ### ....#####
           })),
           displayedContent: aggregatedContent.slice(0, 3).map((doc, index) => ({
             index: index + 1,
             title: doc.title,
             url: doc.realUrl,
             date: doc.date,
-            description: doc.description.replace(/<\/?[^>]+(>|$)/g, "").replace(/<em>/g, "").replace(/<\/em>/g, ""),
+            description: doc.description
+              .replace(/<\/?h[1-6][^>]*>/gi, "") // 去掉所有的 <h1> 到 <h6> 标签
+              .replace(/\n/g, " ") // 去掉所有的换行符
+              .replace(/<br\s*\/?>/gi, " ") // 去掉所有的 <br> 标签
+              .replace(/^#{1,6}\s+/gm, "") // 去掉所有的 # ## ### ....#####
           })),
           totalCount: aggregatedContent.length
         };

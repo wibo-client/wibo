@@ -7,8 +7,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 
+import java.util.List;
+
 public interface MarkdownParagraphRepository extends JpaRepository<MarkdownParagraphPO, Long> {
 
     @Transactional
     void deleteByDocumentDataId(Long documentDataId);
+
+    List<MarkdownParagraphPO> findByDocumentDataId(Long documentDataId);
 }

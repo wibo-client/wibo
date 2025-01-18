@@ -39,30 +39,56 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         try {
             const configHandler = this.globalContext.configHandler;
             const searchItemNumbers = await configHandler.getSearchItemNumbers();
-            //处理路径问题，如果是windows，大概结构是 /local/C:/Users/xxx/xxx 这样,要处理成C:/Users/xxx/xxx ， mac/linux 是 /local/Users/xxx/xxx 这样的，要处理成/Users/xxx/xxx
+
+            // 处理路径前缀
+            let processedPath = pathPrefix;
             if (pathPrefix.startsWith('/local')) {
                 if (pathPrefix.includes(':')) {
                     // Windows 路径
-                    pathPrefix = pathPrefix.replace('/local/', '');
+                    processedPath = pathPrefix.replace('/local/', '');
                 } else {
-                    // macOS/Linux 路径
-                    pathPrefix = pathPrefix.replace('/local', '');
+                    // macOS 路径
+                    processedPath = pathPrefix.replace('/local', '');
                 }
             }
 
-            // 处理 Windows 样式路径
-            if (pathPrefix.includes(':')) {
-                pathPrefix = pathPrefix.replace(/\//g, '\\');
+            // 如果不是目录（不以/结尾），则调用 fetchDocumentContent 接口
+            if (!processedPath.endsWith('/')) {
+                if (pathPrefix.includes(':')) {
+                    // Windows 路径
+                    processedPath = processedPath.replace(/\//g, '\\');
+                }
+                const response = await fetch(`${this.BASE_URL}/fetchDocumentContent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        pathPrefix: processedPath,
+                        query: queryStr,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                return await response.json();
             }
 
+            if (pathPrefix.includes(':')) {
+                // Windows 路径
+                processedPath = processedPath.replace(/\//g, '\\');
+            }
+            // 原有的目录搜索逻辑
             const response = await fetch(`${this.BASE_URL}/searchWithStrategy`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    ...queryStr,
-                    pathPrefix,
+                    query: queryStr,
+                    pathPrefix: processedPath,
                     TopN: searchItemNumbers
                 }),
             });
@@ -71,8 +97,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const results = await response.json();
-            return results;
+            return await response.json();
         } catch (error) {
             console.error('Search failed:', error);
             throw error;

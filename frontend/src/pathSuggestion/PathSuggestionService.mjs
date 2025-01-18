@@ -25,9 +25,15 @@ export class PathSuggestionService {
     }
 
     addPathToTree(normalizedPath, plugin) {
-        // 去掉文件，只保留目录
-        const directoryPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath.slice(0, normalizedPath.lastIndexOf('/') + 1);
-        this.pluginPathMap.set(directoryPath, plugin);
+        // 保存完整路径
+        this.pluginPathMap.set(normalizedPath, plugin);
+
+        // 同时保存目录路径
+        const lastSlashIndex = normalizedPath.lastIndexOf('/');
+        if (lastSlashIndex > 0) {
+            const directoryPath = normalizedPath.slice(0, lastSlashIndex + 1);
+            this.pluginPathMap.set(directoryPath, plugin);
+        }
     }
 
     getNextLevelPath(keywords) {
@@ -46,10 +52,12 @@ export class PathSuggestionService {
             }
         }
 
-        // 只展示最多10个文件
-        const limitedFiles = files.slice(0, 10);
+        // 分别对目录和文件进行排序
+        const sortedDirectories = Array.from(directories).sort();
+        const sortedFiles = files.slice(0, 5).sort();
 
-        return Array.from(directories).concat(limitedFiles).sort();
+        // 先返回目录，再返回文件
+        return [...sortedDirectories, ...sortedFiles];
     }
 
     selectPluginForPath(pathPrefix = '') {

@@ -1,11 +1,11 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { fileURLToPath } from 'url';
-import logger from '../utils/loggerUtils.mjs';
-import { app } from 'electron';
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { fileURLToPath } = require('url');
+const logger = require('../utils/loggerUtils.mjs');
+const { app } = require('electron');
 
 puppeteer.use(StealthPlugin());
 
@@ -17,7 +17,7 @@ class ChromeService {
         this.idleTimeout = 5 * 60 * 1000; // 5分钟无活动后关闭浏览器
         this.idleTimer = null;
         this.globalContext = null;
-        const __filename = fileURLToPath(import.meta.url);
+        const __filename = fileURLToPath(__filename);
         const __dirname = path.dirname(__filename);
 
         if (app.isPackaged) {
@@ -42,8 +42,6 @@ class ChromeService {
 
     findChromePath(baseDir) {
         const platform = os.platform();
-
-        // 1. 首先检查本地打包的 Chrome
         const possibleBasePaths = [
             path.join(baseDir, 'chrome'),
             path.join(baseDir, '..', 'chrome'),
@@ -56,41 +54,23 @@ class ChromeService {
             win32: ['win', 'chrome.exe'],
         };
 
-        // 2. 检查本地打包的 Chrome
         const platformSubPath = platformPaths[platform];
-        if (platformSubPath) {
-            for (const basePath of possibleBasePaths) {
-                const fullPath = path.join(basePath, ...platformSubPath);
-                if (fs.existsSync(fullPath)) {
-                    logger.info(`[ChromeService] 找到本地打包 Chrome: ${fullPath}`);
-                    return fullPath;
-                }
-            }
+        if (!platformSubPath) {
+            logger.warn(`[ChromeService] 不支持的操作系统平台: ${platform}`);
+            return null;
         }
 
-        // 3. 查找系统安装的 Chrome
-        const systemChromePaths = {
-            win32: [
-                path.join(process.env['ProgramFiles'], 'Google/Chrome/Application/chrome.exe'),
-                path.join(process.env['ProgramFiles(x86)'], 'Google/Chrome/Application/chrome.exe'),
-                path.join(process.env['LocalAppData'], 'Google/Chrome/Application/chrome.exe'),
-            ],
-            darwin: [
-                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
-            ]
-        };
-
-        const possiblePaths = systemChromePaths[platform] || [];
-        for (const chromePath of possiblePaths) {
-            if (fs.existsSync(chromePath)) {
-                logger.info(`[ChromeService] 找到系统 Chrome: ${chromePath}`);
-                return chromePath;
+        for (const basePath of possibleBasePaths) {
+            const fullPath = path.join(basePath, ...platformSubPath);
+            logger.info(`[ChromeService] 尝试查找 Chrome 路径: ${fullPath}`);
+            if (fs.existsSync(fullPath)) {
+                logger.info(`[ChromeService] 找到 Chrome 路径: ${fullPath}`);
+                return fullPath;
             }
+            logger.debug(`[ChromeService] Chrome 路径不存在: ${fullPath}`);
         }
 
-        // 4. 如果都找不到，返回 null，让 Puppeteer 使用默认的 Chrome
-        logger.warn('[ChromeService] 未找到 Chrome，将使用 Puppeteer 默认的 Chrome');
+        logger.warn('[ChromeService] 未找到本地 Chrome，将使用系统默认 Chrome');
         return null;
     }
 
@@ -256,4 +236,4 @@ class ChromeService {
     }
 }
 
-export default new ChromeService();
+module.exports = new ChromeService();

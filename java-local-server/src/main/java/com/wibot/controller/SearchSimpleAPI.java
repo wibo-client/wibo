@@ -125,37 +125,49 @@ public class SearchSimpleAPI {
         return response;
     }
 
+    private SearchQuery buildSearchQuery(Map<String, Object> searchParams) {
+        SearchQuery searchQuery = new SearchQuery();
+        @SuppressWarnings("unchecked")
+        Map<String, List<String>> queryMap = (Map<String, List<String>>) searchParams.get("query");
+
+        List<String> exactPhrases = queryMap != null ? queryMap.get("exactPhrases") : new ArrayList<>();
+        List<String> requiredTerms = queryMap != null ? queryMap.get("requiredTerms") : new ArrayList<>();
+        List<String> optionalTerms = queryMap != null ? queryMap.get("optionalTerms") : new ArrayList<>();
+
+        String pathPrefix = (String) searchParams.get("pathPrefix");
+
+        String originalQuery = (String) searchParams.get("originalQuery");
+        String topNStr = String.valueOf(searchParams.get("TopN"));
+        Integer topN;
+        try {
+            topN = Integer.valueOf(topNStr);
+        } catch (NumberFormatException e) {
+            topN = 0; // 默认值
+            logger.warn("Invalid TopN value: {}, using default 0", topNStr);
+        }
+
+        searchQuery.setExactPhrases(exactPhrases);
+        searchQuery.setRequiredTerms(requiredTerms);
+        searchQuery.setOptionalTerms(optionalTerms);
+        searchQuery.setPathPrefix(pathPrefix);
+        searchQuery.setOriginalQuery(originalQuery);
+
+        if (topN != null) {
+            searchQuery.setTopN(topN);
+        }
+
+        return searchQuery;
+    }
+
     @PostMapping("/searchWithStrategy")
     public List<SearchResultVO> searchWithStrategy(@RequestBody Map<String, Object> searchParams) {
         try {
             // 构建 SearchQuery 对象
-            SearchQuery searchQuery = new SearchQuery();
-
-            @SuppressWarnings("unchecked")
-            List<String> exactPhrases = (List<String>) searchParams.get("exactPhrases");
-            @SuppressWarnings("unchecked")
-            List<String> requiredTerms = (List<String>) searchParams.get("requiredTerms");
-            @SuppressWarnings("unchecked")
-            List<String> optionalTerms = (List<String>) searchParams.get("optionalTerms");
-            String pathPrefix = (String) searchParams.get("pathPrefix");
-
-            String originalQuery = (String) searchParams.get("originalQuery");
-            String topNStr = String.valueOf(searchParams.get("TopN"));
-            Integer topN = Integer.valueOf(topNStr == null ? "0" : topNStr);
-
-            searchQuery.setExactPhrases(exactPhrases);
-            searchQuery.setRequiredTerms(requiredTerms);
-            searchQuery.setOptionalTerms(optionalTerms);
-            searchQuery.setPathPrefix(pathPrefix);
-            searchQuery.setOriginalQuery(originalQuery);
-
-            if (topN != null) {
-                searchQuery.setTopN(topN);
-            }
+            SearchQuery searchQuery = buildSearchQuery(searchParams);
 
             // 获取索引处理器
             DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
-                    .selectIndexHandler(pathPrefix);
+                    .selectIndexHandler(searchQuery.getPathPrefix());
             List<SearchDocumentResult> results = documentIndexInterface
                     .searchWithStrategy(searchQuery);
 
@@ -186,7 +198,11 @@ public class SearchSimpleAPI {
         List<Map<String, Object>> summaryList = (List<Map<String, Object>>) requestBody.get("summaryList");
 
         return summaryList.stream().map(item -> {
-            Long id = ((Number) item.get("id")).longValue();
+            Object idObj = item.get("id");
+            if (idObj == null) {
+                throw new IllegalArgumentException("ID cannot be null");
+            }
+            Long id = Long.valueOf(idObj.toString()); // 修复类型转换问题
             String title = (String) item.get("title");
             String description = (String) item.get("description");
             LocalDateTime date = LocalDateTime.parse((String) item.get("date"));
@@ -252,7 +268,25 @@ public class SearchSimpleAPI {
 
     @PostMapping("/fetchDocumentContent")
     public List<SearchResultVO> fetchDocumentContent(@RequestBody Map<String, Object> requestParams) {
-        String pathPrefix = (String) requestParams.get("pathPrefix");
+        Object pathPrefixObj = requestParams.get("pathPrefix");
+
+        if (!(pathPrefixObj instanceof String)) {
+            throw new IllegalArgumentException("pathPrefix and query must be strings");
+        }
+
+        String pathPrefix = (String) pathPrefixObj;
+        SearchQuery searchQuery = buildSearchQuery(requestParams);
+
+        // 获取索引处理器
+        DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
+                .selectIndexHandler(searchQuery.getPathPrefix());
+        List<SearchDocumentResult> results = documentIndexInterface
+                .searchWithStrategy(searchQuery);
+
+        // 获取 results 中的 ID 列表
+        List<Long> resultIds = results.stream()
+                .map(result -> result.getMarkdownParagraph().getId())
+                .collect(Collectors.toList());
 
         // 1) 打开pathPrefix 所对应的文件（这个接口要求必须是文件）
         Optional<DocumentDataPO> documentDataOpt = documentDataRepository.findByFilePath(pathPrefix);
@@ -269,13 +303,37 @@ public class SearchSimpleAPI {
         // 3) 根据DocumentPO的id 取对应的所有MarkdownParagraphPO
         List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
 
-        // 4) 转换为List<SearchResultVO> 后返回
-        return paragraphs.stream().map(paragraph -> {
+        // 4) 根据 results 中的 ID 对 paragraphs 进行重排序
+        List<MarkdownParagraphPO> sortedParagraphs = new ArrayList<>();
+        Set<Long> resultIdSet = new HashSet<>(resultIds);
+
+        // 先添加 results 中有的 ID
+        for (Long id : resultIds) {
+            paragraphs.stream()
+                    .filter(paragraph -> paragraph.getId().equals(id))
+                    .findFirst()
+                    .ifPresent(sortedParagraphs::add);
+        }
+
+        // 再添加 results 中没有但 paragraphs 中有的 ID
+        for (MarkdownParagraphPO paragraph : paragraphs) {
+            if (!resultIdSet.contains(paragraph.getId())) {
+                sortedParagraphs.add(paragraph);
+            }
+        }
+
+        // 打印详细的 debug 日志
+        logger.debug("Sorted Paragraphs:");
+        for (MarkdownParagraphPO paragraph : sortedParagraphs) {
+            logger.debug("Paragraph ID: {}, Order: {}", paragraph.getId(), paragraph.getParagraphOrder());
+        }
+
+        // 转换为List<SearchResultVO> 后返回
+        return sortedParagraphs.stream().map(paragraph -> {
             return new SearchResultVO(paragraph.getId(), title, paragraph.getContent(),
                     paragraph.getCreatedDateTime(), documentData.getFilePath());
         }).collect(Collectors.toList());
     }
-
 
     private MarkdownParagraphPO getParagraphById(Long id) {
         Optional<MarkdownParagraphPO> paragraph = markdownParagraphRepository.findById(id);

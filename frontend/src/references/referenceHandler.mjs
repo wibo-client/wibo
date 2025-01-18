@@ -29,7 +29,15 @@ export default class ReferenceHandler {
         break;
       }
 
-      sendSystemLog(`🔍 执行查询: ${query}`);
+      // 添加更友好的查询日志输出
+      const queryLog = `🔍 执行查询:
+            • 原始查询: ${query.originalQuery}
+            • 精确匹配: ${query.exactPhrases?.join(', ') || '无'}
+            • 必需词: ${query.requiredTerms?.join(', ') || '无'}
+            • 可选词: ${query.optionalTerms?.join(', ') || '无'}
+           `;
+      sendSystemLog(`${queryLog}`);
+
       const result = await selectedPlugin.search(query, path);
       const rerankedResult = await this.globalContext.rerankImpl.rerank(result, query);
 
