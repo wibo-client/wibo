@@ -202,32 +202,7 @@ export class PluginHandlerImpl {
 
     async select(pathPrefix = '') {
         const selectedPlugin = this.pathSuggestionService.selectPluginForPath(pathPrefix);
-
-        if (selectedPlugin) {
-            return selectedPlugin;
-        }
-
-        if (pathPrefix === '' || pathPrefix.endsWith('/')) {
-            // 走原来的 searchWithStrategy 逻辑
-            const response = await fetch(`${this.BASE_URL}/searchWithStrategy`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ pathPrefix })
-            });
-            return await response.json();
-        } else {
-            // 调用新的后端接口
-            const response = await fetch(`${this.BASE_URL}/fetchDocumentContent`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ pathPrefix })
-            });
-            return await response.json();
-        }
+        return selectedPlugin || this.defaultHandler;
     }
 
     async ensurePathSuggestionsUpdated() {

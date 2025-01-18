@@ -214,28 +214,25 @@ app.whenReady().then(async () => {
 
         let searchResults = [];
         for (const query of requeryResult) {
+          sendSystemLog(query.queryLog);
 
-          // 添加更友好的查询日志输出
-          const queryLog = `🔍 执行查询:
-                • 原始查询: ${query.originalQuery}
-                • 精确匹配: ${query.exactPhrases?.join(', ') || '无'}
-                • 必需词: ${query.requiredTerms?.join(', ') || '无'}
-                • 可选词: ${query.optionalTerms?.join(', ') || '无'}
-               `;
-          sendSystemLog(` ${queryLog}`);
-          console.log(queryLog);
-          const result = await selectedPlugin.search(query, path);
+          const result = await selectedPlugin.search(query.query, path);
           searchResults = searchResults.concat(result);
-          if (searchResults.length >= pageFetchLimit) break;
+
+          sendSystemLog(`📊 重排序搜索结果...`);
+          const rerankResult = await selectedPlugin.rerank(searchResults, message);
+
+          if (rerankResult.length >= pageFetchLimit) {
+            searchResults = rerankResult.slice(0, pageFetchLimit);
+            break;
+          } else {
+            searchResults = rerankResult;
+          }
         }
 
-        sendSystemLog('📊 重新排序搜索结果...');
-        const rerankResult = await selectedPlugin.rerank(searchResults, message);
-        sendSystemLog('✅  重新排序完成');
-
         sendSystemLog('📑 获取详细内容...');
-        const aggregatedContent = await selectedPlugin.fetchAggregatedContent(rerankResult);
-        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始依托内容回应问题。`);
+        const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
+        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
 
         // 使用 ReferenceHandler 构建 prompt
         const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);

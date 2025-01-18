@@ -168,11 +168,19 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     }
 
     async rewriteQuery(query) {
-        // 本地服务器不需要重写查询
         const reWriteQuerys = await this.globalContext.rewriteQueryer.rewriteQuery(query);
-        return [reWriteQuerys];
+        const queries = Array.isArray(reWriteQuerys) ? reWriteQuerys : [reWriteQuerys];
+        const queryWithLogs = queries.map(q => ({
+            ...q,
+            queryLog: `🔍 本地文件检索执行计划:
+                • 原始查询: ${q.originalQuery}
+                • 精确匹配: ${q.exactPhrases?.join(', ') || '无'}
+                • 必需词: ${q.requiredTerms?.join(', ') || '无'}
+                • 可选词: ${q.optionalTerms?.join(', ') || '无'}
+                • 检索范围: 本地文件系统`
+        }));
+        return queryWithLogs;
     }
-
 
     async rerank(documentPartList, queryString) {
         if (!Array.isArray(documentPartList) || typeof queryString !== 'string') {
@@ -181,11 +189,9 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         return await this.globalContext.rerankImpl.rerank(documentPartList, queryString);
     }
 
-
     getHandlerName() {
         return '本机文件检索';
     }
-
 
     getHandlerCategory() {
         return '本地文件检索';

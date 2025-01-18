@@ -43,28 +43,33 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
             if (!response || !response[0]) {
                 console.warn('LLM 响应为空，使用原始查询');
-                return [query];
+                return [{ query, queryLog: `计划执行 ${query}` }];
             }
 
-            // 将响应文本按行分割，过滤空行
             const queries = response[0]
                 .split('\n')
                 .map(q => q.trim())
                 .filter(q => q && q.length > 0);
 
-            // 如果没有有效的查询，返回原始查询
             if (queries.length === 0) {
                 console.warn('未生成有效查询，使用原始查询');
-                return [query];
+                return [{ query, queryLog: `计划执行 ${query}` }];
             }
 
-            console.log('生成的查询词组：', queries);
-            return [query, ...queries];
+            const queriesWithLogs = [
+                { query, queryLog: `计划执行 ${query}` },
+                ...queries.map(q => ({
+                    query: q,
+                    queryLog: `计划执行 ${q}`
+                }))
+            ];
+
+            console.log('生成的查询词组：', queriesWithLogs);
+            return queriesWithLogs;
 
         } catch (error) {
             console.error('查询重写失败:', error);
-            // 发生错误时返回原始查询
-            return [query];
+            return [{ query, queryLog: `计划执行 ${query}` }];
         }
     }
 
