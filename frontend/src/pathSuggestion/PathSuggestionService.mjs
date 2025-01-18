@@ -33,26 +33,23 @@ export class PathSuggestionService {
     getNextLevelPath(keywords) {
         // 将 Windows 风格路径转换为 Unix 风格路径
         keywords = keywords.replace(/\\/g, '/');
-        const result = new Set();
+        const directories = new Set();
+        const files = [];
 
         for (const path of this.pluginPathMap.keys()) {
-            // 去掉文件名字，只留下目录
-            const directoryPath = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
-
-            if (directoryPath.includes(keywords)) {
-                const remainingPath = directoryPath.slice(directoryPath.indexOf(keywords) + keywords.length);
-                const nextSlashIndex = remainingPath.indexOf('/');
-
-                if (nextSlashIndex !== -1) {
-                    const nextLevelPath = directoryPath.slice(0, directoryPath.indexOf(keywords) + keywords.length + nextSlashIndex + 1);
-                    result.add(nextLevelPath);
-                } else if (remainingPath.length > 0) {
-                    result.add(directoryPath);
+            if (path.includes(keywords)) {
+                if (path.endsWith('/')) {
+                    directories.add(path);
+                } else {
+                    files.push(path);
                 }
             }
         }
 
-        return Array.from(result).sort();
+        // 只展示最多10个文件
+        const limitedFiles = files.slice(0, 10);
+
+        return Array.from(directories).concat(limitedFiles).sort();
     }
 
     selectPluginForPath(pathPrefix = '') {

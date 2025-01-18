@@ -250,6 +250,33 @@ public class SearchSimpleAPI {
                 .collect(Collectors.toList());
     }
 
+    @PostMapping("/fetchDocumentContent")
+    public List<SearchResultVO> fetchDocumentContent(@RequestBody Map<String, Object> requestParams) {
+        String pathPrefix = (String) requestParams.get("pathPrefix");
+
+        // 1) 打开pathPrefix 所对应的文件（这个接口要求必须是文件）
+        Optional<DocumentDataPO> documentDataOpt = documentDataRepository.findByFilePath(pathPrefix);
+        if (documentDataOpt.isEmpty()) {
+            logger.error("Document not found for pathPrefix: " + pathPrefix);
+            return new ArrayList<>();
+        }
+        DocumentDataPO documentData = documentDataOpt.get();
+
+        // 2) 从数据库中查询出对应的DocumentPO
+        Long documentDataId = documentData.getId();
+
+        String title = documentData.getFileName();
+        // 3) 根据DocumentPO的id 取对应的所有MarkdownParagraphPO
+        List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
+
+        // 4) 转换为List<SearchResultVO> 后返回
+        return paragraphs.stream().map(paragraph -> {
+            return new SearchResultVO(paragraph.getId(), title, paragraph.getContent(),
+                    paragraph.getCreatedDateTime(), documentData.getFilePath());
+        }).collect(Collectors.toList());
+    }
+
+
     private MarkdownParagraphPO getParagraphById(Long id) {
         Optional<MarkdownParagraphPO> paragraph = markdownParagraphRepository.findById(id);
         if (paragraph.isPresent()) {
