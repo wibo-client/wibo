@@ -367,7 +367,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         String field = "content";
         try {
             int searchTopN = searchQuery.getTopN() > 0 ? searchQuery.getTopN() : MAX_SEARCH;
-            String currentPathPrefix = searchQuery.getPathPrefix();
+            // String currentPathPrefix = searchQuery.getPathPrefix();
             List<Query> dmqQueries = new ArrayList<>();
 
             // List<SearchDocumentResult> accumulatedResults = new ArrayList<>();
@@ -403,8 +403,9 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
                 BooleanQuery.Builder requiredBuilder = new BooleanQuery.Builder();
                 for (String term : requiredTerms) {
                     Query termQuery = new TermQuery(new Term(field, term));
-                    requiredBuilder.add(termQuery, BooleanClause.Occur.MUST);
+                    requiredBuilder.add(termQuery, BooleanClause.Occur.SHOULD);
                 }
+                requiredBuilder.setMinimumNumberShouldMatch(1);
                 dmqQueries.add(new BoostQuery(requiredBuilder.build(), REQUIRED_BOOST));
             }
             List<String> optionalTerms = searchQuery.getOptionalTerms();
@@ -432,7 +433,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
                 List<SearchDocumentResult> originalResults = processSearchResults(originalLuceneQuery, searchQuery);
                 // 将内容补到remainCount个
                 for (SearchDocumentResult result : originalResults) {
-                    if (accumulatedResults.size() >= searchTopN) {
+                    if (accumulatedResults.size() >= remainingCount) {
                         break;
                     }
                     accumulatedResults.add(result);
@@ -524,8 +525,8 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
                 }
 
                 // 获取相关数据
-                Long documentId = part.getId();
-                Optional<MarkdownParagraphPO> markdownParagraph = markdownParagraphRepository.findById(documentId);
+                Long documentPartId = part.getId();
+                Optional<MarkdownParagraphPO> markdownParagraph = markdownParagraphRepository.findById(documentPartId);
                 markdownParagraph.ifPresent(content -> {
                     Long documentDataId = content.getDocumentDataId();
                     Optional<DocumentDataPO> documentData = documentDataRepository.findById(documentDataId);

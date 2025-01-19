@@ -1,4 +1,5 @@
 import { QueryRewriter } from './rewriteQueryInter.mjs';
+import { JsonUtils } from '../utils/jsonUtils.mjs';
 
 export class LLMBasedQueryRewriter extends QueryRewriter {
     constructor() {
@@ -40,13 +41,10 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
                 false
             );
 
-                // 预处理 JSON 字符串，移除可能的 Markdown 代码块标记
-            let jsonString = response[0];
-                if (jsonString.includes('```json')) {
-                  jsonString = jsonString
-                    .replace(/```json\n/g, '') // 移除开始的 ```json
-                    .replace(/```(\n)?$/g, ''); // 移除结束的 ```
-                }
+            const jsonString = JsonUtils.extractJsonFromResponse(response[0]);
+            if (!jsonString) {
+                throw new Error('无法提取有效的JSON');
+            }
 
             let parsed;
             try {
@@ -73,10 +71,11 @@ export class LLMBasedQueryRewriter extends QueryRewriter {
                     originalQuery
                 ),
                 queryLog: `查询重写：
-        • 时间范围：${lastNDays > 0 ? `最近${lastNDays}天` : '未指定'}
-        • 必需词：${(parsed.requiredTerms || []).join(', ')}
-        • 可选词：${(parsed.optionalTerms || []).join(', ')}
-        • 精确短语：${(parsed.exactPhrases || []).join(', ')}`
+                • 必需词：${(parsed.requiredTerms || []).join(', ')}
+                • 可选词：${(parsed.optionalTerms || []).join(', ')}
+                • 精确短语：${(parsed.exactPhrases || []).join(', ')}
+                • 时间范围：${lastNDays > 0 ? `最近${lastNDays}天` : '未指定'}
+        `
             }];
         } catch (error) {
             console.error('查询重写失败:', error);

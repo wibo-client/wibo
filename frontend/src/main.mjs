@@ -201,7 +201,7 @@ app.whenReady().then(async () => {
         event.sender.send('add-reference', referenceData, requestId);
         sendSystemLog('✅ 搜索完成');
       } else if (type === 'searchAndChat') {
-        const prompt = await globalContext.referenceHandler.handleLightSearchResults(message, path, selectedPlugin, sendSystemLog);
+        const {prompt,aggregatedContent} = await globalContext.referenceHandler.handleLightSearchResults(message, path, selectedPlugin, sendSystemLog);
         
         const messages = [{ role: 'user', content: prompt }];
 

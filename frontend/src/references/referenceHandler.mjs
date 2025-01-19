@@ -1,3 +1,5 @@
+import { JsonUtils } from '../utils/jsonUtils.mjs';
+
 export default class ReferenceHandler {
   constructor() {
     this.MAX_CONTENT_SIZE = 28720;
@@ -23,7 +25,7 @@ export default class ReferenceHandler {
 
       sendSystemLog(`📊 重排序搜索结果...`);
       const rerankResult = await selectedPlugin.rerank(searchResults, message);
-
+      const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
       if (rerankResult.length >= pageFetchLimit) {
         searchResults = rerankResult.slice(0, pageFetchLimit);
         break;
@@ -37,18 +39,18 @@ export default class ReferenceHandler {
     sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
 
     // 使用 ReferenceHandler 构建 prompt
-    const prompt = await buildPromptFromContent(aggregatedContent, message);
-    return prompt;
+    const prompt = await this.buildPromptFromContent(aggregatedContent, message);
+    return {
+      prompt: prompt,
+      aggregatedContent: aggregatedContent
+    };
   }
 
   async handleSearchResults(message, path, selectedPlugin, sendSystemLog) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
 
-
     const seenUrls = new Set();
     let searchResults = [];
-
-
 
     sendSystemLog('🔄 开始重写查询...');
 
@@ -114,7 +116,7 @@ export default class ReferenceHandler {
 
         const createJsonPrompt = (jsonReference, message) => {
           const prompt = `请基于 参考信息 references 里的内容，提取有助于回答问题的关键事实，
-            严格按照要求回答问题，不需要有其他任何解释说明性反馈，不需要你的判断和解释。
+            
             要求：
             1. 回答中尽可能使用原文内容，包含详细数据和 URL 地址等，不要漏掉数据和连接。
             2. 额外澄清依据的文件路径（即 doc.realUrl）。
@@ -133,7 +135,11 @@ export default class ReferenceHandler {
                 }
               ]
             }
-            4. 如参考信息 references 不足以回答问题返回空的Answer json对象即可。
+            4. 如参考信息 references 不足以回答问题返回空的Answer json对象,格式如下：
+            {
+              "answer": []
+            } 
+            5.严格按照要求回答问题，不需要有其他任何解释说明性反馈，不需要你的判断和解释。
             
             问题：
             ${message}`;
@@ -224,34 +230,37 @@ export default class ReferenceHandler {
 
         for (const answer of groupAnswers) {
           try {
-            let jsonString = answer;
-            if (answer.includes('```json')) {
-              jsonString = answer
-                .replace(/```json\n/g, '')
-                .replace(/```(\n)?$/g, '');
+            const jsonString = JsonUtils.extractJsonFromResponse(answer);
+            if (!jsonString) {
+              console.error('无法提取有效的JSON字符串:', answer);
+              continue;
             }
 
-            const jsonResponse = JSON.parse(jsonString.trim());
+            const jsonResponse = JSON.parse(jsonString);
 
-            // 改进的响应验证逻辑
-            if (jsonResponse && typeof jsonResponse === 'object') {
-              if ('answer' in jsonResponse) {
-                hasValidResponse = true;
+            // 验证 JSON 结构
+            if (jsonResponse && typeof jsonResponse === 'object' && 'answer' in jsonResponse) {
+              hasValidResponse = true;
 
-                if (Array.isArray(jsonResponse.answer)) {
-                  for (const item of jsonResponse.answer) {
-                    if (item?.fact && item?.url) {
-                      parsedFacts.push({
-                        fact: item.fact,
-                        urls: Array.isArray(item.url) ? item.url : [item.url],
-                      });
-                    }
+              if (Array.isArray(jsonResponse.answer)) {
+                for (const item of jsonResponse.answer) {
+                  if (item?.fact && item?.url) {
+                    parsedFacts.push({
+                      fact: item.fact,
+                      urls: Array.isArray(item.url) ? item.url : [item.url],
+                    });
                   }
                 }
               }
+            } else {
+              console.error('JSON响应格式不符合预期:', jsonResponse);
             }
           } catch (error) {
-            console.error('JSON解析错误:', error.message, error.stack);
+            console.error('JSON解析错误:', {
+              error: error.message,
+              stack: error.stack,
+              rawResponse: answer
+            });
             continue;
           }
         }
