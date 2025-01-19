@@ -59,11 +59,15 @@ public class DocumentDataPO {
     @Column
     private LocalDateTime lastProcessingUpdate;
 
+    @Column
+    private LocalDateTime createTime;
+
     @Version
     private Integer version;
 
     public DocumentDataPO() {
         // Default constructor
+        this.createTime = LocalDateTime.now(); // 设置默认生成时间
     }
 
     public DocumentDataPO(String fileName, String extension, String filePath, String md5, LocalDateTime updateDateTime,
@@ -75,6 +79,7 @@ public class DocumentDataPO {
         this.updateDateTime = updateDateTime;
         this.processedState = processedState;
         this.fileRequestType = fileRequestType;
+        this.createTime = LocalDateTime.now();
     }
 
     // Getter 和 Setter 方法
@@ -176,6 +181,14 @@ public class DocumentDataPO {
 
     public void setVersion(Integer version) {
         this.version = version;
+    }
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
     }
 
 }

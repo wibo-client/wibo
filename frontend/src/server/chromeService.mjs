@@ -20,10 +20,17 @@ class ChromeService {
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
 
-        if (app.isPackaged) {
-            this.baseDir = path.join(process.resourcesPath, '');
+        // 确保总是有一个有效的基础路径
+        this.baseDir = '';
+        if (app && app.isPackaged) {
+            this.baseDir = process.resourcesPath || path.join(__dirname, '..', '..');
         } else {
-            this.baseDir = __dirname;
+            this.baseDir = path.resolve(__dirname, '..', '..');
+        }
+
+        // 确保 baseDir 存在后再查找 Chrome
+        if (!fs.existsSync(this.baseDir)) {
+            this.baseDir = process.cwd();
         }
 
         this.chromePath = this.findChromePath(this.baseDir);
@@ -41,55 +48,78 @@ class ChromeService {
     }
 
     findChromePath(baseDir) {
+        // 确保基础路径有效
+        if (!baseDir || typeof baseDir !== 'string') {
+            logger.warn('[ChromeService] baseDir 无效，使用当前工作目录');
+            baseDir = process.cwd();
+        }
+
+        const resolvedBaseDir = path.resolve(baseDir);
+        logger.info(`[ChromeService] 使用基础路径: ${resolvedBaseDir}`);
+
         const platform = os.platform();
-
-        // 1. 首先检查本地打包的 Chrome
+        
+        // 安全地构建基础路径数组
         const possibleBasePaths = [
-            path.join(baseDir, 'chrome'),
-            path.join(baseDir, '..', 'chrome'),
-            path.join(baseDir, '..', '..', 'chrome'),
-            path.join(process.cwd(), 'chrome'),
-        ];
+            resolvedBaseDir,
+            path.join(resolvedBaseDir, 'chrome'),
+            path.join(resolvedBaseDir, 'dist', 'chrome'),
+            path.join(resolvedBaseDir, '..', 'chrome')
+        ].filter(p => fs.existsSync(p));
 
-        const platformPaths = {
-            darwin: ['mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'],
-            win32: ['win', 'chrome.exe'],
+        // 安全地获取环境变量
+        const getProgramPath = (envVar) => {
+            const value = process.env[envVar];
+            return value ? path.join(value, 'Google/Chrome/Application/chrome.exe') : null;
         };
 
-        // 2. 检查本地打包的 Chrome
-        const platformSubPath = platformPaths[platform];
+        const systemChromePaths = {
+            win32: [
+                getProgramPath('ProgramFiles'),
+                getProgramPath('ProgramFiles(x86)'),
+                getProgramPath('LocalAppData')
+            ].filter(Boolean),
+            darwin: [
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary'
+            ]
+        };
+
+        // 查找本地打包的 Chrome
+        const platformSubPath = {
+            darwin: ['mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'],
+            win32: ['win', 'chrome.exe']
+        }[platform];
+
         if (platformSubPath) {
             for (const basePath of possibleBasePaths) {
-                const fullPath = path.join(basePath, ...platformSubPath);
-                if (fs.existsSync(fullPath)) {
-                    logger.info(`[ChromeService] 找到本地打包 Chrome: ${fullPath}`);
-                    return fullPath;
+                try {
+                    const fullPath = path.join(basePath, ...platformSubPath);
+                    if (fs.existsSync(fullPath)) {
+                        logger.info(`[ChromeService] 找到本地打包 Chrome: ${fullPath}`);
+                        return fullPath;
+                    }
+                } catch (error) {
+                    logger.warn(`[ChromeService] 检查路径失败: ${basePath}`, error.message);
+                    continue;
                 }
             }
         }
 
-        // 3. 查找系统安装的 Chrome
-        const systemChromePaths = {
-            win32: [
-                path.join(process.env['ProgramFiles'], 'Google/Chrome/Application/chrome.exe'),
-                path.join(process.env['ProgramFiles(x86)'], 'Google/Chrome/Application/chrome.exe'),
-                path.join(process.env['LocalAppData'], 'Google/Chrome/Application/chrome.exe'),
-            ],
-            darwin: [
-                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
-            ]
-        };
-
+        // 查找系统 Chrome
         const possiblePaths = systemChromePaths[platform] || [];
         for (const chromePath of possiblePaths) {
-            if (fs.existsSync(chromePath)) {
-                logger.info(`[ChromeService] 找到系统 Chrome: ${chromePath}`);
-                return chromePath;
+            try {
+                if (fs.existsSync(chromePath)) {
+                    logger.info(`[ChromeService] 找到系统 Chrome: ${chromePath}`);
+                    return chromePath;
+                }
+            } catch (error) {
+                logger.warn(`[ChromeService] 检查系统 Chrome 路径失败: ${chromePath}`, error.message);
+                continue;
             }
         }
 
-        // 4. 如果都找不到，返回 null，让 Puppeteer 使用默认的 Chrome
         logger.warn('[ChromeService] 未找到 Chrome，将使用 Puppeteer 默认的 Chrome');
         return null;
     }

@@ -7,6 +7,40 @@ export default class ReferenceHandler {
     this.globalContext = globalContext;
   }
 
+
+  async handleLightSearchResults(message, path, selectedPlugin, sendSystemLog) {
+
+    sendSystemLog('🔄 开始重写查询...');
+    const requeryResult = await selectedPlugin.rewriteQuery(message);
+    sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
+    let searchResults = [];
+    for (const query of requeryResult) {
+      sendSystemLog(query.queryLog);
+
+      const result = await selectedPlugin.search(query.query, path);
+      searchResults = searchResults.concat(result);
+
+      sendSystemLog(`📊 重排序搜索结果...`);
+      const rerankResult = await selectedPlugin.rerank(searchResults, message);
+
+      if (rerankResult.length >= pageFetchLimit) {
+        searchResults = rerankResult.slice(0, pageFetchLimit);
+        break;
+      } else {
+        searchResults = rerankResult;
+      }
+    }
+
+    sendSystemLog('📑 获取详细内容...');
+    const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
+    sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
+
+    // 使用 ReferenceHandler 构建 prompt
+    const prompt = await buildPromptFromContent(aggregatedContent, message);
+    return prompt;
+  }
+
   async handleSearchResults(message, path, selectedPlugin, sendSystemLog) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
 
@@ -55,9 +89,22 @@ export default class ReferenceHandler {
 
 
   async handleAggregatedContent(searchResults, message, selectedPlugin, sendSystemLog) {
+    // 检查搜索结果是否为空
+    if (!searchResults || searchResults.length === 0) {
+      sendSystemLog('ℹ️ 未找到相关内容');
+      return [];
+    }
+
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
+
+        // 检查聚合内容是否为空
+        if (!aggregatedContent || aggregatedContent.length === 0) {
+          sendSystemLog('ℹ️ 无法获取详细内容');
+          return [];
+        }
+
         let currentLength = 0;
         let partIndex = 1;
         const tasks = [];
@@ -119,7 +166,7 @@ export default class ReferenceHandler {
           } else {
             const jsonPrompt = createJsonPrompt(todoTasksRef, message);
             tasks.push(async () => {
-              sendSystemLog(`🤖 分析内容...`);
+              sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
               let groupAnswer;
               for (let i = 0; i < 3; i++) {
                 try {
@@ -149,7 +196,7 @@ export default class ReferenceHandler {
         if (todoTasksRef.length > 0) {
           const jsonPrompt = createJsonPrompt(todoTasksRef, message);
           tasks.push(async () => {
-            sendSystemLog(`🤖 分析内容...`);
+            sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
             let groupAnswer;
             for (let i = 0; i < 3; i++) {
               try {
@@ -173,64 +220,71 @@ export default class ReferenceHandler {
 
         // 解析 JSON 并提取 fact
         const parsedFacts = [];
-        const seenUrls = new Set();
         let hasValidResponse = false;
 
-        // ...existing code...
         for (const answer of groupAnswers) {
           try {
-            // 预处理 JSON 字符串，移除可能的 Markdown 代码块标记
             let jsonString = answer;
             if (answer.includes('```json')) {
               jsonString = answer
-                .replace(/```json\n/g, '') // 移除开始的 ```json
-                .replace(/```(\n)?$/g, ''); // 移除结束的 ```
+                .replace(/```json\n/g, '')
+                .replace(/```(\n)?$/g, '');
             }
 
-            // 尝试解析 JSON
             const jsonResponse = JSON.parse(jsonString.trim());
 
-            // 检查是否有 answer 属性且为数组
-            if (jsonResponse.answer && Array.isArray(jsonResponse.answer)) {
-              // 如果数组不为空，则处理其中的内容
-              if (jsonResponse.answer.length > 0) {
+            // 改进的响应验证逻辑
+            if (jsonResponse && typeof jsonResponse === 'object') {
+              if ('answer' in jsonResponse) {
                 hasValidResponse = true;
-                for (const item of jsonResponse.answer) {
-                  if (item.fact && item.url) { // 确保必要的字段存在
-                    parsedFacts.push({
-                      fact: item.fact,
-                      urls: Array.isArray(item.url) ? item.url : [item.url],
-                    });
+
+                if (Array.isArray(jsonResponse.answer)) {
+                  for (const item of jsonResponse.answer) {
+                    if (item?.fact && item?.url) {
+                      parsedFacts.push({
+                        fact: item.fact,
+                        urls: Array.isArray(item.url) ? item.url : [item.url],
+                      });
+                    }
                   }
                 }
               }
-              // 即使是空数组，也标记为有效响应（因为这是预期的格式）
-              hasValidResponse = true;
             }
           } catch (error) {
-            console.error('Error parsing JSON response:', error);
-            console.error('Raw response:', answer);
+            console.error('JSON解析错误:', error.message, error.stack);
             continue;
           }
         }
-        // ...existing code...
 
+        // 改进的结果处理逻辑
         if (hasValidResponse) {
-          sendSystemLog(`✅ 成功解析 ${parsedFacts.length} 条事实`);
+          const resultMessage = parsedFacts.length > 0
+            ? `✅ 成功解析 ${parsedFacts.length} 条事实`
+            : '✅ 未发现相关事实';
+          sendSystemLog(resultMessage);
           return parsedFacts;
-        } else {
-          throw new Error('No valid responses found in the current attempt');
         }
 
+        // 如果没有有效响应，但还有重试机会
+        if (attempt < 2) {
+          throw new Error('未获得有效响应，准备重试');
+        }
+
+        // 最后一次尝试也失败了，返回空数组
+        sendSystemLog('ℹ️ 未能获取有效内容');
+        return [];
+
       } catch (error) {
-        console.error(`Attempt ${attempt + 1} failed:`, error);
-        sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : '停止重试'}`);
+        console.error(`第 ${attempt + 1} 次尝试失败:`, error.message);
+        sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : ''}`);
 
         if (attempt === 2) {
-          throw new Error('内容聚合失败，请重试或检查输入');
+          return [];
         }
       }
     }
+
+    return [];
   }
 
   async refineBatch(currentBatch, message, sendSystemLog) {
@@ -350,4 +404,20 @@ export default class ReferenceHandler {
     const suggestionContext = contextBuilder.join('');
     return `尽可能依托于如下参考信息：\n${suggestionContext}\n\n处理用户的请求：\n${message}`;
   }
+
+
+  async buildSearchResultsString(searchResults) {
+    let sb = '';
+    let fileNumber = 1;
+    searchResults.forEach(result => {
+      sb += `#### index ${fileNumber++} 标题 ： [${result.title}](${result.url})\n\n`;
+
+      sb += `${result.description}\n`;
+      if (result.date) {
+        sb += `${result.date}\n`;
+      }
+    });
+    return sb;
+  }
+
 }

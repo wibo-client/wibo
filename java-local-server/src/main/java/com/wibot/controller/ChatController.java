@@ -30,6 +30,7 @@ import com.wibot.controller.vo.SearchResult;
 import com.wibot.index.DocumentIndexInterface;
 import com.wibot.index.SearchDocumentResult;
 import com.wibot.index.analyzerKW.SearchEngineAnalyzer;
+import com.wibot.index.search.SearchQuery;
 import com.wibot.pathHandler.PathBasedIndexHandlerSelector;
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownBasedContentRepository;
@@ -111,7 +112,12 @@ public class ChatController {
         logger.info("Starting search for input: {}", input);
 
         DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(path);
-        List<SearchDocumentResult> documentPartList = documentIndexInterface.search(input, path, 20);
+        SearchQuery searchQuery = new SearchQuery();
+        searchQuery.setOriginalQuery(input);
+        searchQuery.setPathPrefix(path);
+        searchQuery.setTopN(20);
+
+        List<SearchDocumentResult> documentPartList = documentIndexInterface.searchWithStrategy(searchQuery);
         List<SearchResult> searchResults = processDocumentPartList(documentPartList, 10);
 
         logger.info("Search completed. Found {} results.", searchResults.size());
@@ -128,7 +134,13 @@ public class ChatController {
 
         String analyzerTokens = searchEngineAnalyzer.analyze(input);
         String tempSearchInput = analyzerTokens + " " + input;
-        List<SearchDocumentResult> documentPartList = documentIndexInterface.search(tempSearchInput, path, 100);
+
+        SearchQuery searchQuery = new SearchQuery();
+        searchQuery.setOriginalQuery(tempSearchInput);
+        searchQuery.setPathPrefix(path);
+        searchQuery.setTopN(20);
+
+        List<SearchDocumentResult> documentPartList = documentIndexInterface.searchWithStrategy(searchQuery);
         List<SearchDocumentResult> rerankedDocumentPartList = documentRerankInterface.rerank(documentPartList, input);
         List<SearchResult> searchResults = processDocumentPartList(rerankedDocumentPartList, 10);
 
@@ -191,7 +203,12 @@ public class ChatController {
             // 1. 搜索相关文档
             DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(path);
 
-            List<SearchDocumentResult> documentPartList = documentIndexInterface.search(input, path, 40);
+            SearchQuery searchQuery = new SearchQuery();
+            searchQuery.setOriginalQuery(input);
+            searchQuery.setPathPrefix(path);
+            searchQuery.setTopN(40);
+
+            List<SearchDocumentResult> documentPartList = documentIndexInterface.searchWithStrategy(searchQuery);
             List<SearchDocumentResult> rerankedDocumentPartList = documentRerankInterface.rerank(documentPartList,
                     input);
 

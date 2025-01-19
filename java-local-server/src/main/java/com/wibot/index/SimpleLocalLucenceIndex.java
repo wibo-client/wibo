@@ -8,9 +8,8 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.HashSet;
-import java.util.Set;
-
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer;
@@ -20,7 +19,8 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.TextField;
+import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexOptions;
@@ -32,8 +32,6 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.queryparser.xml.builders.DisjunctionMaxQueryBuilder;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
@@ -47,15 +45,11 @@ import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
-import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-// import com.wibot.index.analyzer.CompositeAnalyzer;
-import com.wibot.index.analyzerKW.SearchEngineAnalyzer;
 import com.wibot.index.search.SearchQuery;
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
@@ -67,6 +61,9 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.PrefixQuery;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
+import org.apache.lucene.document.LongPoint;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -96,31 +93,6 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private final List<Document> pendingDocuments = new ArrayList<>();
     private final Object commitLock = new Object();
-
-    // public SimpleLocalLucenceIndex(String configStr) {
-    // JSONObject configJson = new JSONObject(configStr);
-    // String indexDir = configJson.getString("indexDir");
-    // if (indexDir != null && !indexDir.isEmpty()) {
-    // INDEX_DIR = indexDir;
-    // }
-    // String maxSearch = configJson.getString("maxSearch");
-    // if (maxSearch != null && !maxSearch.isEmpty()) {
-    // MAX_SEARCH = Integer.parseInt(maxSearch);
-    // }
-
-    // try {
-    // directory = FSDirectory.open(Paths.get(INDEX_DIR));
-    // analyzer = new StandardAnalyzer();
-    // IndexWriterConfig config = new IndexWriterConfig(analyzer);
-    // config.setRAMBufferSizeMB(256.0); // 增加内存缓冲区大小
-    // config.setMaxBufferedDocs(1000); // 增加最大缓冲文档数
-    // config.setMergeScheduler(new ConcurrentMergeScheduler()); // 使用并发合并调度器
-    // indexWriter = new IndexWriter(directory, config);
-    // } catch (IOException e) {
-    // throw new RuntimeException("初始化索引失败", e);
-    // }
-    // startCommitScheduler();
-    // }
 
     @PostConstruct
     public void init() {
@@ -213,6 +185,17 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             logger.debug("Adding file path to index: {}", filePath);
             doc.add(new StringField("file_path", filePath, Field.Store.YES));
 
+            // 添加文档创建时间
+            Optional<DocumentDataPO> documentData = documentDataRepository.findById(Long.parseLong(docId));
+            if (documentData.isPresent()) {
+                LocalDateTime createTime = documentData.get().getCreateTime();
+                // 存储为毫秒时间戳用于排序
+                doc.add(new NumericDocValuesField("create_time",
+                        createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+                // 存储原始时间便于展示
+                doc.add(new StoredField("create_time_display", createTime.toString()));
+            }
+
             // 修改：使用组合分析器处理内容
             String cleanedContent = cleanText(content);
             logger.debug("Building index for content: {}", cleanedContent); // 添加日志
@@ -256,16 +239,6 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         }
     }
 
-    @Override
-    public List<SearchDocumentResult> search(String queryStr, String pathPrefix) {
-        try {
-            return search(queryStr, pathPrefix, MAX_SEARCH);
-        } catch (Exception e) {
-            logger.error("搜索失败: {}", queryStr, e);
-            return new ArrayList<>();
-        }
-    }
-
     /**
      * 删除索引中的文档根据ID
      *
@@ -279,16 +252,6 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         } catch (IOException e) {
             logger.error("删除文档 ID: {} 失败", id, e);
         }
-    }
-
-    @Override
-    public List<SearchDocumentResult> search(String query) {
-        return search(query, null, MAX_SEARCH);
-    }
-
-    @Override
-    public List<SearchDocumentResult> search(String query, int TopN) {
-        return search(query, null, TopN);
     }
 
     // 在同一文件中
@@ -459,15 +422,14 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
 
             DisjunctionMaxQuery dmq = new DisjunctionMaxQuery(dmqQueries, 0.1f); // 0.1为tie breaker
 
-            List<SearchDocumentResult> accumulatedResults = search(dmq, currentPathPrefix, searchTopN);
+            List<SearchDocumentResult> accumulatedResults = processSearchResults(dmq, searchQuery);
 
             // 如果还不够，用原始查询再补救一下，如果够了，就不不久了。
             if (accumulatedResults.size() < searchTopN && searchQuery.getOriginalQuery() != null
                     && !searchQuery.getOriginalQuery().isEmpty()) {
                 int remainingCount = searchTopN - accumulatedResults.size();
                 Query originalLuceneQuery = parseQuery(searchQuery.getOriginalQuery());
-                List<SearchDocumentResult> originalResults = search(originalLuceneQuery, currentPathPrefix,
-                        remainingCount);
+                List<SearchDocumentResult> originalResults = processSearchResults(originalLuceneQuery, searchQuery);
                 // 将内容补到remainCount个
                 for (SearchDocumentResult result : originalResults) {
                     if (accumulatedResults.size() >= searchTopN) {
@@ -478,26 +440,20 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             }
 
             return accumulatedResults;
-
         } catch (Exception e) {
             logger.error("多策略搜索失败", e);
             return new ArrayList<>();
         }
     }
 
-    // 添加辅助方法用于去重添加结果
-    private void addUniqueResults(List<SearchDocumentResult> accumulated, List<SearchDocumentResult> newResults,
-            Set<Long> foundIds) {
-        for (SearchDocumentResult result : newResults) {
-            if (foundIds.add(result.getId())) { // 如果ID不存在，则添加
-                accumulated.add(result);
-            }
-        }
-    }
-
-    // 添加一个新的重载方法用于处理 Query 对象的搜索
-    private List<SearchDocumentResult> search(Query query, String pathPrefix, int topN) throws IOException {
+    // 添加一个辅助方法来处理搜索结果
+    private List<SearchDocumentResult> processSearchResults(Query query, SearchQuery searchQuery)
+            throws IOException {
         // 确保 topN 大于 0
+        int topN = searchQuery.getTopN();
+
+        Sort sort = null;
+
         if (topN <= 0) {
             throw new IllegalArgumentException("topN must be greater than 0");
         }
@@ -506,77 +462,96 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             IndexSearcher searcher = new IndexSearcher(reader);
 
             // 如果有路径前缀，添加路径过滤
-            if (pathPrefix != null && !pathPrefix.isEmpty()) {
+            if (searchQuery.getPathPrefix() != null && !searchQuery.getPathPrefix().isEmpty()) {
                 BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
                 booleanQuery.add(query, BooleanClause.Occur.MUST);
-                booleanQuery.add(new PrefixQuery(new Term("file_path", pathPrefix)), BooleanClause.Occur.MUST);
+                booleanQuery.add(new PrefixQuery(new Term("file_path", searchQuery.getPathPrefix())),
+                        BooleanClause.Occur.MUST);
                 query = booleanQuery.build();
             }
 
-            // 执行搜索并处理结果
-            return processSearchResults(searcher, query, topN);
-        }
-    }
-
-    // 添加一个辅助方法来处理搜索结果
-    private List<SearchDocumentResult> processSearchResults(IndexSearcher searcher, Query query, int topN)
-            throws IOException {
-        TopDocs topDocs = searcher.search(query, topN);
-        List<SearchDocumentResult> results = new ArrayList<>();
-
-        // 设置高亮
-        SimpleHTMLFormatter formatter = new SimpleHTMLFormatter();
-        QueryScorer scorer = new QueryScorer(query);
-        Highlighter highlighter = new Highlighter(formatter, scorer);
-        highlighter.setTextFragmenter(new SimpleFragmenter(300));
-
-        int index = 0;
-        for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
-            Document doc = searcher.doc(scoreDoc.doc);
-
-            if (index == 0) {
-                logger.debug("First document ID: {}", doc.get("id"));
-                logger.debug("First document file path: {}", doc.get("file_path"));
-                logger.debug("First document content: {}", doc.get("content"));
+            LocalDateTime startTime = searchQuery.getStartTime();
+            LocalDateTime endTime = searchQuery.getEndTime();
+            if (startTime != null && endTime != null) {
+                BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
+                booleanQuery.add(query, BooleanClause.Occur.MUST);
+                long startTimestamp = startTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long endTimestamp = endTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                Query timeRangeQuery = LongPoint.newRangeQuery("create_time", startTimestamp, endTimestamp);
+                booleanQuery.add(timeRangeQuery, BooleanClause.Occur.MUST);
+                query = booleanQuery.build();
             }
 
-            SearchDocumentResult part = new SearchDocumentResult();
-            String idStr = doc.get("id");
-            if (idStr != null && !idStr.equals("null")) {
-                part.setId(Long.parseLong(idStr));
+            // 处理日期排序
+
+            if (searchQuery.getDateSort() != SearchQuery.SortOrder.NONE) {
+                boolean reverse = searchQuery.getDateSort() == SearchQuery.SortOrder.DESC;
+                sort = new Sort(new SortField("create_time", SortField.Type.LONG, reverse));
+            }
+
+            // 执行搜索
+            TopDocs topDocs;
+            if (sort != null) {
+                topDocs = searcher.search(query, topN, sort);
             } else {
-                logger.error("文档ID为空");
-                continue;
+                topDocs = searcher.search(query, topN);
             }
+            List<SearchDocumentResult> results = new ArrayList<>();
 
-            // 获取相关数据
-            Long documentId = part.getId();
-            Optional<MarkdownParagraphPO> markdownParagraph = markdownParagraphRepository.findById(documentId);
-            markdownParagraph.ifPresent(content -> {
-                Long documentDataId = content.getDocumentDataId();
-                Optional<DocumentDataPO> documentData = documentDataRepository.findById(documentDataId);
-                documentData.ifPresent(data -> {
-                    part.setTitle(data.getFilePath());
+            // 设置高亮
+            SimpleHTMLFormatter formatter = new SimpleHTMLFormatter();
+            QueryScorer scorer = new QueryScorer(query);
+            Highlighter highlighter = new Highlighter(formatter, scorer);
+            highlighter.setTextFragmenter(new SimpleFragmenter(300));
+
+            int index = 0;
+            for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+                Document doc = searcher.doc(scoreDoc.doc);
+
+                if (index == 0) {
+                    logger.debug("First document ID: {}", doc.get("id"));
+                    logger.debug("First document file path: {}", doc.get("file_path"));
+                    logger.debug("First document content: {}", doc.get("content"));
+                }
+
+                SearchDocumentResult part = new SearchDocumentResult();
+                String idStr = doc.get("id");
+                if (idStr != null && !idStr.equals("null")) {
+                    part.setId(Long.parseLong(idStr));
+                } else {
+                    logger.error("文档ID为空");
+                    continue;
+                }
+
+                // 获取相关数据
+                Long documentId = part.getId();
+                Optional<MarkdownParagraphPO> markdownParagraph = markdownParagraphRepository.findById(documentId);
+                markdownParagraph.ifPresent(content -> {
+                    Long documentDataId = content.getDocumentDataId();
+                    Optional<DocumentDataPO> documentData = documentDataRepository.findById(documentDataId);
+                    documentData.ifPresent(data -> {
+                        part.setTitle(data.getFilePath());
+                    });
+                    part.setMarkdownParagraph(content);
                 });
-                part.setMarkdownParagraph(content);
-            });
 
-            // 设置分数和高亮内容
-            part.setScore(scoreDoc.score);
-            String content = doc.get("content");
-            try {
-                String snippet = highlighter.getBestFragment(analyzer, "content", content);
-                part.setHighLightContentPart(snippet != null ? snippet : "No match found");
-            } catch (Exception e) {
-                logger.error("生成高亮片段失败", e);
-                part.setHighLightContentPart(content.substring(0, Math.min(content.length(), 300)));
+                // 设置分数和高亮内容
+                part.setScore(scoreDoc.score);
+                String content = doc.get("content");
+                try {
+                    String snippet = highlighter.getBestFragment(analyzer, "content", content);
+                    part.setHighLightContentPart(snippet != null ? snippet : "No match found");
+                } catch (Exception e) {
+                    logger.error("生成高亮片段失败", e);
+                    part.setHighLightContentPart(content.substring(0, Math.min(content.length(), 300)));
+                }
+
+                results.add(part);
+                index++;
             }
 
-            results.add(part);
-            index++;
+            return results;
         }
-
-        return results;
     }
 
     public boolean deleteIndex(String filePath) {
@@ -797,4 +772,5 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         }
         return suggestions;
     }
+
 }

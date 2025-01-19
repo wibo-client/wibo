@@ -175,7 +175,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
                 // 点击下一页
                 await Promise.all([
-                    page.waitForNavigation({ timeout: browserTimeout * 1000 }),
+                    // page.waitForNavigation({ timeout: browserTimeout * 300 }),
                     page.click(nextPageSelector)
                 ]);
 
@@ -191,7 +191,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 return true;
             } catch (error) {
                 retryCount++;
-                console.warn(`翻页失败 (${retryCount}/${maxRetries}):`, error.message);
+                console.warn(`翻页失败 (${retryCount}/${maxRetries}):`, error.message,error.stack);
 
                 if (error.message.includes('Node is detached')) {
                     // 对于节点分离错误，尝试刷新页面

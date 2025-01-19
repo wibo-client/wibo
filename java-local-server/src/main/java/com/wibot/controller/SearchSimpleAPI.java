@@ -8,10 +8,8 @@ import com.wibot.index.SimpleLocalLucenceIndex;
 import com.wibot.index.search.SearchQuery;
 import com.wibot.pathHandler.PathBasedIndexHandlerSelector;
 import com.wibot.persistence.DocumentDataRepository;
-import com.wibot.persistence.MarkdownBasedContentRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
 import com.wibot.persistence.entity.DocumentDataPO;
-import com.wibot.persistence.entity.MarkdownBasedContentPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,7 +61,12 @@ public class SearchSimpleAPI {
         int TopN = (int) searchParams.get("TopN");
 
         DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(pathPrefix);
-        List<SearchDocumentResult> results = documentIndexInterface.search(queryStr, pathPrefix, TopN);
+        SearchQuery searchQuery = new SearchQuery();
+        searchQuery.setOriginalQuery(queryStr);
+        searchQuery.setPathPrefix(pathPrefix);
+        searchQuery.setTopN(TopN);
+
+        List<SearchDocumentResult> results = documentIndexInterface.searchWithStrategy(searchQuery);
 
         return results.stream().map(item -> {
             Optional<DocumentDataPO> docData = documentDataRepository
@@ -128,15 +131,19 @@ public class SearchSimpleAPI {
     private SearchQuery buildSearchQuery(Map<String, Object> searchParams) {
         SearchQuery searchQuery = new SearchQuery();
         @SuppressWarnings("unchecked")
-        Map<String, List<String>> queryMap = (Map<String, List<String>>) searchParams.get("query");
+        Map<String, Object> queryMap = (Map<String, Object>) searchParams.get("query");
+        @SuppressWarnings("unchecked")
+        List<String> exactPhrases = queryMap != null ? (List<String>) queryMap.get("exactPhrases") : new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        List<String> requiredTerms = queryMap != null ? (List<String>) queryMap.get("requiredTerms")
+                : new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        List<String> optionalTerms = queryMap != null ? (List<String>) queryMap.get("optionalTerms")
+                : new ArrayList<>();
 
-        List<String> exactPhrases = queryMap != null ? queryMap.get("exactPhrases") : new ArrayList<>();
-        List<String> requiredTerms = queryMap != null ? queryMap.get("requiredTerms") : new ArrayList<>();
-        List<String> optionalTerms = queryMap != null ? queryMap.get("optionalTerms") : new ArrayList<>();
-
+        String originalQuery = queryMap != null ? String.valueOf(queryMap.get("originalQuery")) : "";
         String pathPrefix = (String) searchParams.get("pathPrefix");
 
-        String originalQuery = (String) searchParams.get("originalQuery");
         String topNStr = String.valueOf(searchParams.get("TopN"));
         Integer topN;
         try {
@@ -154,6 +161,12 @@ public class SearchSimpleAPI {
 
         if (topN != null) {
             searchQuery.setTopN(topN);
+        }
+
+        // 处理最近 N 天的参数
+        if (searchParams.containsKey("lastNDays")) {
+            int lastNDays = Integer.parseInt(String.valueOf(searchParams.get("lastNDays")));
+            searchQuery.setLastNDays(lastNDays);
         }
 
         return searchQuery;

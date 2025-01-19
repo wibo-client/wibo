@@ -136,18 +136,11 @@ app.whenReady().then(async () => {
       const selectedPlugin = await globalContext.pluginHandler.select(path);
       sendSystemLog(`✅ 已选择插件: ${path}`);
 
-      let pageFetchLimit = await globalContext.configHandler.getPageFetchLimit();
-      sendSystemLog(`ℹ️ 页面获取限制: ${pageFetchLimit}`);
-
 
 
       if (type === 'search') {
-        sendSystemLog('🔄 开始重写查询...');
-        const requeryResult = await selectedPlugin.rewriteQuery(message);
-        sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
-
-        const searchResults = await globalContext.referenceHandler.handleSearchResults(requeryResult, path, selectedPlugin, sendSystemLog);
-        const markdownResult = buildSearchResultsString(searchResults);
+        const searchResults = await globalContext.referenceHandler.handleSearchResults(message, path, selectedPlugin, sendSystemLog);
+        const markdownResult = await globalContext.referenceHandler.buildSearchResultsString(searchResults);
         event.sender.send('llm-stream', markdownResult, requestId);
         sendSystemLog('✅ 搜索完成');
 
@@ -206,36 +199,10 @@ app.whenReady().then(async () => {
 
         sendSystemLog('📚 添加参考文档...');
         event.sender.send('add-reference', referenceData, requestId);
-
+        sendSystemLog('✅ 搜索完成');
       } else if (type === 'searchAndChat') {
-        sendSystemLog('🔄 开始重写查询...');
-        const requeryResult = await selectedPlugin.rewriteQuery(message);
-        sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
-
-        let searchResults = [];
-        for (const query of requeryResult) {
-          sendSystemLog(query.queryLog);
-
-          const result = await selectedPlugin.search(query.query, path);
-          searchResults = searchResults.concat(result);
-
-          sendSystemLog(`📊 重排序搜索结果...`);
-          const rerankResult = await selectedPlugin.rerank(searchResults, message);
-
-          if (rerankResult.length >= pageFetchLimit) {
-            searchResults = rerankResult.slice(0, pageFetchLimit);
-            break;
-          } else {
-            searchResults = rerankResult;
-          }
-        }
-
-        sendSystemLog('📑 获取详细内容...');
-        const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
-        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
-
-        // 使用 ReferenceHandler 构建 prompt
-        const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);
+        const prompt = await globalContext.referenceHandler.handleLightSearchResults(message, path, selectedPlugin, sendSystemLog);
+        
         const messages = [{ role: 'user', content: prompt }];
 
         await globalContext.llmCaller.callAsync(messages, true, (chunk) => {
@@ -405,20 +372,6 @@ app.whenReady().then(async () => {
   app.on('quit', () => {
     console.log('App is quitting.');
   });
-
-  function buildSearchResultsString(searchResults) {
-    let sb = '';
-    let fileNumber = 1;
-    searchResults.forEach(result => {
-      sb += `#### index ${fileNumber++} 标题 ： [${result.title}](${result.url})\n\n`;
-
-      sb += `${result.description}\n`;
-      if (result.date) {
-        sb += `${result.date}\n`;
-      }
-    });
-    return sb;
-  }
 
   // 全局异常处理
   process.on('unhandledRejection', (reason, promise) => {
