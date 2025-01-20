@@ -126,7 +126,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
     console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
 
-    // 发送系统日志的辅助函数
+    // 发送系统日志的辅助函数·
     const sendSystemLog = (log) => {
       event.sender.send('system-log', log, requestId);
     };
@@ -136,27 +136,19 @@ app.whenReady().then(async () => {
       const selectedPlugin = await globalContext.pluginHandler.select(path);
       sendSystemLog(`✅ 已选择插件: ${path}`);
 
-
-
       if (type === 'search') {
         const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
-       
         const markdownResult = await globalContext.referenceHandler.buildSearchResultsString(searchResults);
         event.sender.send('llm-stream', markdownResult, requestId);
         sendSystemLog('✅ 搜索完成');
 
       } else if (type === 'highQuilityRAGChat') {
-
         const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
-        const detailsSearchResults =  await globalContext.referenceHandler.fetchDetails(searchResults,selectedPlugin,sendSystemLog);
+        const detailsSearchResults = await globalContext.referenceHandler.fetchDetails(searchResults, selectedPlugin, sendSystemLog);
         
-        //map 过程，尽可能收集所有的关键信息
         let parsedFacts = await globalContext.referenceHandler.extractKeyFacts(detailsSearchResults, message, sendSystemLog);
-
-        // reduce 过程 精炼 parsedFacts
         let refinedParsedFacts = await globalContext.referenceHandler.refineParsedFacts(parsedFacts, message, sendSystemLog);
 
-        // 合并所有事实内容
         const allFacts = refinedParsedFacts.fact;
         const finalPrompt = `请基于以下参考内容回答问题：
         参考内容：
@@ -164,40 +156,30 @@ app.whenReady().then(async () => {
         
         问题：${message}`;
 
-        // 直接发送最终总结
         await globalContext.llmCaller.callAsync(
           [{ role: 'user', content: finalPrompt }],
           true,
           (chunk) => event.sender.send('llm-stream', chunk, requestId)
         );
 
-        // 获取所有已被引用的 URLs
         const citedUrls = new Set(refinedParsedFacts.urls);
-
-        // 重新排序 searchResults，被引用的排在前面
         const sortedSearchResults = [...searchResults].sort((a, b) => {
           const aIsCited = citedUrls.has(a.realUrl);
           const bIsCited = citedUrls.has(b.realUrl);
-          return bIsCited - aIsCited; // 被引用的排在前面
+          return bIsCited - aIsCited;
         });
 
-        // 发送引用数据到渲染进程
-        const referenceData = {
-          fullContent: sortedSearchResults.map((doc, index) => ({
-            index: index + 1,
-            title: doc.title,
-            url: doc.realUrl,
-            date: doc.date,
-            description: doc.description.replace(/<\/?[^>]+(>|$)/g, "").replace(/<em>/g, "").replace(/<\/em>/g, ""),
-          })),
-          totalCount: searchResults.length
-        };
-
+        const referenceData = globalContext.referenceHandler.buildReferenceData(sortedSearchResults);
         sendSystemLog('📚 添加参考文档...');
         event.sender.send('add-reference', referenceData, requestId);
         sendSystemLog('✅ 搜索完成');
+
       } else if (type === 'searchAndChat') {
-        const {prompt,aggregatedContent} = await globalContext.referenceHandler.handleLightSearchResults(message, path, selectedPlugin, sendSystemLog);
+        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
+        sendSystemLog('📑 获取详细内容...');
+        const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
+        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
+        const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);
         
         const messages = [{ role: 'user', content: prompt }];
 
@@ -205,23 +187,7 @@ app.whenReady().then(async () => {
           event.sender.send('llm-stream', chunk, requestId);
         });
 
-        // 移除 DOM 操作相关代码，改为构建数据对象
-        const referenceData = {
-          fullContent: aggregatedContent.map((doc, index) => ({
-            index: index + 1,
-            title: doc.title,
-            url: doc.realUrl,
-            date: doc.date,
-            description: doc.description
-              .replace(/<\/?h[1-6][^>]*>/gi, "") // 去掉所有的 <h1> 到 <h6> 标签
-              .replace(/\n/g, " ") // 去掉所有的换行符
-              .replace(/<br\s*\/?>/gi, " ") // 去掉所有的 <br> 标签
-              .replace(/^#{1,6}\s+/gm, "") // 去掉所有的 # ## ### ....#####
-          })),
-          totalCount: aggregatedContent.length
-        };
-
-        // 发送引用数据到渲染进程
+        const referenceData = globalContext.referenceHandler.buildReferenceData(aggregatedContent);
         sendSystemLog('📚 添加参考文档...');
         event.sender.send('add-reference', referenceData, requestId);
 

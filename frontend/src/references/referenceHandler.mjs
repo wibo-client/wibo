@@ -9,6 +9,22 @@ export default class ReferenceHandler {
     this.globalContext = globalContext;
   }
 
+  buildReferenceData(aggregatedContent) {
+    return {
+      fullContent: aggregatedContent.map((doc, index) => ({
+        index: index + 1,
+        title: doc.title,
+        url: doc.realUrl,
+        date: doc.date,
+        description: doc.description
+          .replace(/<\/?h[1-6][^>]*>/gi, "") // 去掉所有的 <h1> 到 <h6> 标签
+          .replace(/\n/g, " ") // 去掉所有的换行符
+          .replace(/<br\s*\/?>/gi, " ") // 去掉所有的 <br> 标签
+          .replace(/^#{1,6}\s+/gm, "") // 去掉所有的 # ## ### ....#####
+      })),
+      totalCount: aggregatedContent.length
+    };
+  }
 
   async handleLightSearchResults(message, path, selectedPlugin, sendSystemLog) {
 
