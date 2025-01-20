@@ -16,11 +16,11 @@
 ## 百度的Rerwite 搞起来。 ok 
 ## [Object object]问题优化 ok
 
-## 预研：考虑减少包大小，主要是chrome的可行方法
-## 考虑日期问题 ，尤其是在local
+## 预研：考虑减少包大小，主要是chrome的可行方法 ok. need test
+
 ## 优先windows release
 ## 增加删除 聊天记录
-## 增加对日期的识别
+
 
 ## TODO 把extractKeyFacts 和 refineContent 移动到java端。提高性能
 ## 支持用 / *xxx的方式，来允许用户使用特定的文档全量做处理。
@@ -28,6 +28,8 @@
 
 V1.6.0
 ## 知乎搜索能力增强
+## 增加对日期的识别考虑日期问题 ，尤其是在local
+
 
 暂时不做了
 ## 本地优先作为 default 

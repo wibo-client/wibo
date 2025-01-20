@@ -27,29 +27,31 @@ export default class ReferenceHandler {
   }
 
 
-  async searchAndRerank(message, path, selectedPlugin, sendSystemLog) {
+  async searchAndRerank(message, path, requestContext) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
-
+    const searchType = requestContext.type;
+    const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
     const seenUrls = new Set();
     let searchResults = [];
 
-    sendSystemLog('🔄 开始重写查询...');
+    requestContext.sendSystemLog('🔄 开始重写查询...');
 
-    const requeryResult = await selectedPlugin.rewriteQuery(message);
+    const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
 
-    sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+    requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
 
+    const limitThisTurn = searchType === 'highQuilityRAGChat' ? searchItemNumbers : pageFetchLimit;
 
     for (const query of requeryResult) {
-      if (searchResults.length >= searchItemNumbers) {
-        sendSystemLog(`📊 已达到搜索结果数量限制: ${searchItemNumbers}`);
+      if (searchResults.length >= limitThisTurn) {
+        requestContext.sendSystemLog(`📊 已达到搜索结果数量限制: ${searchItemNumbers}`);
         break;
       }
 
       // 添加更友好的查询日志输出
-      sendSystemLog(query.queryLog);
+      requestContext.sendSystemLog(query.queryLog);
 
-      const result = await selectedPlugin.search(query.query, path);
+      const result = await requestContext.selectedPlugin.search(query.query, path);
       const rerankedResult = await this.globalContext.rerankImpl.rerank(result, query.query);
 
       // 去重并添加结果
@@ -58,37 +60,37 @@ export default class ReferenceHandler {
           seenUrls.add(item.id);
           searchResults.push(item);
 
-          if (searchResults.length >= searchItemNumbers) {
+          if (searchResults.length >= limitThisTurn) {
             break;
           }
         }
       }
     }
 
-    sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
+    requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
     return searchResults;
   }
 
-  async fetchDetails(searchResults, selectedPlugin, sendSystemLog) {
-    sendSystemLog('📑 获取详细内容...');
+  async fetchDetails(searchResults, path, requestContext) {
+    requestContext.sendSystemLog('📑 获取详细内容...');
     if (!searchResults || searchResults.length === 0) {
-      sendSystemLog('ℹ️ 未找到相关内容');
+      requestContext.sendSystemLog('ℹ️ 未找到相关内容');
       return [];
     }
-    const detailsSearchResults = await selectedPlugin.fetchAggregatedContent(searchResults);
-    sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
+    const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(searchResults);
+    requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
     return detailsSearchResults;
   }
 
 
-  async extractKeyFacts(detailsSearchResults, message, sendSystemLog) {
+  async extractKeyFacts(detailsSearchResults, message, requestContext) {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
 
         // 检查聚合内容是否为空
         if (!detailsSearchResults || detailsSearchResults.length === 0) {
-          sendSystemLog('ℹ️ 无法获取详细内容');
+          requestContext.sendSystemLog('ℹ️ 无法获取详细内容');
           return [];
         }
 
@@ -157,7 +159,7 @@ export default class ReferenceHandler {
           } else {
             const jsonPrompt = createJsonPrompt(todoTasksRef, message);
             tasks.push(async () => {
-              sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
+              requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
               let groupAnswer;
               for (let i = 0; i < 3; i++) {
                 try {
@@ -172,9 +174,9 @@ export default class ReferenceHandler {
               }
               if (groupAnswer) {
                 groupAnswers.push(groupAnswer.join(''));
-                sendSystemLog('✅ 内容分析完成');
+                requestContext.sendSystemLog('✅ 内容分析完成');
               } else {
-                sendSystemLog('❌ 内容分析失败');
+                requestContext.sendSystemLog('❌ 内容分析失败');
 
               }
             });
@@ -190,7 +192,7 @@ export default class ReferenceHandler {
         if (todoTasksRef.length > 0) {
           const jsonPrompt = createJsonPrompt(todoTasksRef, message);
           tasks.push(async () => {
-            sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
+            requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
             let groupAnswer;
             for (let i = 0; i < 3; i++) {
               try {
@@ -205,9 +207,9 @@ export default class ReferenceHandler {
             }
             if (groupAnswer) {
               groupAnswers.push(groupAnswer.join(''));
-              sendSystemLog('✅ 内容分析完成');
+              requestContext.sendSystemLog('✅ 内容分析完成');
             } else {
-              sendSystemLog('❌ 内容分析失败,一般是因为模型返回不符合预期');
+              requestContext.sendSystemLog('❌ 内容分析失败,一般是因为模型返回不符合预期');
               console.error('Error in LLM call attempt:', groupAnswer);
             }
           });
@@ -261,7 +263,7 @@ export default class ReferenceHandler {
           const resultMessage = parsedFacts.length > 0
             ? `✅ 成功解析 ${parsedFacts.length} 条事实`
             : '✅ 未发现相关事实';
-          sendSystemLog(resultMessage);
+          requestContext.sendSystemLog(resultMessage);
           return parsedFacts;
         }
 
@@ -271,12 +273,12 @@ export default class ReferenceHandler {
         }
 
         // 最后一次尝试也失败了，返回空数组
-        sendSystemLog('ℹ️ 未能获取有效内容');
+        requestContext.sendSystemLog('ℹ️ 未能获取有效内容');
         return [];
 
       } catch (error) {
         console.error(`第 ${attempt + 1} 次尝试失败:`, error.message);
-        sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : ''}`);
+        requestContext.sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : ''}`);
 
         if (attempt === 2) {
           return [];
@@ -287,11 +289,11 @@ export default class ReferenceHandler {
     return [];
   }
 
-  async refineBatch(currentBatch, message, sendSystemLog) {
+  async refineBatch(currentBatch, message, requestContext) {
     const batchContent = currentBatch.join('\n\n--- 分割线 ---\n\n');
     const prompt = `请基于以下内容进行精炼，保留所有重要信息，消除重复内容，保持逻辑连贯。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n${batchContent}\n\n请基于以上内容，回答问题：${message}`;
 
-    sendSystemLog(`🔄 正在精炼内容...`);
+    requestContext.sendSystemLog(`🔄 正在精炼内容...`);
     let refinedAnswer;
     for (let j = 0; j < 3; j++) {
       try {
@@ -303,17 +305,17 @@ export default class ReferenceHandler {
     }
 
     if (refinedAnswer) {
-      sendSystemLog('✅ 内容精炼完成');
+      requestContext.sendSystemLog('✅ 内容精炼完成');
       // 确保返回数组形式
       const result = refinedAnswer.join('').split('\n\n--- 分割线 ---\n\n');
       return Array.isArray(result) ? result : [result];
     } else {
-      sendSystemLog('❌ 内容精炼失败');
+      requestContext.sendSystemLog('❌ 内容精炼失败');
       return null;
     }
   }
 
-  async refineParsedFacts(parsedFacts, message, sendSystemLog) {
+  async refineParsedFacts(parsedFacts, message, requestContext) {
     // 1. 提取所有 URL，并保持原始顺序
     const allUrls = Array.from(new Set(
       parsedFacts.flatMap(fact => fact.urls)
@@ -347,7 +349,7 @@ export default class ReferenceHandler {
         if (currentBatch.join(' ').length + content.length <= this.MAX_CONTENT_SIZE) {
           currentBatch.push(content);
         } else {
-          const refinedBatch = await this.refineBatch(currentBatch, message, sendSystemLog);
+          const refinedBatch = await this.refineBatch(currentBatch, message, requestContext);
           if (refinedBatch === null) {
             break;
           }
@@ -358,7 +360,7 @@ export default class ReferenceHandler {
 
       // 处理剩余的批次
       if (currentBatch.length > 0) {
-        const refinedBatch = await this.refineBatch(currentBatch, message, sendSystemLog);
+        const refinedBatch = await this.refineBatch(currentBatch, message, requestContext);
         if (refinedBatch !== null) {
           newRefinedContent = newRefinedContent.concat(refinedBatch);
         }
@@ -420,7 +422,7 @@ export default class ReferenceHandler {
     return sb;
   }
 
-  // async callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream) {
+  // async callLLMRemoteAsync(messages, requestContext, sendLLMStream) {
   //   try {
   //     const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
   //     if (!serverInfo.isHealthy || !serverInfo.port) {
@@ -444,7 +446,7 @@ export default class ReferenceHandler {
 
   //     if (!response.ok) {
   //       if (response.status === 401) {
-  //         sendSystemLog('❌ 未授权：请在管理界面中输入API密钥');
+  //         requestContext.sendSystemLog('❌ 未授权：请在管理界面中输入API密钥');
   //         throw new Error('Unauthorized: 请在管理界面中输入API密钥');
   //       }
   //       throw new Error(`HTTP error! status: ${response.status}`);
@@ -494,7 +496,7 @@ export default class ReferenceHandler {
 
   //   } catch (error) {
   //     console.error('Remote LLM call failed:', error);
-  //     sendSystemLog(`❌ 错误: ${error.message}`);
+  //     requestContext.sendSystemLog(`❌ 错误: ${error.message}`);
   //     throw error;
   //   }
   // }

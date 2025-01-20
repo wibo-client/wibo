@@ -154,23 +154,38 @@ app.whenReady().then(async () => {
       event.sender.send('llm-stream', markdownResult, requestId);
     };
 
+    // 发送参考文档的辅助函数
+    const sendReference = (referenceData) => {
+      event.sender.send('add-reference', referenceData, requestId);
+    };
+
+    const requestContext = {
+      requestId,
+      type,
+      sendSystemLog,
+      sendLLMStream,
+      sendReference,
+      results: {}
+    };
+
     try {
       sendSystemLog('🔍 正在选择合适的插件...');
       const selectedPlugin = await globalContext.pluginHandler.select(path);
+      requestContext.selectedPlugin = selectedPlugin;
       sendSystemLog(`✅ 已选择插件: ${path}`);
 
       if (type === 'search') {
-        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
+        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
         const markdownResult = await globalContext.referenceHandler.buildSearchResultsString(searchResults);
         sendLLMStream(markdownResult);
         sendSystemLog('✅ 搜索完成');
 
       } else if (type === 'highQuilityRAGChat') {
-        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
-        const detailsSearchResults = await globalContext.referenceHandler.fetchDetails(searchResults, selectedPlugin, sendSystemLog);
+        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
+        const detailsSearchResults = await globalContext.referenceHandler.fetchDetails(searchResults, path, requestContext);
 
-        let parsedFacts = await globalContext.referenceHandler.extractKeyFacts(detailsSearchResults, message, sendSystemLog);
-        let refinedParsedFacts = await globalContext.referenceHandler.refineParsedFacts(parsedFacts, message, sendSystemLog);
+        let parsedFacts = await globalContext.referenceHandler.extractKeyFacts(detailsSearchResults, message, requestContext);
+        let refinedParsedFacts = await globalContext.referenceHandler.refineParsedFacts(parsedFacts, message, requestContext);
 
         const allFacts = refinedParsedFacts.fact;
         const finalPrompt = `请基于以下参考内容回答问题：
@@ -181,8 +196,8 @@ app.whenReady().then(async () => {
 
         await callLLMAsync(
           [{ role: 'user', content: finalPrompt }],
-          sendSystemLog,
-          sendLLMStream
+          requestContext.sendSystemLog,
+          requestContext.sendLLMStream
         );
 
         const citedUrls = new Set(refinedParsedFacts.urls);
@@ -193,12 +208,11 @@ app.whenReady().then(async () => {
         });
 
         const referenceData = globalContext.referenceHandler.buildReferenceData(sortedSearchResults);
-        sendSystemLog('📚 添加参考文档...');
-        event.sender.send('add-reference', referenceData, requestId);
+        sendReference(referenceData);
         sendSystemLog('✅ 搜索完成');
 
       } else if (type === 'searchAndChat') {
-        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
+        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
         sendSystemLog('📑 获取详细内容...');
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
         sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
@@ -206,18 +220,17 @@ app.whenReady().then(async () => {
 
         const messages = [{ role: 'user', content: prompt }];
 
-        await callLLMAsync(messages, sendSystemLog, sendLLMStream);
+        await callLLMAsync(messages, requestContext.sendSystemLog, requestContext.sendLLMStream);
 
         const referenceData = globalContext.referenceHandler.buildReferenceData(aggregatedContent);
-        sendSystemLog('📚 添加参考文档...');
-        event.sender.send('add-reference', referenceData, requestId);
+        sendReference(referenceData);
 
       } else if (type === 'chat') {
         sendSystemLog('💬 启动直接对话模式...');
         await callLLMAsync(
           [{ role: 'user', content: message }],
-          sendSystemLog,
-          sendLLMStream
+          requestContext.sendSystemLog,
+          requestContext.sendLLMStream
         );
         sendSystemLog('✅ 对话完成');
       }
