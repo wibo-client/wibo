@@ -67,7 +67,7 @@ public class SingletonLLMChat {
 
     @Scheduled(fixedRate = 10000) // 每20秒执行一次
     public synchronized void resetConfig() {
-        logger.info("Resetting LLM chat configuration");
+        logger.debug("Resetting LLM chat configuration");
         this.inited = false;
     }
 

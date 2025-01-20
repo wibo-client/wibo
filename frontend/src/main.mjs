@@ -51,7 +51,7 @@ async function init() {
   await pluginHandler.init(globalContext);
   await contentCrawler.init(globalContext);
   await referenceHandler.init(globalContext);
-
+  await localServerManager.init(globalContext);
   mainWindow = new MainWindow();
   mainWindow.init();
   mainWindow.create();
@@ -123,6 +123,19 @@ app.whenReady().then(async () => {
     }
   });
 
+  async function callLLMAsync(messages, event, requestId, sendSystemLog) {
+    try {
+      const serverInfo = await globalContext.localServerManager.getCurrentServerInfo();
+      if (!serverInfo.isHealthy || !serverInfo.port) {
+        throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
+      }
+      await globalContext.referenceHandler.callLLMRemoteAsync(messages, event, requestId, sendSystemLog);
+    } catch (error) {
+      console.error('LLM call failed:', error);
+      throw error;
+    }
+  }
+
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
     console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
 
@@ -145,7 +158,7 @@ app.whenReady().then(async () => {
       } else if (type === 'highQuilityRAGChat') {
         const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, selectedPlugin, sendSystemLog);
         const detailsSearchResults = await globalContext.referenceHandler.fetchDetails(searchResults, selectedPlugin, sendSystemLog);
-        
+
         let parsedFacts = await globalContext.referenceHandler.extractKeyFacts(detailsSearchResults, message, sendSystemLog);
         let refinedParsedFacts = await globalContext.referenceHandler.refineParsedFacts(parsedFacts, message, sendSystemLog);
 
@@ -156,10 +169,11 @@ app.whenReady().then(async () => {
         
         问题：${message}`;
 
-        await globalContext.llmCaller.callAsync(
+        await callLLMAsync(
           [{ role: 'user', content: finalPrompt }],
-          true,
-          (chunk) => event.sender.send('llm-stream', chunk, requestId)
+          event,
+          requestId,
+          sendSystemLog
         );
 
         const citedUrls = new Set(refinedParsedFacts.urls);
@@ -180,12 +194,10 @@ app.whenReady().then(async () => {
         const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
         sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
         const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);
-        
+
         const messages = [{ role: 'user', content: prompt }];
 
-        await globalContext.llmCaller.callAsync(messages, true, (chunk) => {
-          event.sender.send('llm-stream', chunk, requestId);
-        });
+        await callLLMAsync(messages, event, requestId, sendSystemLog);
 
         const referenceData = globalContext.referenceHandler.buildReferenceData(aggregatedContent);
         sendSystemLog('📚 添加参考文档...');
@@ -193,10 +205,11 @@ app.whenReady().then(async () => {
 
       } else if (type === 'chat') {
         sendSystemLog('💬 启动直接对话模式...');
-        await globalContext.llmCaller.callAsync(
+        await callLLMAsync(
           [{ role: 'user', content: message }],
-          true,
-          (chunk) => event.sender.send('llm-stream', chunk, requestId)
+          event,
+          requestId,
+          sendSystemLog
         );
         sendSystemLog('✅ 对话完成');
       }

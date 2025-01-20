@@ -8,6 +8,4 @@ import java.util.Optional;
 @Repository
 public interface SystemConfigRepository extends JpaRepository<SystemConfigPO, Long> {
     Optional<SystemConfigPO> findByConfigKey(String configKey);
-
-    void deleteByConfigKey(String configKey);
 }

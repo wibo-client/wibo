@@ -48,6 +48,10 @@ export default class LocalServerManager {
         this.initializePaths(); // 在构造函数中调用合并后的初始化方法
     }
 
+    async init(globalContext) {
+        this.globalContext = globalContext;
+    }
+
     // 新增：获取 desiredState 方法
     getDesiredState() {
         return this.store.get('serverDesiredState', false);
@@ -128,6 +132,8 @@ export default class LocalServerManager {
                         pid: 0  // 调试模式下不需要真实PID
                     });
                 }
+                // 如果健康检查成功，同步AK
+                await this.syncApiKey(this.portForDebug);
             } catch (e) {
                 processExists = false;
             }
@@ -135,6 +141,10 @@ export default class LocalServerManager {
             try {
                 process.kill(savedProcess.pid, 0);
                 processExists = await this.checkHealth(savedProcess.port);
+                // 如果健康检查成功，同步AK
+                if (processExists) {
+                    await this.syncApiKey(savedProcess.port);
+                }
             } catch (e) {
                 processExists = false;
             }
@@ -624,6 +634,34 @@ export default class LocalServerManager {
             logger.info('[LocalServer] Server stopped');
         } catch (error) {
             logger.error('[LocalServer] Stop error:', error);
+        }
+    }
+
+    // 新增：同步API密钥的方法
+    async syncApiKey(port) {
+        try {
+            const apiKey = await this.globalContext.configHandler.getModelSK();
+            if (!apiKey) {
+                console.log('No API key available to sync');
+                return;
+            }
+
+            const response = await fetch(`http://localhost:${port}/admin/save-ak`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ak: apiKey })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            //console.log('Successfully synced API key with Java server');
+        } catch (error) {
+            console.error('Failed to sync API key:', error);
+            // 不抛出错误，因为这是辅助功能
         }
     }
 }

@@ -35,7 +35,7 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
         let attempts = 0;
         while (attempts < 3) {
             try {
-                const response = await this.llmCall.callAsync(messages);
+                const response = await this.llmCall.callSync(messages);
                 console.info("Received JSON result from LLM:", response[0]);
 
                 const jsonString = JsonUtils.extractJsonFromResponse(response[0]);

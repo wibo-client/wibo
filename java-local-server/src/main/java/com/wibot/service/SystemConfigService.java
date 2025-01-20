@@ -8,6 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -78,28 +81,33 @@ public class SystemConfigService {
      * @param key   配置键
      * @param value 配置值(任意对象，将被转换为JSON)
      */
+    @Transactional
     public void saveConfig(String key, Object value) {
         try {
-            String jsonValue = objectMapper.writeValueAsString(value);
+            // 先查询是否存在
             Optional<SystemConfigPO> existingConfig = configRepository.findByConfigKey(key);
-
+            
             if (existingConfig.isPresent()) {
+                // 如果存在，更新现有记录
                 SystemConfigPO config = existingConfig.get();
-                config.setConfigValue(jsonValue);
+                config.setConfigValue(String.valueOf(value));
+                config.setUpdatedAt(LocalDateTime.now());
                 configRepository.save(config);
             } else {
+                // 如果不存在，创建新记录
                 SystemConfigPO config = new SystemConfigPO();
                 config.setConfigKey(key);
-                config.setConfigValue(jsonValue);
+                config.setConfigValue(String.valueOf(value));
+                config.setCreatedAt(LocalDateTime.now());
+                config.setUpdatedAt(LocalDateTime.now());
                 configRepository.save(config);
             }
             
             // 保存时清除所有缓存
             configCache.clear();
             lastClearTime = System.currentTimeMillis();
-        } catch (JsonProcessingException e) {
-            logger.error("Error saving config: {} ", key, e);
-            throw new RuntimeException("配置保存失败", e);
+        } catch (Exception e) {
+            throw new RuntimeException("保存配置失败: " + key, e);
         }
     }
 
@@ -126,15 +134,51 @@ public class SystemConfigService {
         Optional<SystemConfigPO> config = configRepository.findByConfigKey(key);
         if (config.isPresent()) {
             try {
-                T value = objectMapper.readValue(config.get().getConfigValue(), clazz);
+                String configValue = config.get().getConfigValue();
+                T value;
+                
+                // 如果是String类型，直接返回
+                if (clazz == String.class) {
+                    @SuppressWarnings("unchecked")
+                    T stringValue = (T) configValue;
+                    value = stringValue;
+                } else {
+                    // 对于非String类型，尝试JSON解析
+                    try {
+                        value = objectMapper.readValue(configValue, clazz);
+                    } catch (JsonProcessingException e) {
+                        // 如果JSON解析失败，尝试直接转换
+                        value = convertValue(configValue, clazz);
+                    }
+                }
+                
                 configCache.put(cacheKey, new CacheEntry(value));
                 return value;
-            } catch (JsonProcessingException e) {
+            } catch (Exception e) {
                 logger.error("Error reading config: {} ", key, e);
                 return defaultValue;
             }
         }
         return defaultValue;
+    }
+
+    /**
+     * 转换简单类型的值
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T convertValue(String value, Class<T> clazz) {
+        if (clazz == Boolean.class) {
+            return (T) Boolean.valueOf(value);
+        } else if (clazz == Integer.class) {
+            return (T) Integer.valueOf(value);
+        } else if (clazz == Long.class) {
+            return (T) Long.valueOf(value);
+        } else if (clazz == Double.class) {
+            return (T) Double.valueOf(value);
+        } else if (clazz == Float.class) {
+            return (T) Float.valueOf(value);
+        }
+        throw new IllegalArgumentException("Unsupported type conversion for: " + clazz);
     }
 
     /**
@@ -181,14 +225,14 @@ public class SystemConfigService {
         return getConfig(key, Boolean.class, defaultValue);
     }
 
-    /**
-     * 删除配置
-     * 
-     * @param key 配置键
-     */
-    public void deleteConfig(String key) {
-        configRepository.deleteByConfigKey(key);
-    }
+    // /**
+    //  * 删除配置
+    //  * 
+    //  * @param key 配置键
+    //  */
+    // public void deleteConfig(String key) {
+    //     configRepository.deleteByConfigKey(key);
+    // }
 
     /**
      * 获取所有配置
