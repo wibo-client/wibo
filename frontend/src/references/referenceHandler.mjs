@@ -26,41 +26,6 @@ export default class ReferenceHandler {
     };
   }
 
-  async handleLightSearchResults(message, path, selectedPlugin, sendSystemLog) {
-
-    sendSystemLog('🔄 开始重写查询...');
-    const requeryResult = await selectedPlugin.rewriteQuery(message);
-    sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
-
-    let searchResults = [];
-    for (const query of requeryResult) {
-      sendSystemLog(query.queryLog);
-
-      const result = await selectedPlugin.search(query.query, path);
-      searchResults = searchResults.concat(result);
-
-      sendSystemLog(`📊 重排序搜索结果...`);
-      const rerankResult = await selectedPlugin.rerank(searchResults, message);
-      const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
-      if (rerankResult.length >= pageFetchLimit) {
-        searchResults = rerankResult.slice(0, pageFetchLimit);
-        break;
-      } else {
-        searchResults = rerankResult;
-      }
-    }
-
-    sendSystemLog('📑 获取详细内容...');
-    const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
-    sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
-
-    // 使用 ReferenceHandler 构建 prompt
-    const prompt = await this.buildPromptFromContent(aggregatedContent, message);
-    return {
-      prompt: prompt,
-      aggregatedContent: aggregatedContent
-    };
-  }
 
   async searchAndRerank(message, path, selectedPlugin, sendSystemLog) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
@@ -455,7 +420,7 @@ export default class ReferenceHandler {
     return sb;
   }
 
-  async callLLMRemoteAsync(messages, event, requestId, sendSystemLog) {
+  async callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream) {
     try {
       const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
       if (!serverInfo.isHealthy || !serverInfo.port) {
@@ -498,7 +463,7 @@ export default class ReferenceHandler {
           if (receiveBuffer.length > 0) {
             const finalData = this.processStreamBuffer(receiveBuffer);
             if (finalData) {
-              event.sender.send('llm-stream', finalData, requestId);
+              sendLLMStream(finalData);
             }
           }
           break;
@@ -523,7 +488,7 @@ export default class ReferenceHandler {
         // 处理当前累积的缓冲区
         const data = this.processStreamBuffer(lastAvailableChunk);
         if (data) {
-          event.sender.send('llm-stream', data, requestId);
+          sendLLMStream(data);
         }
       }
 
