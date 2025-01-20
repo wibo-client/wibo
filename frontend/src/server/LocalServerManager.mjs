@@ -639,29 +639,29 @@ export default class LocalServerManager {
 
     // 新增：同步API密钥的方法
     async syncApiKey(port) {
-        try {
-            const apiKey = await this.globalContext.configHandler.getModelSK();
-            if (!apiKey) {
-                console.log('No API key available to sync');
-                return;
-            }
+        // try {
+        //     const apiKey = await this.globalContext.configHandler.getModelSK();
+        //     if (!apiKey) {
+        //         console.log('No API key available to sync');
+        //         return;
+        //     }
 
-            const response = await fetch(`http://localhost:${port}/admin/save-ak`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ ak: apiKey })
-            });
+        //     const response = await fetch(`http://localhost:${port}/admin/save-ak`, {
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //         },
+        //         body: JSON.stringify({ ak: apiKey })
+        //     });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+        //     if (!response.ok) {
+        //         throw new Error(`HTTP error! status: ${response.status}`);
+        //     }
 
-            //console.log('Successfully synced API key with Java server');
-        } catch (error) {
-            console.error('Failed to sync API key:', error);
-            // 不抛出错误，因为这是辅助功能
-        }
+        //     //console.log('Successfully synced API key with Java server');
+        // } catch (error) {
+        //     console.error('Failed to sync API key:', error);
+        //     // 不抛出错误，因为这是辅助功能
+        // }
     }
 }

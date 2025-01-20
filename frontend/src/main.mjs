@@ -124,16 +124,21 @@ app.whenReady().then(async () => {
   });
 
   async function callLLMAsync(messages, sendSystemLog, sendLLMStream) {
-    try {
-      const serverInfo = await globalContext.localServerManager.getCurrentServerInfo();
-      if (!serverInfo.isHealthy || !serverInfo.port) {
-        throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
-      }
-      await globalContext.referenceHandler.callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream);
-    } catch (error) {
-      console.error('LLM call failed:', error);
-      throw error;
-    }
+
+    await globalContext.llmCaller.callAsync(messages,
+      true,
+      (chunk) => sendLLMStream(chunk)
+    );
+    // try {
+    //   const serverInfo = await globalContext.localServerManager.getCurrentServerInfo();
+    //   if (!serverInfo.isHealthy || !serverInfo.port) {
+    //     throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
+    //   }
+    //   await globalContext.referenceHandler.callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream);
+    // } catch (error) {
+    //   console.error('LLM call failed:', error);
+    //   throw error;
+    // }
   }
 
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {

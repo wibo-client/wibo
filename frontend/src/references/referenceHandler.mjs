@@ -161,7 +161,7 @@ export default class ReferenceHandler {
               let groupAnswer;
               for (let i = 0; i < 3; i++) {
                 try {
-                  groupAnswer = await this.callLLMRemoteSync([{
+                  groupAnswer = await this.globalContext.llmCaller.callSync([{
                     role: 'user',
                     content: JSON.stringify(jsonPrompt, null, 2)
                   }]);
@@ -194,7 +194,7 @@ export default class ReferenceHandler {
             let groupAnswer;
             for (let i = 0; i < 3; i++) {
               try {
-                groupAnswer = await this.callLLMRemoteSync([{
+                groupAnswer = await this.globalContext.llmCaller.callSync([{
                   role: 'user',
                   content: JSON.stringify(jsonPrompt, null, 2)
                 }]);
@@ -420,126 +420,126 @@ export default class ReferenceHandler {
     return sb;
   }
 
-  async callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream) {
-    try {
-      const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
-      if (!serverInfo.isHealthy || !serverInfo.port) {
-        throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
-      }
+  // async callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream) {
+  //   try {
+  //     const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
+  //     if (!serverInfo.isHealthy || !serverInfo.port) {
+  //       throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
+  //     }
 
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role || 'user',
-        content: msg.content
-      }));
+  //     const formattedMessages = messages.map(msg => ({
+  //       role: msg.role || 'user',
+  //       content: msg.content
+  //     }));
 
-      const response = await fetch(`http://localhost:${serverInfo.port}/chat/streamCall`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: formattedMessages
-        })
-      });
+  //     const response = await fetch(`http://localhost:${serverInfo.port}/chat/streamCall`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //         messages: formattedMessages
+  //       })
+  //     });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          sendSystemLog('❌ 未授权：请在管理界面中输入API密钥');
-          throw new Error('Unauthorized: 请在管理界面中输入API密钥');
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       if (response.status === 401) {
+  //         sendSystemLog('❌ 未授权：请在管理界面中输入API密钥');
+  //         throw new Error('Unauthorized: 请在管理界面中输入API密钥');
+  //       }
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let receiveBuffer = [];
-      let lastAvailableChunk = [];
+  //     const reader = response.body.getReader();
+  //     const decoder = new TextDecoder();
+  //     let receiveBuffer = [];
+  //     let lastAvailableChunk = [];
 
-      while (true) {
-        const { done, value } = await reader.read();
+  //     while (true) {
+  //       const { done, value } = await reader.read();
 
-        if (done) {
-          // 处理最后的缓冲区数据
-          if (receiveBuffer.length > 0) {
-            const finalData = this.processStreamBuffer(receiveBuffer);
-            if (finalData) {
-              sendLLMStream(finalData);
-            }
-          }
-          break;
-        }
+  //       if (done) {
+  //         // 处理最后的缓冲区数据
+  //         if (receiveBuffer.length > 0) {
+  //           const finalData = this.processStreamBuffer(receiveBuffer);
+  //           if (finalData) {
+  //             sendLLMStream(finalData);
+  //           }
+  //         }
+  //         break;
+  //       }
 
-        const chunk = decoder.decode(value, { stream: false });
-        const lines = chunk.split('\n');
+  //       const chunk = decoder.decode(value, { stream: false });
+  //       const lines = chunk.split('\n');
 
-        for (const line of lines) {
-          if (line.trim() === '') {
-            receiveBuffer = [];
-            continue;
-          } else {
-            lastAvailableChunk = receiveBuffer;
-          }
+  //       for (const line of lines) {
+  //         if (line.trim() === '') {
+  //           receiveBuffer = [];
+  //           continue;
+  //         } else {
+  //           lastAvailableChunk = receiveBuffer;
+  //         }
 
-          if (line.startsWith('data:')) {
-            receiveBuffer.push(line);
-          }
-        }
+  //         if (line.startsWith('data:')) {
+  //           receiveBuffer.push(line);
+  //         }
+  //       }
 
-        // 处理当前累积的缓冲区
-        const data = this.processStreamBuffer(lastAvailableChunk);
-        if (data) {
-          sendLLMStream(data);
-        }
-      }
+  //       // 处理当前累积的缓冲区
+  //       const data = this.processStreamBuffer(lastAvailableChunk);
+  //       if (data) {
+  //         sendLLMStream(data);
+  //       }
+  //     }
 
-    } catch (error) {
-      console.error('Remote LLM call failed:', error);
-      sendSystemLog(`❌ 错误: ${error.message}`);
-      throw error;
-    }
-  }
+  //   } catch (error) {
+  //     console.error('Remote LLM call failed:', error);
+  //     sendSystemLog(`❌ 错误: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
-  // 将 processStreamBuffer 改为类方法
-  processStreamBuffer(buffer) {
-    if (!buffer || buffer.length === 0) return null;
+  // // 将 processStreamBuffer 改为类方法
+  // processStreamBuffer(buffer) {
+  //   if (!buffer || buffer.length === 0) return null;
 
-    return buffer
-      .map(line => line.replace('data:', '').trim())
-      .join('\n');
-  }
+  //   return buffer
+  //     .map(line => line.replace('data:', '').trim())
+  //     .join('\n');
+  // }
 
-  async callLLMRemoteSync(messages) {
-    try {
-      const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
-      if (!serverInfo.isHealthy || !serverInfo.port) {
-        throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
-      }
+  // async callLLMRemoteSync(messages) {
+  //   try {
+  //     const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
+  //     if (!serverInfo.isHealthy || !serverInfo.port) {
+  //       throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
+  //     }
 
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role || 'user',
-        content: msg.content
-      }));
+  //     const formattedMessages = messages.map(msg => ({
+  //       role: msg.role || 'user',
+  //       content: msg.content
+  //     }));
 
-      const response = await fetch(`http://localhost:${serverInfo.port}/chat/syncCall`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: formattedMessages
-        })
-      });
+  //     const response = await fetch(`http://localhost:${serverInfo.port}/chat/syncCall`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //         messages: formattedMessages
+  //       })
+  //     });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
 
-      const result = await response.text();
-      return [result]; // 保持与原有 callSync 返回格式一致
-    } catch (error) {
-      console.error('Remote LLM sync call failed:', error);
-      throw error;
-    }
-  }
+  //     const result = await response.text();
+  //     return [result]; // 保持与原有 callSync 返回格式一致
+  //   } catch (error) {
+  //     console.error('Remote LLM sync call failed:', error);
+  //     throw error;
+  //   }
+  // }
 
 }

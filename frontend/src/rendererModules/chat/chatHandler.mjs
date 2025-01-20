@@ -54,7 +54,7 @@ export default class ChatHandler {
       const currentScrollTop = feedbackBox.scrollTop;
 
       // 检测是否向上滚动到接近顶部
-      if (currentScrollTop < lastScrollTop && currentScrollTop < 100 && !this.loadingHistory) {
+      if (currentScrollTop < lastScrollTop && currentScrollTop < 0 && !this.loadingHistory) {
         await this.loadMoreHistory(feedbackBox);
       }
 
@@ -511,7 +511,7 @@ export default class ChatHandler {
       const requestContext = {
         requestId, // 传递生成的 UUID
         onChunk: (chunk) => {
-          wholeMessage = chunk;
+          wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);
 
           // 为 WIBO 消息中的链接添加点击处理
