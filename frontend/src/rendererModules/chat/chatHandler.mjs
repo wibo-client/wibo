@@ -555,15 +555,16 @@ export default class ChatHandler {
           const referenceMessageElement = document.createElement('div');
           referenceMessageElement.className = 'message reference';
 
-          // 构建初始显示内容
+          // 构建初始显示内容（只显示第一条）
           let initialContent = '### 参考文档\n\n';
-          referenceData.displayedContent.forEach(doc => {
-            initialContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
+          if (referenceData.fullContent.length > 0) {
+            const doc = referenceData.fullContent[0];
+            initialContent += `1. [${doc.title}](${doc.url})\n`;
             if (doc.date) {
               initialContent += `   日期: ${doc.date}\n`;
             }
             initialContent += `   描述: ${doc.description}\n\n`;
-          });
+          }
 
           // 构建完整内容
           let fullContent = '### 参考文档\n\n';
@@ -576,16 +577,15 @@ export default class ChatHandler {
           });
 
           referenceMessageElement.innerHTML = `
-              <div class="reference-content">
-                  ${marked(initialContent)}
-              </div>
-              <div class="reference-actions">
-                  <a href="#" class="reference-toggle">展开更多参考(${referenceData.totalCount})</a>
-               
-              </div>
-              <div class="reference-full-content" style="display:none">
-                  ${marked(fullContent)}
-              </div>
+            <div class="reference-content">
+                ${marked(initialContent)}
+            </div>
+            <div class="reference-actions">
+                <a href="#" class="reference-toggle">展开更多参考(${referenceData.fullContent.length})</a>
+            </div>
+            <div class="reference-full-content" style="display:none">
+                ${marked(fullContent)}
+            </div>
           `;
 
           // 将引用消息添加到同一个 wibo-container 中
@@ -599,9 +599,19 @@ export default class ChatHandler {
             e.preventDefault();
             const url = link.getAttribute('href');
 
-            // 检查是否是控制按钮
-            if (link.classList.contains('reference-toggle') ||
-              link.classList.contains('reference-follow-up')) {
+            // 检查是否是展开/折叠按钮
+            if (link.classList.contains('reference-toggle')) {
+              const content = referenceMessageElement.querySelector('.reference-content');
+              const fullContentElement = referenceMessageElement.querySelector('.reference-full-content');
+              
+              content.classList.toggle('expanded');
+              if (content.classList.contains('expanded')) {
+                content.innerHTML = fullContentElement.innerHTML;
+                link.textContent = '收起参考';
+              } else {
+                content.innerHTML = marked(initialContent);
+                link.textContent = `展开更多参考(${referenceData.fullContent.length})`;
+              }
               return;
             }
 
@@ -613,31 +623,6 @@ export default class ChatHandler {
                 console.error('打开链接失败:', error);
               }
             }
-          });
-
-          // 添加展开/折叠功能
-          const toggleButton = referenceMessageElement.querySelector('.reference-toggle');
-          const content = referenceMessageElement.querySelector('.reference-content');
-          const fullContentElement = referenceMessageElement.querySelector('.reference-full-content');
-
-          toggleButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            content.classList.toggle('expanded');
-            if (content.classList.contains('expanded')) {
-              content.innerHTML = fullContentElement.innerHTML;
-              toggleButton.textContent = '收起参考';
-            } else {
-              content.innerHTML = marked(initialContent);
-              toggleButton.textContent = `展开更多参考(${referenceData.totalCount})`;
-            }
-          });
-
-          // 添加追问功能
-          const followUpButton = referenceMessageElement.querySelector('.reference-follow-up');
-          followUpButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            // 这里预留追问功能的实现
-            console.log('追问功能待实现');
           });
         }
       };

@@ -46,7 +46,7 @@ export default class ReferenceHandler {
     };
   }
 
-  async handleSearchResults(message, path, selectedPlugin, sendSystemLog) {
+  async searchAndRerank(message, path, selectedPlugin, sendSystemLog) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
 
     const seenUrls = new Set();
@@ -88,21 +88,25 @@ export default class ReferenceHandler {
     return searchResults;
   }
 
-
-
-  async handleAggregatedContent(searchResults, message, selectedPlugin, sendSystemLog) {
-    // 检查搜索结果是否为空
+  async fetchDetails(searchResults, selectedPlugin, sendSystemLog) {
+    sendSystemLog('📑 获取详细内容...');
     if (!searchResults || searchResults.length === 0) {
       sendSystemLog('ℹ️ 未找到相关内容');
       return [];
     }
+    const detailsSearchResults = await selectedPlugin.fetchAggregatedContent(searchResults);
+    sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
+    return detailsSearchResults;
+  }
 
+
+  async extractKeyFacts(detailsSearchResults, message, sendSystemLog) {
+ 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
 
         // 检查聚合内容是否为空
-        if (!aggregatedContent || aggregatedContent.length === 0) {
+        if (!detailsSearchResults || detailsSearchResults.length === 0) {
           sendSystemLog('ℹ️ 无法获取详细内容');
           return [];
         }
@@ -161,7 +165,7 @@ export default class ReferenceHandler {
           };
         }
 
-        for (const doc of aggregatedContent) {
+        for (const doc of detailsSearchResults) {
           const jsonReference = createJsonReference(doc);
 
           let jsonStr = JSON.stringify(jsonReference, null, 2);
