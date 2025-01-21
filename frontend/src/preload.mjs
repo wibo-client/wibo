@@ -70,7 +70,9 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 添加日志相关方法
   logs: {
-    getLogs: () => ipcRenderer.invoke('get-application-logs')
+    getLogs: (offset, limit) => ipcRenderer.invoke('get-application-logs', offset, limit),
+    getLatestLogs: (lastKnownTotal) => ipcRenderer.invoke('get-latest-logs', lastKnownTotal),
+    getLogPath: () => ipcRenderer.invoke('get-log-path')
   },
 
   // 添加 setDefaultHandler 方法

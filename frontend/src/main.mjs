@@ -10,6 +10,7 @@ import LocalServerManager from './server/LocalServerManager.mjs'; // 添加 Loca
 import ContentCrawler from './contentHandler/contentCrawler.mjs'; // 添加 ContentCrawler 的导入
 import ChatStore from './config/chatStore.mjs'; // 添加 ChatStore 的导入
 import ReferenceHandler from './references/referenceHandler.mjs';
+import LogHandler from './logHandler/logHandler.mjs';  // 添加这行
 
 // 添加常量定义
 const MAX_BATCH_SIZE_5000 = 28720;
@@ -30,6 +31,7 @@ async function init() {
   const contentCrawler = new ContentCrawler();
   const chatStore = new ChatStore(); // 实例化 ChatStore
   const referenceHandler = new ReferenceHandler();
+  const logHandler = new LogHandler(); // 添加这行
 
   globalContext = { // 初始化全局变量
     pluginHandler,
@@ -41,7 +43,8 @@ async function init() {
     contentCrawler,
     localServerManager,
     chatStore,
-    referenceHandler
+    referenceHandler,
+    logHandler  // 添加这行
   };
 
   await llmCaller.init(globalContext);
@@ -52,6 +55,7 @@ async function init() {
   await contentCrawler.init(globalContext);
   await referenceHandler.init(globalContext);
   await localServerManager.init(globalContext);
+  await logHandler.init(globalContext); // 添加这行
   mainWindow = new MainWindow();
   mainWindow.init();
   mainWindow.create();
@@ -327,6 +331,35 @@ app.whenReady().then(async () => {
       await globalContext.pluginHandler.setDefaultHandler(pathPrefix);
     } catch (error) {
       console.error('设置默认插件失败:', error);
+      throw error;
+    }
+  });
+
+  // 添加新的 IPC 处理器
+  ipcMain.handle('get-application-logs', async (event, offset, limit) => {
+    try {
+      return await globalContext.logHandler.getLogs(offset, limit);
+    } catch (error) {
+      console.error('获取日志失败:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('get-latest-logs', async (event, lastKnownTotal) => {
+    try {
+      return await globalContext.logHandler.getLatestLogs(lastKnownTotal);
+    } catch (error) {
+      console.error('获取最新日志失败:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('get-log-path', async () => {
+    try {
+      const { getLogPath } = await import('./utils/loggerUtils.mjs');
+      return getLogPath();
+    } catch (error) {
+      console.error('获取日志路径失败:', error);
       throw error;
     }
   });

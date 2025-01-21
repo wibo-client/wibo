@@ -4,6 +4,7 @@ import ChatHandler from './rendererModules/chat/chatHandler.mjs';
 import KnowledgeBaseHandler from './rendererModules/knowledge/knowledgeBaseHandler.mjs';
 import BrowserConfigHandler from './rendererModules/browser/browserConfigHandler.mjs';
 import QuickNavigationHandler from './rendererModules/navigation/quickNavigationHandler.mjs';
+import LogViewerHandler from './rendererModules/logs/logViewerHandler.mjs';
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM 加载完成');
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const knowledgeBaseHandler = new KnowledgeBaseHandler();
   const browserConfigHandler = new BrowserConfigHandler();
   const quickNavigationHandler = new QuickNavigationHandler();
+  const logViewerHandler = new LogViewerHandler(); // 添加日志查看器模块
   setupTabSwitching();
 
   // 添加定期检查服务状态

@@ -59,7 +59,6 @@
         <div id="masked-ak" class="small-text"></div>
       </div>
       <button id="saveConfigButton" class="btn">保存</button>
-      <button id="viewLogsButton" class="log-viewer-button">查看日志</button>
     </div>
     <div class="section">
       <h3>后台执行用浏览器设置</h3>
@@ -287,6 +286,7 @@
           <!-- 增加保存按钮 -->
           <div class="index-settings-actions">
             <button id="saveIndexSettings" class="btn">保存索引设置</button>
+            <button id="viewLogsButton" class="log-viewer-button">查看日志</button>
           </div>
         </div>
 
@@ -305,7 +305,10 @@
   <div id="logOverlay" class="log-overlay"></div>
   <div id="logDialog" class="log-dialog">
     <div class="log-header">
-      <h3>应用日志</h3>
+      <div class="log-header-info">
+        <h3>应用日志</h3>
+        <div class="log-path" id="logPathDisplay">日志路径: 加载中...</div>
+      </div>
       <button class="close-button">&times;</button>
     </div>
     <div id="logContent" class="log-content"></div>
