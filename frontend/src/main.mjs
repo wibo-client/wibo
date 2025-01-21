@@ -15,6 +15,9 @@ import LogHandler from './logHandler/logHandler.mjs';  // 添加这行
 // 添加常量定义
 const MAX_BATCH_SIZE_5000 = 28720;
 
+// 在文件顶部添加任务跟踪器
+const activeRequests = new Map();
+
 let mainWindow;
 let globalContext; // 声明全局变量
 
@@ -148,17 +151,35 @@ app.whenReady().then(async () => {
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
     console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
 
+    // 创建 AbortController 并存储
+    const abortController = new AbortController();
+    activeRequests.set(requestId, abortController);
+
     // 创建请求上下文
     const requestContext = {
       requestId,
       type,
+      abortSignal: abortController.signal,
       sendSystemLog: (log) => event.sender.send('system-log', log, requestId),
-      sendLLMStream: (markdownResult) => event.sender.send('llm-stream', markdownResult, requestId),
+      sendLLMStream: (markdownResult) => {
+        // 如果已终止,则不发送任何内容到前端
+        if (!abortController.signal.aborted) {
+          event.sender.send('llm-stream', markdownResult, requestId);
+        }
+      },
       sendReference: (referenceData) => event.sender.send('add-reference', referenceData, requestId),
-      results: {}
+      results: {},
+      // 添加检查终止的函数
+      checkAborted: function() {
+        if (this.abortSignal.aborted) {
+          this.sendSystemLog('⚠️ 任务正在被终止...');
+          throw new Error('任务已被终止');
+        }
+      }
     };
 
     try {
+      requestContext.checkAborted();
       const selectedPlugin = await globalContext.pluginHandler.select(path);
       requestContext.selectedPlugin = selectedPlugin;
 
@@ -173,9 +194,16 @@ app.whenReady().then(async () => {
         requestContext.sendSystemLog('🔍 进入深问模式，大模型会遍历所有的文档片段，回答将更全面，但消耗的token相对较多，时间较慢');
         
         await globalContext.referenceHandler.searchOrFullScan(message, path, requestContext);
+        requestContext.checkAborted();
+        
         await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
+        requestContext.checkAborted();
+        
         await globalContext.referenceHandler.extractKeyFacts(message, path, requestContext);
+        requestContext.checkAborted();
+        
         await globalContext.referenceHandler.refineParsedFacts(message, path, requestContext);
+        requestContext.checkAborted();
 
         const finalPrompt = `请基于以下参考内容回答问题：
         参考内容：
@@ -197,7 +225,11 @@ app.whenReady().then(async () => {
         requestContext.sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
 
         await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
+        requestContext.checkAborted();
+        
         await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
+        requestContext.checkAborted();
+        
         await globalContext.referenceHandler.buildPromptFromContent(message, path, requestContext);
 
         await callLLMAsync(
@@ -222,8 +254,36 @@ app.whenReady().then(async () => {
 
     } catch (error) {
       console.error(`Error occurred in handler for 'send-message': ${error}`, error);
-      requestContext.sendSystemLog(`❌ 错误: ${error.message}`);
-      event.sender.send('error', { message: error.message }, requestId);
+      let errorMessage = error.message;
+      if (abortController.signal.aborted) {
+        errorMessage = '❌ 任务已被终止';
+      }
+      requestContext.sendSystemLog(errorMessage);
+      event.sender.send('error', { message: errorMessage }, requestId);
+    } finally {
+      // 清理请求
+      activeRequests.delete(requestId);
+    }
+  });
+
+  // 删除重复的处理器，只保留这一个，并优化实现
+  ipcMain.handle('stop-current-task', async (event, requestId) => {
+    try {
+      console.log('尝试终止任务:', requestId);
+      const abortController = activeRequests.get(requestId);
+      if (!abortController) {
+        console.log('未找到对应的任务:', requestId);
+        console.log('当前活跃任务列表:', Array.from(activeRequests.keys()));
+        throw new Error('任务未找到，可能是终止已经提交了');
+      }
+      
+      abortController.abort();
+      activeRequests.delete(requestId);
+      console.log('成功终止任务:', requestId);
+      return { success: true };
+    } catch (error) {
+      console.error('终止任务失败:', error);
+      throw error;
     }
   });
 
@@ -335,18 +395,6 @@ app.whenReady().then(async () => {
       return getLogPath();
     } catch (error) {
       console.error('获取日志路径失败:', error);
-      throw error;
-    }
-  });
-
-  // 添加终止任务的处理器
-  ipcMain.handle('stop-current-task', async (event, requestId) => {
-    try {
-      // TODO: 实现终止任务的具体逻辑
-      console.log('收到终止任务请求:', requestId);
-      return { success: true };
-    } catch (error) {
-      console.error('终止任务失败:', error);
       throw error;
     }
   });

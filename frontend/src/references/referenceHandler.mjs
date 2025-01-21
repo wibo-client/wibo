@@ -37,14 +37,14 @@ export default class ReferenceHandler {
     let searchResults = [];
 
     requestContext.sendSystemLog('🔄 开始重写查询...');
-
+    requestContext.checkAborted();  
     const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
-
+    requestContext.checkAborted();  
     requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
 
     let discaredCount = 0;
     for (const query of requeryResult) {
-
+      requestContext.checkAborted();  
       // 添加更友好的查询日志输出
       requestContext.sendSystemLog(query.queryLog);
 
@@ -63,6 +63,7 @@ export default class ReferenceHandler {
         }
       }
     }
+    requestContext.checkAborted();  
     if (discaredCount > 0) {
       requestContext.sendSystemLog(`片段多于 5倍的 searchItemNumbers 配置 ，参考了 ${searchResults.length}个片段， 有${discaredCount} 个片段会被忽略，你可以减少检索范围来规避此情况`);
     } else {
@@ -93,10 +94,11 @@ export default class ReferenceHandler {
 
       // 添加更友好的查询日志输出
       requestContext.sendSystemLog(query.queryLog);
-
+      requestContext.checkAborted();  
       const result = await requestContext.selectedPlugin.search(query.query, path);
+      requestContext.checkAborted(); 
       const rerankedResult = await this.globalContext.rerankImpl.rerank(result, query.query);
-
+      requestContext.checkAborted(); 
       // 去重并添加结果
       for (const item of rerankedResult) {
         if (!seenUrls.has(item.id)) {
@@ -134,7 +136,7 @@ export default class ReferenceHandler {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-
+        requestContext.checkAborted();  // 添加检查
         // 检查聚合内容是否为空
         if (!detailsSearchResults || detailsSearchResults.length === 0) {
           requestContext.sendSystemLog('ℹ️ 无法获取详细内容');
@@ -245,11 +247,13 @@ export default class ReferenceHandler {
           // 创建最后一批的副本
           const finalBatchRefs = [...todoTasksRef];
           const jsonPrompt = createJsonPrompt(finalBatchRefs, message);
+          
           tasks.push(async () => {
             requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢）,批次 ${currentBatchIndex}，分析 ${finalBatchRefs.length} 条内容，剩余 0 条待分析`);
             let groupAnswer;
             for (let i = 0; i < 3; i++) {
               try {
+              requestContext.checkAborted();  // 添加检查
                 groupAnswer = await this.globalContext.llmCaller.callSync([{
                   role: 'user',
                   content: JSON.stringify(jsonPrompt, null, 2)
@@ -352,6 +356,7 @@ export default class ReferenceHandler {
     let refinedAnswer;
     for (let j = 0; j < 3; j++) {
       try {
+        requestContext.checkAborted();  // 添加检查
         refinedAnswer = await this.globalContext.llmCaller.callSync([{ role: 'user', content: prompt }]);
         break;
       } catch (error) {

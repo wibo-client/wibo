@@ -476,9 +476,17 @@ export default class ChatHandler {
       // 添加终止任务的点击处理
       systemStop.addEventListener('click', async () => {
         try {
-          await window.electron.stopCurrentTask(requestId);
+          const result = await window.electron.stopCurrentTask(requestId);
+          systemContent.querySelector('.execution-log:last-child').textContent = `⏳ 终止命令已提交...`;
+          
+          if (!result.success) {
+            console.error('终止任务失败:', result);
+          }
         } catch (error) {
-          console.error('终止任务失败:', error);
+          console.error('终止任务请求失败:', error);
+          // 可以选择向用户显示错误信息
+          const errorMessage = error.message || '终止任务失败';
+          systemContent.querySelector('.execution-log:last-child').textContent = `❌ ${errorMessage}`;
         }
       });
 
