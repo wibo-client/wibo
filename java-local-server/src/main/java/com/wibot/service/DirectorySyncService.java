@@ -21,8 +21,8 @@ import java.util.stream.Stream;
 @Service
 public class DirectorySyncService {
     private static final Logger logger = LoggerFactory.getLogger(DirectorySyncService.class);
-    private static final int BATCH_SIZE = 5; // 每批处理文件数
-    private static final int PROCESS_DELAY = 1000; // 每批处理后延迟时间(毫秒)
+    private static final int BATCH_SIZE = 5; // Number of files processed per batch
+    private static final int PROCESS_DELAY = 1000; // Delay time after each batch (milliseconds)
 
     @Autowired
     private UserDirectoryIndexRepository indexRepository;
@@ -35,9 +35,9 @@ public class DirectorySyncService {
 
     private final AtomicInteger processingCount = new AtomicInteger(0);
 
-    @Scheduled(fixedRate = 300000) // 5分钟执行一次
+    @Scheduled(fixedRate = 300000) // Execute every 5 minutes
     public synchronized void syncDirectories() {
-        logger.info("开始目录同步任务");
+        logger.info("Starting directory synchronization task");
         List<UserDirectoryIndexPO> completedTasks = indexRepository
                 .findByIndexStatus(UserDirectoryIndexPO.STATUS_COMPLETED);
 
@@ -45,7 +45,7 @@ public class DirectorySyncService {
             try {
                 syncDirectory(task);
             } catch (Exception e) {
-                logger.error("同步目录失败: " + task.getDirectoryPath(), e);
+                logger.error("Failed to synchronize directory: " + task.getDirectoryPath(), e);
             }
         }
     }
@@ -54,10 +54,10 @@ public class DirectorySyncService {
         String directoryPath = task.getDirectoryPath();
         Path dirPath = Paths.get(directoryPath);
 
-        // 修改获取现有文件记录的逻辑，分离正常文件和被忽略的文件
+        // Modify the logic to get existing file records, separating normal files and ignored files
         List<DocumentDataPO> existingDocs = documentDataRepository.findByFilePathStartingWith(directoryPath);
 
-        // 分别处理正常文件和被忽略的文件
+        // Process normal files and ignored files separately
         Map<String, DocumentDataPO> normalDocsMap = existingDocs.stream()
                 .filter(doc -> !DocumentDataPO.PROCESSED_STATE_DELETED.equals(doc.getProcessedState())
                         && !DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
@@ -67,26 +67,26 @@ public class DirectorySyncService {
                 .filter(doc -> DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
                 .collect(Collectors.toMap(DocumentDataPO::getFilePath, doc -> doc));
 
-        // 获取当前文件系统中的文件
+        // Get files in the current file system
         Set<String> currentFiles = new HashSet<>();
         try (Stream<Path> paths = Files.walk(dirPath)) {
             paths.filter(Files::isRegularFile).forEach(path -> currentFiles.add(path.toString()));
         }
 
-        // 分析正常文件的变化
+        // Analyze changes in normal files
         Set<String> newFiles = findNewFiles(currentFiles, normalDocsMap.keySet(), ignoredDocsMap.keySet());
         Set<String> deletedFiles = findDeletedFiles(currentFiles, normalDocsMap.keySet());
         Set<String> updatedFiles = findUpdatedFiles(currentFiles, normalDocsMap);
 
-        // 分析被忽略文件的变化（检查删除）
+        // Analyze changes in ignored files (check for deletion)
         Set<String> deletedIgnoredFiles = findDeletedFiles(currentFiles, ignoredDocsMap.keySet());
-        // 合并所有需要删除的文件
+        // Merge all files to be deleted
         deletedFiles.addAll(deletedIgnoredFiles);
 
-        // 处理文件变化
-        processBatch(newFiles, StandardWatchEventKinds.ENTRY_CREATE, "新增");
-        processBatch(deletedFiles, StandardWatchEventKinds.ENTRY_DELETE, "删除");
-        processBatch(updatedFiles, StandardWatchEventKinds.ENTRY_MODIFY, "更新");
+        // Process file changes
+        processBatch(newFiles, StandardWatchEventKinds.ENTRY_CREATE, "new");
+        processBatch(deletedFiles, StandardWatchEventKinds.ENTRY_DELETE, "delete");
+        processBatch(updatedFiles, StandardWatchEventKinds.ENTRY_MODIFY, "update");
 
         indexRepository.save(task);
     }
@@ -113,7 +113,7 @@ public class DirectorySyncService {
                 return lastModified > existingDoc.getUpdateDateTime().atZone(ZoneId.systemDefault()).toInstant()
                         .toEpochMilli();
             } catch (IOException e) {
-                logger.error("检查文件更新失败: " + path, e);
+                logger.error("Failed to check file update: " + path, e);
                 return false;
             }
         }).collect(Collectors.toSet());
@@ -149,10 +149,10 @@ public class DirectorySyncService {
 
         for (String file : batch) {
             try {
-                logger.info("处理{}文件: {}", operationType, file);
+                logger.info("Processing {} file: {}", operationType, file);
                 directoryProcessingService.processFile(Paths.get(file), eventKind);
             } catch (Exception e) {
-                logger.error("处理{}文件失败: {}", operationType, file, e);
+                logger.error("Failed to process {} file: {}", operationType, file, e);
             } finally {
                 processingCount.decrementAndGet();
             }
