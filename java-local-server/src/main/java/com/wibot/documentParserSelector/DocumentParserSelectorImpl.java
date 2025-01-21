@@ -108,6 +108,27 @@ public class DocumentParserSelectorImpl implements DocumentParserSelectorInterfa
         case "xsd":
         case "xml":
         case "css":
+        case "mjs":
+        case "c":
+        case "cpp":
+        case "h":
+        case "hpp":
+        case "cs":
+        case "go":
+        case "rs":
+        case "rb":
+        case "php":
+        case "pl":
+        case "pm":
+        case "tcl":
+        case "r":
+        case "swift":
+        case "kt":
+        case "groovy":
+        case "scala":
+        case "dart":
+        case "lua":
+        case "tsv":
             return sourceCodeParser;
         case "csv":
         case "txt":
