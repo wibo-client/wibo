@@ -169,19 +169,21 @@ app.whenReady().then(async () => {
     };
 
     try {
-      sendSystemLog('🔍 正在选择合适的插件...');
+
       const selectedPlugin = await globalContext.pluginHandler.select(path);
       requestContext.selectedPlugin = selectedPlugin;
-      sendSystemLog(`✅ 已选择插件: ${path}`);
+
 
       if (type === 'search') {
+        sendSystemLog('🔍 进入直接搜索...');
         const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
         const markdownResult = await globalContext.referenceHandler.buildSearchResultsString(searchResults);
         sendLLMStream(markdownResult);
         sendSystemLog('✅ 搜索完成');
 
       } else if (type === 'highQuilityRAGChat') {
-        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
+        sendSystemLog('🔍 进入深问模式 ，大模型会遍历所有的文档片段，回答回更全面，但消耗的token相对较多，时间较慢');
+        const searchResults = await globalContext.referenceHandler.searchOrFullScan(message, path, requestContext);
         const detailsSearchResults = await globalContext.referenceHandler.fetchDetails(searchResults, path, requestContext);
 
         let parsedFacts = await globalContext.referenceHandler.extractKeyFacts(detailsSearchResults, message, requestContext);
@@ -209,12 +211,15 @@ app.whenReady().then(async () => {
 
         const referenceData = globalContext.referenceHandler.buildReferenceData(sortedSearchResults);
         sendReference(referenceData);
-        sendSystemLog('✅ 搜索完成');
+        sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
       } else if (type === 'searchAndChat') {
+        sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
+
         const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
         sendSystemLog('📑 获取详细内容...');
-        const aggregatedContent = await selectedPlugin.fetchAggregatedContent(searchResults);
+        const aggregatedContent = await globalContext.referenceHandler.fetchDetails(searchResults, path, requestContext);
+
         sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
         const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);
 
@@ -224,6 +229,7 @@ app.whenReady().then(async () => {
 
         const referenceData = globalContext.referenceHandler.buildReferenceData(aggregatedContent);
         sendReference(referenceData);
+        sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
       } else if (type === 'chat') {
         sendSystemLog('💬 启动直接对话模式...');
@@ -232,7 +238,7 @@ app.whenReady().then(async () => {
           requestContext.sendSystemLog,
           requestContext.sendLLMStream
         );
-        sendSystemLog('✅ 对话完成');
+        sendSystemLog('✅ 开始回答');
       }
 
     } catch (error) {

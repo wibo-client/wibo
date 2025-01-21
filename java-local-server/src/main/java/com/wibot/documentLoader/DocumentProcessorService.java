@@ -77,7 +77,7 @@ public class DocumentProcessorService {
         DocumentDataPO currentDoc = null;
         while (true) {
             try {
-                logger.debug("线程 {} (处理器 {}) 开始查找未处理的任务", Thread.currentThread().getName(), processorId);
+                logger.debug("Thread {} (Processor {}) starts looking for unprocessed tasks", Thread.currentThread().getName(), processorId);
 
                 // 查找未处理的任务，包括新文件和已删除文件
                 List<DocumentDataPO> allDocuments = documentDataRepository
@@ -92,7 +92,7 @@ public class DocumentProcessorService {
                         .toList();
 
                 if (documents.isEmpty()) {
-                    logger.debug("线程 {} (处理器 {}) 未找到任务，休眠10秒", Thread.currentThread().getName(), processorId);
+                    logger.debug("Thread {} (Processor {}) found no tasks, sleeping for 10 seconds", Thread.currentThread().getName(), processorId);
                     Thread.sleep(10000);
                     continue;
                 }
@@ -107,11 +107,11 @@ public class DocumentProcessorService {
                     currentDoc = document;
                     boolean success = processDocument(document);
                     if (success) {
-                        logger.debug("线程 {} (处理器 {}) 处理文档成功: {}", Thread.currentThread().getName(), processorId,
+                        logger.debug("Thread {} (Processor {}) successfully processed document: {}", Thread.currentThread().getName(), processorId,
                                 document.getFilePath());
                         document.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_INDEXED);
                     } else {
-                        logger.error("线程 {} (处理器 {}) 处理文档失败: {}", Thread.currentThread().getName(), processorId,
+                        logger.error("Thread {} (Processor {}) failed to process document: {}", Thread.currentThread().getName(), processorId,
                                 document.getFilePath());
                         document.setProcessedState(DocumentDataPO.PROCESSED_ERROR);
                     }
@@ -125,10 +125,10 @@ public class DocumentProcessorService {
             } catch (Exception e) {
                 
                 logger.atError()
-                      .setMessage("线程 {} (处理器 {}) 处理文档时出错: {}")
+                      .setMessage("Thread {} (Processor {}) encountered an error while processing document: {}")
                       .addArgument(Thread.currentThread().getName())
                       .addArgument(processorId)
-                      .addArgument(currentDoc != null ? currentDoc.getFilePath() : "未知文档")
+                      .addArgument(currentDoc != null ? currentDoc.getFilePath() : "Unknown document")
                       .setCause(e)
                       .log();
             }
@@ -138,48 +138,48 @@ public class DocumentProcessorService {
 
     private void processDeletedDocument(DocumentDataPO document) {
         String threadName = Thread.currentThread().getName();
-        logger.info("线程 {} 开始处理已删除文档: {}", threadName, document.getFileName());
+        logger.info("Thread {} starts processing deleted document: {}", threadName, document.getFileName());
 
         try {
             // 1. 删除索引
             index.deleteIndex(document.getFilePath());
-            logger.debug("线程 {} 删除索引完成: {}", threadName, document.getFilePath());
+            logger.debug("Thread {} completed index deletion: {}", threadName, document.getFilePath());
 
             // 2. 删除markdown段落数据
             markdownParagraphRepository.deleteByDocumentDataId(document.getId());
-            logger.debug("线程 {} 删除markdown段落数据完成: {}", threadName, document.getId());
+            logger.debug("Thread {} completed markdown paragraph deletion: {}", threadName, document.getId());
 
             // 3. 删除markdown内容
             markdownRepo.deleteByDocumentDataId(document.getId());
-            logger.debug("线程 {} 删除markdown内容完成: {}", threadName, document.getId());
+            logger.debug("Thread {} completed markdown content deletion: {}", threadName, document.getId());
 
             // 4. 最后删除文档数据
             documentDataRepository.delete(document);
-            logger.info("线程 {} 文档删除处理完成: {}", threadName, document.getFileName());
+            logger.info("Thread {} completed document deletion: {}", threadName, document.getFileName());
 
         } catch (Exception e) {
-            logger.error("线程 {} 处理删除文档失败: {}", threadName, document.getFilePath(), e);
-            throw new RuntimeException("处理删除文档失败", e);
+            logger.error("Thread {} failed to process deleted document: {}", threadName, document.getFilePath(), e);
+            throw new RuntimeException("Failed to process deleted document", e);
         }
     }
 
     private boolean processDocument(DocumentDataPO document) {
         String threadName = Thread.currentThread().getName();
-        logger.info("线程 {} 开始处理文档: {}", threadName, document.getFileName());
+        logger.info("Thread {} starts processing document: {}", threadName, document.getFileName());
 
         int retryCount = 0;
         while (retryCount < MAX_RETRY_ATTEMPTS) {
             try {
                 if (retryCount > 0) {
-                    logger.info("线程 {} 正在进行第 {} 次重试处理文档: {}", threadName, retryCount, document.getFileName());
+                    logger.info("Thread {} retrying document processing attempt {}: {}", threadName, retryCount, document.getFileName());
                     Thread.sleep(RETRY_DELAY_MS * retryCount); // 递增重试延迟
                 }
 
                 DocumentParserInterface parser = selector.select(document.getExtension());
-                logger.debug("线程 {} 选择的解析器: {}", threadName, parser.getClass().getName());
+                logger.debug("Thread {} selected parser: {}", threadName, parser.getClass().getName());
 
                 String markdown = parser.parseDocument(document);
-                logger.debug("线程 {} 解析后的Markdown内容长度: {}", threadName, markdown.length());
+                logger.debug("Thread {} parsed Markdown content length: {}", threadName, markdown.length());
                 MarkdownBasedContentPO markdownAfter;
                 Optional<MarkdownBasedContentPO> existingContent = markdownRepo.findByDocumentDataId(document.getId());
                 if (existingContent.isPresent()) {
@@ -201,10 +201,10 @@ public class DocumentProcessorService {
                 }
 
                 // 创建并保存文档索引
-                logger.debug("线程 {} 创建文档索引", threadName);
+                logger.debug("Thread {} creating document index", threadName);
                 String filePath = document.getFilePath();
 
-                logger.debug("线程 {} 删除已有的索引: {}", threadName, filePath);
+                logger.debug("Thread {} deleting existing index: {}", threadName, filePath);
                 index.deleteIndex(filePath);
 
                 List<MarkdownParagraphPO> markdownParagraphs = MarkdownBasedContentPO
@@ -214,11 +214,11 @@ public class DocumentProcessorService {
                     paragraph = markdownParagraphRepository.save(paragraph);
                     String paragraphId = String.valueOf(paragraph.getId());
                     String documentDataId = String.valueOf(paragraph.getDocumentDataId());
-                    logger.debug("线程 {} 保存{} 的 段落索引: {}", threadName, documentDataId, paragraphId);
+                    logger.debug("Thread {} saving paragraph index for {}: {}", threadName, documentDataId, paragraphId);
                     try {
                         index.buildIndex(paragraphId, filePath, paragraph.getContent());
                     } catch (Exception e) {
-                        logger.error("线程 {} 保存段落索引失败: {}", threadName, paragraphId, e);
+                        logger.error("Thread {} failed to save paragraph index: {}", threadName, paragraphId, e);
                         // 处理保存段落索引失败的情况
                     }
                 }
@@ -228,10 +228,10 @@ public class DocumentProcessorService {
             } catch (Exception e) {
                 retryCount++;
                 if (retryCount >= MAX_RETRY_ATTEMPTS) {
-                    logger.error("线程 {} 处理文档失败，已重试 {} 次: {}", threadName, retryCount, document.getFilePath(), e);
+                    logger.error("Thread {} failed to process document after {} attempts: {}", threadName, retryCount, document.getFilePath(), e);
                     return false;
                 } else {
-                    logger.warn("线程 {} 处理文档失败，准备第 {} 次重试: {}", threadName, retryCount + 1, document.getFilePath(), e);
+                    logger.warn("Thread {} failed to process document, preparing for retry attempt {}: {}", threadName, retryCount + 1, document.getFilePath(), e);
                 }
             }
         }

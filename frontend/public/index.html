@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="styles/chat.css">
   <link rel="stylesheet" href="styles/quickLink.css">
   <link rel="stylesheet" href="styles/knowledgebase.css">
+  <link rel="stylesheet" href="styles/logs.css">
 </head>
 
 <body>
@@ -58,6 +59,7 @@
         <div id="masked-ak" class="small-text"></div>
       </div>
       <button id="saveConfigButton" class="btn">保存</button>
+      <button id="viewLogsButton" class="log-viewer-button">查看日志</button>
     </div>
     <div class="section">
       <h3>后台执行用浏览器设置</h3>
@@ -297,6 +299,16 @@
       </div>
     </div>
   </div>
+  </div>
+
+  <!-- 添加日志查看对话框 -->
+  <div id="logOverlay" class="log-overlay"></div>
+  <div id="logDialog" class="log-dialog">
+    <div class="log-header">
+      <h3>应用日志</h3>
+      <button class="close-button">&times;</button>
+    </div>
+    <div id="logContent" class="log-content"></div>
   </div>
 
   <!-- 将原插件内容区域改为快捷导航内容 -->

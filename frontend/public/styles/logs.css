@@ -1,0 +1,73 @@
+.log-viewer-button {
+  margin: 10px;
+  padding: 8px 15px;
+  background-color: #4a5568;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.log-viewer-button:hover {
+  background-color: #2d3748;
+}
+
+.log-dialog {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  height: 70%;
+  background: white;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  z-index: 1000;
+}
+
+.log-dialog.active {
+  display: block;
+}
+
+.log-content {
+  height: calc(100% - 50px);
+  padding: 20px;
+  overflow-y: auto;
+  background: #f8f9fa;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: #edf2f7;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #4a5568;
+}
+
+.log-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.log-overlay.active {
+  display: block;
+}

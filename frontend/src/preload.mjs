@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   sendMessage: (message, type, path, context) => {
     const requestId = context.requestId; // 使用传递的 UUID
-    
+
     // 注册系统日志事件监听器
     ipcRenderer.on('system-log', (event, log, id) => {
       if (id === requestId && context?.onSystemLog) {
@@ -66,6 +66,11 @@ contextBridge.exposeInMainWorld('electron', {
     saveMessage: (message) => ipcRenderer.invoke('save-chat-message', message),
     getMessages: (offset, limit) => ipcRenderer.invoke('get-chat-messages', offset, limit),
     getMessageCount: () => ipcRenderer.invoke('get-chat-message-count')
+  },
+
+  // 添加日志相关方法
+  logs: {
+    getLogs: () => ipcRenderer.invoke('get-application-logs')
   },
 
   // 添加 setDefaultHandler 方法

@@ -49,7 +49,7 @@ public class DirectoryProcessingService {
         long currentTime = System.currentTimeMillis();
         if (ignoredPathMatcher == null || (currentTime - lastUpdateTime) > UPDATE_INTERVAL) {
             synchronized (this) {
-                // 双重检查，避免并发更新
+                // Double-check to avoid concurrent updates
                 if (ignoredPathMatcher == null || (currentTime - lastUpdateTime) > UPDATE_INTERVAL) {
                     try {
                         String ignoredDirsStr = systemConfigService
@@ -57,10 +57,10 @@ public class DirectoryProcessingService {
                         List<String> ignoredPatterns = Arrays.asList(ignoredDirsStr.split("\n"));
                         ignoredPathMatcher = new PathMatcherUtil(ignoredPatterns);
                         lastUpdateTime = currentTime;
-                        logger.debug("已更新忽略规则匹配器，规则数量: {}", ignoredPatterns.size());
+                        logger.debug("Updated ignore rules matcher, number of rules: {}", ignoredPatterns.size());
                     } catch (Exception e) {
-                        logger.error("更新忽略规则匹配器失败", e);
-                        // 如果更新失败且没有现有实例，创建一个空的匹配器
+                        logger.error("Failed to update ignore rules matcher", e);
+                        // If update fails and there is no existing instance, create an empty matcher
                         if (ignoredPathMatcher == null) {
                             ignoredPathMatcher = new PathMatcherUtil(Collections.emptyList());
                         }
@@ -71,10 +71,10 @@ public class DirectoryProcessingService {
         return ignoredPathMatcher;
     }
 
-    // 每10秒检查新任务
+    // Check for new tasks every 10 seconds
     @Scheduled(fixedRate = 10000)
     public synchronized void processNewTasks() {
-        logger.debug("开始检查新任务");
+        logger.debug("Checking for new tasks");
 
         List<UserDirectoryIndexPO> pendingTasks = indexRepository.findAll();
         for (UserDirectoryIndexPO task : pendingTasks) {
@@ -86,11 +86,11 @@ public class DirectoryProcessingService {
                 } else if (UserDirectoryIndexPO.STATUS_IGNORE_TRIGGERED.equals(task.getIndexStatus())) {
                     processIgnoreRulesChange(task);
                 } else {
-                    logger.debug("跳过任务: {} ,任务状态{} , 任务目录 {} ", task.getId(), task.getIndexStatus(),
+                    logger.debug("Skipping task: {} , status: {} , directory: {} ", task.getId(), task.getIndexStatus(),
                             task.getDirectoryPath());
                 }
             } catch (Exception e) {
-                logger.error("处理任务失败: {} - {}", task.getIndexStatus(), task.getDirectoryPath(), e);
+                logger.error("Failed to process task: {} - {}", task.getIndexStatus(), task.getDirectoryPath(), e);
             }
         }
 
@@ -98,18 +98,18 @@ public class DirectoryProcessingService {
 
     private void tryProcessTask(UserDirectoryIndexPO task) {
         try {
-            logger.debug("开始处理目录任务: {}", task.getId());
+            logger.debug("Processing directory task: {}", task.getId());
 
             processDirectory(task);
 
         } catch (Exception e) {
-            logger.error("处理任务失败: {}", task.getId(), e);
+            logger.error("Failed to process task: {}", task.getId(), e);
             indexRepository.save(task);
         }
     }
 
     private void markFileAsIgnored(Path filePath) throws IOException {
-        logger.debug("标记文件为忽略状态: {}", filePath);
+        logger.debug("Marking file as ignored: {}", filePath);
         Optional<DocumentDataPO> existingDoc = documentDataRepository.findByFilePath(filePath.toString());
 
         DocumentDataPO documentData;
@@ -126,21 +126,21 @@ public class DirectoryProcessingService {
     private void processDirectory(UserDirectoryIndexPO index) throws Exception {
         Path dirPath = Paths.get(index.getDirectoryPath());
 
-        logger.debug("开始处理目录: {}", index.getDirectoryPath());
+        logger.debug("Processing directory: {}", index.getDirectoryPath());
 
-        // 处理文件
+        // Process files
         try (Stream<Path> paths = Files.walk(dirPath)) {
             paths.filter(Files::isRegularFile)
                     .forEach(filePath -> {
                         try {
-                            // 使用 getter 方法获取最新的匹配器
+                            // Use getter method to get the latest matcher
                             if (getIgnoredPathMatcher().matches(dirPath.relativize(filePath))) {
                                 markFileAsIgnored(filePath);
                                 return;
                             }
                             processFile(filePath, StandardWatchEventKinds.ENTRY_CREATE);
                         } catch (Exception e) {
-                            logger.error("处理文件失败: {}", filePath, e);
+                            logger.error("Failed to process file: {}", filePath, e);
                         }
                     });
         }
@@ -149,24 +149,24 @@ public class DirectoryProcessingService {
         index.setCompletionTime(LocalDateTime.now());
         indexRepository.save(index);
 
-        logger.debug("目录处理完成: {}", index.getDirectoryPath());
+        logger.debug("Directory processing completed: {}", index.getDirectoryPath());
     }
 
     public synchronized void processFile(Path filePath, WatchEvent.Kind<?> kind) throws Exception {
-        logger.debug("开始处理文件: {}, 事件类型: {}", filePath, kind);
+        logger.debug("Processing file: {}, event type: {}", filePath, kind);
 
-        // 处理删除事件
+        // Handle delete event
         if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
             handleDeletedFile(filePath);
             return;
         }
 
-        // 检查文件可读性
+        // Check file readability
         if (!Files.isReadable(filePath)) {
-            throw new IOException("文件不可读: " + filePath);
+            throw new IOException("File is not readable: " + filePath);
         }
 
-        // 创建基础文档数据（不含MD5）
+        // Create basic document data (without MD5)
         DocumentDataPO documentData = createDocumentDataWithoutMd5(filePath);
         DocumentParserInterface parser = selector.select(documentData.getExtension());
         boolean shouldProcess = parser.shouldProcess(documentData.getExtension());
@@ -181,7 +181,7 @@ public class DirectoryProcessingService {
             }
 
         } catch (Exception e) {
-            logger.error("处理文件失败: " + filePath, e);
+            logger.error("Failed to process file: " + filePath, e);
             throw e;
         }
     }
@@ -192,7 +192,7 @@ public class DirectoryProcessingService {
             DocumentDataPO doc = existingDoc.get();
             doc.setProcessedState(DocumentDataPO.PROCESSED_STATE_DELETED);
             documentDataRepository.save(doc);
-            logger.info("文件已标记为删除: {}", filePath);
+            logger.info("File marked as deleted: {}", filePath);
         }
     }
 
@@ -204,44 +204,44 @@ public class DirectoryProcessingService {
             return;
         }
 
-        // 仅在需要处理的情况下计算MD5
+        // Calculate MD5 only if processing is needed
         String newMd5 = calculateMD5(filePath);
         if (existing.getMd5() != null && existing.getMd5().equals(newMd5)) {
-            logger.debug("文件未变化，跳过处理: {}", filePath);
+            logger.debug("File unchanged, skipping processing: {}", filePath);
             return;
         }
 
-        // 更新现有记录
+        // Update existing record
         newDoc.setId(existing.getId());
         newDoc.setMd5(newMd5);
         newDoc.setVersion(existing.getVersion());
         newDoc.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
         documentDataRepository.save(newDoc);
-        logger.debug("更新文件状态: {}", filePath);
+        logger.debug("File status updated: {}", filePath);
     }
 
     private void handleNewDocument(DocumentDataPO documentData, boolean shouldProcess, Path filePath) throws Exception {
         if (!shouldProcess) {
             documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_IGNORED);
             documentDataRepository.save(documentData);
-            logger.debug("新文件已标记为忽略: {}", filePath);
+            logger.debug("New file marked as ignored: {}", filePath);
             return;
         }
 
         documentData.setMd5(calculateMD5(filePath));
         documentData.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
         documentDataRepository.save(documentData);
-        logger.debug("新文件已保存: {}", filePath);
+        logger.debug("New file saved: {}", filePath);
     }
 
     public synchronized void handleFileChange(Path file, WatchEvent.Kind<?> kind) {
         try {
-            logger.debug("处理文件变化: {} - {}", kind.name(), file);
+            logger.debug("Handling file change: {} - {}", kind.name(), file);
             if (Files.isRegularFile(file) || kind == StandardWatchEventKinds.ENTRY_DELETE) {
                 processFile(file, kind);
             }
         } catch (Exception e) {
-            logger.error("处理文件变化失败: " + file, e);
+            logger.error("Failed to handle file change: " + file, e);
         }
     }
 
@@ -285,24 +285,24 @@ public class DirectoryProcessingService {
 
     private synchronized void processDeletedDirectory(UserDirectoryIndexPO task) {
         try {
-            logger.debug("开始处理删除目录: {}", task.getDirectoryPath());
+            logger.debug("Processing deleted directory: {}", task.getDirectoryPath());
 
-            // 查找该目录下的所有文档记录
+            // Find all document records under this directory
             List<DocumentDataPO> docs = documentDataRepository.findByFilePathStartingWith(task.getDirectoryPath());
 
-            // 标记所有文档为删除状态
+            // Mark all documents as deleted
             for (DocumentDataPO doc : docs) {
                 doc.setProcessedState(DocumentDataPO.PROCESSED_STATE_DELETED);
                 documentDataRepository.save(doc);
-                logger.debug("文档已标记为删除: {}", doc.getFilePath());
+                logger.debug("Document marked as deleted: {}", doc.getFilePath());
             }
 
-            // 直接从数据库中删除目录记录
+            // Directly delete the directory record from the database
             indexRepository.delete(task);
-            logger.debug("目录记录已删除: {}", task.getDirectoryPath());
+            logger.debug("Directory record deleted: {}", task.getDirectoryPath());
 
         } catch (Exception e) {
-            logger.error("处理删除目录失败: {}", task.getDirectoryPath(), e);
+            logger.error("Failed to process deleted directory: {}", task.getDirectoryPath(), e);
             indexRepository.save(task);
         }
     }
@@ -316,58 +316,58 @@ public class DirectoryProcessingService {
         if (existingDoc.isPresent()) {
             DocumentDataPO existing = existingDoc.get();
             if (!shouldProcess) {
-                // 如果文件现在应该被忽略
+                // If the file should now be ignored
                 existing.setProcessedState(DocumentDataPO.PROCESSED_STATE_IGNORED);
                 documentDataRepository.save(existing);
-                logger.info("文件状态更新为忽略: {}", filePath);
+                logger.info("File status updated to ignored: {}", filePath);
             }
         }
     }
 
-    // 用于处理忽略规则变化的方法
+    // Method to handle ignore rules changes
     public void handleIgnoreRulesChange(String directoryPath) {
         try {
             Path dirPath = Paths.get(directoryPath);
-            // 获取所有已索引的文件
+            // Get all indexed files
             List<DocumentDataPO> indexedDocs = documentDataRepository.findByFilePathStartingWithAndProcessedState(
                     directoryPath, DocumentDataPO.PROCESSED_STATE_FILE_INDEXED);
 
-            // 使用 getter 方法获取最新的匹配器
+            // Use getter method to get the latest matcher
             for (DocumentDataPO doc : indexedDocs) {
                 Path filePath = Paths.get(doc.getFilePath());
                 if (getIgnoredPathMatcher().matches(dirPath.relativize(filePath))) {
                     doc.setProcessedState(DocumentDataPO.PROCESSED_STATE_IGNORED);
                     documentDataRepository.save(doc);
-                    logger.info("文件状态更新为忽略: {}", doc.getFilePath());
+                    logger.info("File status updated to ignored: {}", doc.getFilePath());
                 }
             }
         } catch (Exception e) {
-            logger.error("处理忽略规则变化失败: {}", directoryPath, e);
+            logger.error("Failed to handle ignore rules change: {}", directoryPath, e);
         }
     }
 
     private void processIgnoreRulesChange(UserDirectoryIndexPO task) {
         try {
-            logger.info("开始处理目录忽略规则变更: {}", task.getDirectoryPath());
+            logger.info("Processing directory ignore rules change: {}", task.getDirectoryPath());
             handleIgnoreRulesChange(task.getDirectoryPath());
 
-            // 处理完成后更新任务状态
+            // Update task status after processing
             task.setIndexStatus(UserDirectoryIndexPO.STATUS_COMPLETED);
             task.setCompletionTime(LocalDateTime.now());
             indexRepository.save(task);
 
-            logger.info("目录忽略规则变更处理完成: {}", task.getDirectoryPath());
+            logger.info("Directory ignore rules change processing completed: {}", task.getDirectoryPath());
         } catch (Exception e) {
-            logger.error("处理目录忽略规则变更失败: {}", task.getDirectoryPath(), e);
+            logger.error("Failed to process directory ignore rules change: {}", task.getDirectoryPath(), e);
         }
     }
 
     /**
-     * 将所有已完成的目录设置为需要重新评估忽略规则
+     * Set all completed directories to require re-evaluation of ignore rules
      */
     public void triggerIgnoreRulesChangeForAllDirectories() {
         try {
-            logger.info("开始触发所有目录的忽略规则重新评估");
+            logger.info("Triggering re-evaluation of ignore rules for all directories");
 
             List<UserDirectoryIndexPO> completedTasks = indexRepository
                     .findByIndexStatus(UserDirectoryIndexPO.STATUS_COMPLETED);
@@ -375,19 +375,19 @@ public class DirectoryProcessingService {
             for (UserDirectoryIndexPO task : completedTasks) {
                 try {
                     task.setIndexStatus(UserDirectoryIndexPO.STATUS_IGNORE_TRIGGERED);
-                    task.setSubmitTime(LocalDateTime.now()); // 更新提交时间
-                    task.setCompletionTime(null); // 清除完成时间
+                    task.setSubmitTime(LocalDateTime.now()); // Update submit time
+                    task.setCompletionTime(null); // Clear completion time
                     indexRepository.save(task);
-                    logger.debug("目录已设置为重新评估状态: {}", task.getDirectoryPath());
+                    logger.debug("Directory set for re-evaluation: {}", task.getDirectoryPath());
                 } catch (Exception e) {
-                    logger.error("设置目录重新评估状态失败: {}", task.getDirectoryPath(), e);
+                    logger.error("Failed to set directory for re-evaluation: {}", task.getDirectoryPath(), e);
                 }
             }
 
-            logger.info("已触发 {} 个目录的忽略规则重新评估", completedTasks.size());
+            logger.info("Triggered re-evaluation of ignore rules for {} directories", completedTasks.size());
         } catch (Exception e) {
-            logger.error("触发目录忽略规则重新评估失败", e);
-            throw new RuntimeException("触发忽略规则重新评估失败", e);
+            logger.error("Failed to trigger re-evaluation of ignore rules", e);
+            throw new RuntimeException("Failed to trigger re-evaluation of ignore rules", e);
         }
     }
 }

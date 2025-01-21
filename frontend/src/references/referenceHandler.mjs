@@ -26,8 +26,7 @@ export default class ReferenceHandler {
     };
   }
 
-
-  async searchAndRerank(message, path, requestContext) {
+  async searchOrFullScan(message, path, requestContext) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
     const searchType = requestContext.type;
     const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
@@ -40,7 +39,51 @@ export default class ReferenceHandler {
 
     requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
 
-    const limitThisTurn = searchType === 'highQuilityRAGChat' ? searchItemNumbers : pageFetchLimit;
+    let discaredCount = 0;
+    for (const query of requeryResult) {
+
+      // 添加更友好的查询日志输出
+      requestContext.sendSystemLog(query.queryLog);
+
+      const result = await requestContext.selectedPlugin.search(query.query, path);
+
+      // 去重并添加结果
+      for (const item of result) {
+        if (searchItemNumbers * 10 < searchResults.length) {
+          discaredCount++;
+          continue;
+        }
+        if (!seenUrls.has(item.id)) {
+          seenUrls.add(item.id);
+          searchResults.push(item);
+
+        }
+      }
+    }
+    if (discaredCount > 0) {
+      requestContext.sendSystemLog(`片段多于 5倍的 searchItemNumbers 配置 ，参考了 ${searchResults.length}个片段， 有${discaredCount} 个片段会被忽略，你可以减少检索范围来规避此情况`);
+    } else {
+      requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
+    }
+    return searchResults;
+
+  }
+
+
+
+  async searchAndRerank(message, path, requestContext) {
+    const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
+    const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
+    const seenUrls = new Set();
+    let searchResults = [];
+
+    requestContext.sendSystemLog('🔄 开始重写查询...');
+
+    const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
+
+    requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
+    const limitThisTurn = pageFetchLimit;
 
     for (const query of requeryResult) {
       if (searchResults.length >= limitThisTurn) {
@@ -102,11 +145,11 @@ export default class ReferenceHandler {
         const todoTasksRef = [];
 
         const createJsonPrompt = (jsonReference, message) => {
-          const prompt = `请基于 参考信息 references 里的内容，提取有助于回答问题的关键事实，
+          const prompt = `请基于 参考信息 references 里 content 字段里的内容，提取有助于回答问题的关键事实，
             
             要求：
             1. 回答中尽可能使用原文内容，包含详细数据和 URL 地址等，不要漏掉数据和连接。
-            2. 额外澄清依据的文件路径（即 doc.realUrl）。
+            2. 额外澄清依据的文件路径（即 reference里 url字段）。
             3. 用 JSON 格式返回答案，格式如下：
             {
               "answer": [
@@ -122,7 +165,7 @@ export default class ReferenceHandler {
                 }
               ]
             }
-            4. 如参考信息 references 不足以回答问题返回空的Answer json对象,格式如下：
+            4. 如参考信息 references 不足以回答问题,返回空的Answer json对象,格式如下：
             {
               "answer": []
             } 
@@ -148,6 +191,7 @@ export default class ReferenceHandler {
           };
         }
 
+        let taskBatchIndex = 0;
         for (const doc of detailsSearchResults) {
           const jsonReference = createJsonReference(doc);
 
@@ -157,9 +201,12 @@ export default class ReferenceHandler {
             currentLength += jsonStr.length;
             continue;
           } else {
-            const jsonPrompt = createJsonPrompt(todoTasksRef, message);
+            const currentBatchIndex = ++taskBatchIndex; // 在这里获取独立的批次号
+            const currentBatchRefs = [...todoTasksRef];
+
+            const jsonPrompt = createJsonPrompt(currentBatchRefs, message);
             tasks.push(async () => {
-              requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
+              requestContext.sendSystemLog(`🤖 分析内容(本步骤较慢) ,批次 ${currentBatchIndex}，分析 ${currentBatchRefs.length} 条内容`);
               let groupAnswer;
               for (let i = 0; i < 3; i++) {
                 try {
@@ -174,10 +221,9 @@ export default class ReferenceHandler {
               }
               if (groupAnswer) {
                 groupAnswers.push(groupAnswer.join(''));
-                requestContext.sendSystemLog('✅ 内容分析完成');
+                requestContext.sendSystemLog(`✅ 批次 ${currentBatchIndex}内容分析完成`);
               } else {
                 requestContext.sendSystemLog('❌ 内容分析失败');
-
               }
             });
             if (tasks.length >= maxConcurrentTasks) {
@@ -190,9 +236,12 @@ export default class ReferenceHandler {
         }
 
         if (todoTasksRef.length > 0) {
-          const jsonPrompt = createJsonPrompt(todoTasksRef, message);
+          const currentBatchIndex = ++taskBatchIndex; // 在这里获取独立的批次号
+          // 创建最后一批的副本
+          const finalBatchRefs = [...todoTasksRef];
+          const jsonPrompt = createJsonPrompt(finalBatchRefs, message);
           tasks.push(async () => {
-            requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢，多等一下）...`);
+            requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢）,批次 ${currentBatchIndex}，分析 ${finalBatchRefs.length} 条内容，剩余 0 条待分析`);
             let groupAnswer;
             for (let i = 0; i < 3; i++) {
               try {
@@ -207,7 +256,7 @@ export default class ReferenceHandler {
             }
             if (groupAnswer) {
               groupAnswers.push(groupAnswer.join(''));
-              requestContext.sendSystemLog('✅ 内容分析完成');
+              requestContext.sendSystemLog('✅ 最后的一个批次，内容分析完成');
             } else {
               requestContext.sendSystemLog('❌ 内容分析失败,一般是因为模型返回不符合预期');
               console.error('Error in LLM call attempt:', groupAnswer);
@@ -316,6 +365,7 @@ export default class ReferenceHandler {
   }
 
   async refineParsedFacts(parsedFacts, message, requestContext) {
+    requestContext.sendSystemLog(' 🔄 开始精炼数据......');
     // 1. 提取所有 URL，并保持原始顺序
     const allUrls = Array.from(new Set(
       parsedFacts.flatMap(fact => fact.urls)
@@ -327,6 +377,7 @@ export default class ReferenceHandler {
 
     if (totalLength <= this.MAX_CONTENT_SIZE) {
       // 如果内容长度已经符合要求，直接返回
+      requestContext.sendSystemLog('✅ 精炼完毕 ');
       return {
         fact: factsContent.join('\n\n'),
         urls: allUrls
