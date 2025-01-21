@@ -132,4 +132,5 @@ public interface DocumentDataRepository
                                              @Param("oldState") String oldState, 
                                              @Param("newState") String newState);
 
+        List<DocumentDataPO> findByFilePathLike(String filePathPattern);
 }

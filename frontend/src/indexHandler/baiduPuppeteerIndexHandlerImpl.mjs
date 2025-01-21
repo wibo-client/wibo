@@ -191,7 +191,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 return true;
             } catch (error) {
                 retryCount++;
-                console.warn(`翻页失败 (${retryCount}/${maxRetries}):`, error.message,error.stack);
+                console.warn(`翻页失败 (${retryCount}/${maxRetries}):`, error.message, error.stack);
 
                 if (error.message.includes('Node is detached')) {
                     // 对于节点分离错误，尝试刷新页面
@@ -268,12 +268,11 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 const nextPageSuccess = await this.handleNextPage(page, browserTimeout);
                 if (!nextPageSuccess) break;
             }
-            let resultId = 0;
             const outputContent = results.slice(0, searchItemNumbers).map(result => {
                 if (recordDescription && result.description) {
                     result.description = result.description.replace(/(播报|暂停|||爱企查|\n)/g, '');
                 }
-                result.id = resultId++;
+                result.id = Math.floor(Math.random() * 100000);;
                 return result;
             });
 

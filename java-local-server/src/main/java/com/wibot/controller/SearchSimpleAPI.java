@@ -32,6 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @RestController
 @RequestMapping("") // 添加基础路径
@@ -281,71 +283,42 @@ public class SearchSimpleAPI {
 
     @PostMapping("/fetchDocumentContent")
     public List<SearchResultVO> fetchDocumentContent(@RequestBody Map<String, Object> requestParams) {
-        Object pathPrefixObj = requestParams.get("pathPrefix");
+        String pathPrefix = String.valueOf(requestParams.get("pathPrefix"));
 
-        if (!(pathPrefixObj instanceof String)) {
-            throw new IllegalArgumentException("pathPrefix and query must be strings");
-        }
-
-        String pathPrefix = (String) pathPrefixObj;
-        SearchQuery searchQuery = buildSearchQuery(requestParams);
-
-        // 获取索引处理器
-        DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
-                .selectIndexHandler(searchQuery.getPathPrefix());
-        List<SearchDocumentResult> results = documentIndexInterface
-                .searchWithStrategy(searchQuery);
-
-        // 获取 results 中的 ID 列表
-        List<Long> resultIds = results.stream()
-                .map(result -> result.getMarkdownParagraph().getId())
-                .collect(Collectors.toList());
-
-        // 1) 打开pathPrefix 所对应的文件（这个接口要求必须是文件）
-        Optional<DocumentDataPO> documentDataOpt = documentDataRepository.findByFilePath(pathPrefix);
-        if (documentDataOpt.isEmpty()) {
-            logger.error("Document not found for pathPrefix: " + pathPrefix);
-            return new ArrayList<>();
-        }
-        DocumentDataPO documentData = documentDataOpt.get();
-
-        // 2) 从数据库中查询出对应的DocumentPO
-        Long documentDataId = documentData.getId();
-
-        String title = documentData.getFileName();
-        // 3) 根据DocumentPO的id 取对应的所有MarkdownParagraphPO
-        List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
-
-        // 4) 根据 results 中的 ID 对 paragraphs 进行重排序
-        List<MarkdownParagraphPO> sortedParagraphs = new ArrayList<>();
-        Set<Long> resultIdSet = new HashSet<>(resultIds);
-
-        // 先添加 results 中有的 ID
-        for (Long id : resultIds) {
-            paragraphs.stream()
-                    .filter(paragraph -> paragraph.getId().equals(id))
-                    .findFirst()
-                    .ifPresent(sortedParagraphs::add);
-        }
-
-        // 再添加 results 中没有但 paragraphs 中有的 ID
-        for (MarkdownParagraphPO paragraph : paragraphs) {
-            if (!resultIdSet.contains(paragraph.getId())) {
-                sortedParagraphs.add(paragraph);
+        // 处理带有通配符的路径
+        List<DocumentDataPO> documentDataList;
+        if (pathPrefix.contains("*")) {
+            documentDataList = findDocumentsWithWildcard(pathPrefix);
+        } else {
+            Optional<DocumentDataPO> documentDataOpt = documentDataRepository.findByFilePath(pathPrefix);
+            if (documentDataOpt.isEmpty()) {
+                logger.error("Document not found for pathPrefix: " + pathPrefix);
+                return new ArrayList<>();
             }
+            documentDataList = List.of(documentDataOpt.get());
         }
 
-        // 打印详细的 debug 日志
-        logger.debug("Sorted Paragraphs:");
-        for (MarkdownParagraphPO paragraph : sortedParagraphs) {
-            logger.debug("Paragraph ID: {}, Order: {}", paragraph.getId(), paragraph.getParagraphOrder());
+        List<SearchResultVO> searchResults = new ArrayList<>();
+        for (DocumentDataPO documentData : documentDataList) {
+            Long documentDataId = documentData.getId();
+            String title = documentData.getFileName();
+
+            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
+
+            searchResults.addAll(paragraphs.stream().map(paragraph -> {
+                return new SearchResultVO(paragraph.getId(), title, "",
+                        paragraph.getCreatedDateTime(), documentData.getFilePath());
+            }).collect(Collectors.toList()));
         }
 
-        // 转换为List<SearchResultVO> 后返回
-        return sortedParagraphs.stream().map(paragraph -> {
-            return new SearchResultVO(paragraph.getId(), title, paragraph.getContent(),
-                    paragraph.getCreatedDateTime(), documentData.getFilePath());
-        }).collect(Collectors.toList());
+        return searchResults;
+    }
+
+    private List<DocumentDataPO> findDocumentsWithWildcard(String pathPrefix) {    
+        //for h2 only
+        String sqlPattern = pathPrefix.replace("\\", "\\\\").replace("*", "%");
+  
+        return documentDataRepository.findByFilePathLike(sqlPattern);
     }
 
     private MarkdownParagraphPO getParagraphById(Long id) {

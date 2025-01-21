@@ -65,6 +65,13 @@ export class PathSuggestionService {
         if (pathPrefix === '') {
             return null;
         }
+
+        // 截取到最后一个 /，不要后面的文件
+        const lastSlashIndex = pathPrefix.lastIndexOf('/');
+        if (lastSlashIndex > 0) {
+            pathPrefix = pathPrefix.slice(0, lastSlashIndex + 1);
+        }
+
         // 查找最匹配的插件
         let longestMatch = '';
         let selectedPlugin = null;

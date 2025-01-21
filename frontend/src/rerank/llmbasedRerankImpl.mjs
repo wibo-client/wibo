@@ -31,7 +31,6 @@ export class LLMBasedRerankImpl extends DocumentRerankInterface {
             示例输出：\n
             ["2","3","1","4","5"]`
         }];
-
         let attempts = 0;
         while (attempts < 3) {
             try {
