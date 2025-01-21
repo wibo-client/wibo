@@ -4,7 +4,7 @@
   <groupId>com.wibo.app</groupId>
   <artifactId>wibo</artifactId>
   <packaging>jar</packaging>
-  <version>1..0</version>
+  <version>1.6.0</version>
   <name>wibo</name>
   <url>http://maven.apache.org</url>
 
