@@ -29,12 +29,11 @@
 
 ## 增加删除 聊天记录
 ## 知乎搜索能力增强
-## 增加对日期的识别考虑日期问题 ，尤其是在local
 ## 基于精炼事实，来做summary
 
 # 暂时不做了
 ## 本地优先作为 default 
-
+## 增加对日期的识别考虑日期问题 ，尤其是在local
 ## TODO 把extractKeyFacts 和 refineContent 移动到java端。提高性能
 
 
