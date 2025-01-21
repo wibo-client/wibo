@@ -148,55 +148,38 @@ app.whenReady().then(async () => {
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
     console.log(`Received message: ${message}, type: ${type}, path: ${path}`);
 
-    // 发送系统日志的辅助函数
-    const sendSystemLog = (log) => {
-      event.sender.send('system-log', log, requestId);
-    };
-
-    // 发送 LLM 流的辅助函数
-    const sendLLMStream = (markdownResult) => {
-      event.sender.send('llm-stream', markdownResult, requestId);
-    };
-
-    // 发送参考文档的辅助函数
-    const sendReference = (referenceData) => {
-      event.sender.send('add-reference', referenceData, requestId);
-    };
-
+    // 创建请求上下文
     const requestContext = {
       requestId,
       type,
-      sendSystemLog,
-      sendLLMStream,
-      sendReference,
+      sendSystemLog: (log) => event.sender.send('system-log', log, requestId),
+      sendLLMStream: (markdownResult) => event.sender.send('llm-stream', markdownResult, requestId),
+      sendReference: (referenceData) => event.sender.send('add-reference', referenceData, requestId),
       results: {}
     };
 
     try {
-
       const selectedPlugin = await globalContext.pluginHandler.select(path);
       requestContext.selectedPlugin = selectedPlugin;
 
-
       if (type === 'search') {
-        sendSystemLog('🔍 进入直接搜索...');
-        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
-        const markdownResult = await globalContext.referenceHandler.buildSearchResultsString(searchResults);
-        sendLLMStream(markdownResult);
-        sendSystemLog('✅ 搜索完成');
+        requestContext.sendSystemLog('🔍 进入直接搜索...');
+        await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
+        await globalContext.referenceHandler.buildSearchResultsString(message, path, requestContext);
+        requestContext.sendLLMStream(requestContext.results.markdownResult);
+        requestContext.sendSystemLog('✅ 搜索完成');
 
       } else if (type === 'highQuilityRAGChat') {
-        sendSystemLog('🔍 进入深问模式 ，大模型会遍历所有的文档片段，回答回更全面，但消耗的token相对较多，时间较慢');
-        const searchResults = await globalContext.referenceHandler.searchOrFullScan(message, path, requestContext);
-        const detailsSearchResults = await globalContext.referenceHandler.fetchDetails(searchResults, path, requestContext);
+        requestContext.sendSystemLog('🔍 进入深问模式，大模型会遍历所有的文档片段，回答将更全面，但消耗的token相对较多，时间较慢');
+        
+        await globalContext.referenceHandler.searchOrFullScan(message, path, requestContext);
+        await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
+        await globalContext.referenceHandler.extractKeyFacts(message, path, requestContext);
+        await globalContext.referenceHandler.refineParsedFacts(message, path, requestContext);
 
-        let parsedFacts = await globalContext.referenceHandler.extractKeyFacts(detailsSearchResults, message, requestContext);
-        let refinedParsedFacts = await globalContext.referenceHandler.refineParsedFacts(parsedFacts, message, requestContext);
-
-        const allFacts = refinedParsedFacts.fact;
         const finalPrompt = `请基于以下参考内容回答问题：
         参考内容：
-        ${allFacts}
+        ${requestContext.results.refinedFacts.fact}
         
         问题：${message}`;
 
@@ -206,48 +189,40 @@ app.whenReady().then(async () => {
           requestContext.sendLLMStream
         );
 
-        const citedUrls = new Set(refinedParsedFacts.urls);
-        const sortedSearchResults = [...searchResults].sort((a, b) => {
-          const aIsCited = citedUrls.has(a.realUrl);
-          const bIsCited = citedUrls.has(b.realUrl);
-          return bIsCited - aIsCited;
-        });
-
-        const referenceData = globalContext.referenceHandler.buildReferenceData(sortedSearchResults);
-        sendReference(referenceData);
-        sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
+        await globalContext.referenceHandler.buildReferenceData(message, path, requestContext);
+        requestContext.sendReference(requestContext.results.referenceData);
+        requestContext.sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
       } else if (type === 'searchAndChat') {
-        sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
+        requestContext.sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
 
-        const searchResults = await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
-        sendSystemLog('📑 获取详细内容...');
-        const aggregatedContent = await globalContext.referenceHandler.fetchDetails(searchResults, path, requestContext);
+        await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
+        await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
+        await globalContext.referenceHandler.buildPromptFromContent(message, path, requestContext);
 
-        sendSystemLog(`✅ 获取到 ${aggregatedContent.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
-        const prompt = await globalContext.referenceHandler.buildPromptFromContent(aggregatedContent, message);
+        await callLLMAsync(
+          [{ role: 'user', content: requestContext.results.finalPrompt }],
+          requestContext.sendSystemLog,
+          requestContext.sendLLMStream
+        );
 
-        const messages = [{ role: 'user', content: prompt }];
-
-        await callLLMAsync(messages, requestContext.sendSystemLog, requestContext.sendLLMStream);
-
-        const referenceData = globalContext.referenceHandler.buildReferenceData(aggregatedContent);
-        sendReference(referenceData);
-        sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
+        await globalContext.referenceHandler.buildReferenceData(message, path, requestContext);
+        requestContext.sendReference(requestContext.results.referenceData);
+        requestContext.sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
       } else if (type === 'chat') {
-        sendSystemLog('💬 启动直接对话模式...');
+        requestContext.sendSystemLog('💬 启动直接对话模式...');
         await callLLMAsync(
           [{ role: 'user', content: message }],
           requestContext.sendSystemLog,
           requestContext.sendLLMStream
         );
-        sendSystemLog('✅ 开始回答');
+        requestContext.sendSystemLog('✅ 开始回答');
       }
 
     } catch (error) {
       console.error(`Error occurred in handler for 'send-message': ${error}`, error);
-      sendSystemLog(`❌ 错误: ${error.message}`);
+      requestContext.sendSystemLog(`❌ 错误: ${error.message}`);
       event.sender.send('error', { message: error.message }, requestId);
     }
   });

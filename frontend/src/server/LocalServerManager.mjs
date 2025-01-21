@@ -257,68 +257,29 @@ export default class LocalServerManager {
 
     // 修改检查进程状态方法
     async checkProcessStatus() {
-        if (!this.javaProcess) {
-            const savedProcess = this.getJavaProcess();
-            if (!savedProcess) return false;
-
-            try {
-                // 首先检查进程是否存在
-                process.kill(savedProcess.pid, 0);
-
-                // 进程存在，继续检查健康状态
-                const isHealthy = await this.checkHealth(savedProcess.port);
-
-                if (!isHealthy) {
-                    logger.warn('[ProcessCheck] Process exists but health check failed');
-
-                    // 尝试终止进程
-                    try {
-                        if (process.platform === 'win32') {
-                            spawn('taskkill', ['/pid', savedProcess.pid, '/f', '/t']);
-                        } else {
-                            process.kill(savedProcess.pid, 'SIGTERM');
-                            // 给进程一些时间来完成终止
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            // 如果进程还在，强制终止
-                            try {
-                                process.kill(savedProcess.pid, 'SIGKILL');
-                            } catch (e) {
-                                // 忽略错误，因为进程可能已经终止
-                            }
-                        }
-                    } catch (killError) {
-                        logger.error('[ProcessCheck] Failed to kill unhealthy process:', killError);
-                    }
-
-                    // 清理存储的进程信息
-                    this.deleteJavaProcess();
-                    return false;
-                }
-                this.savedProcess = savedProcess;
-
-                // 进程正常且健康
-                return true;
-
-            } catch (e) {
-                logger.warn('[ProcessCheck] Process check failed:', e.message);
-                this.deleteJavaProcess();
-                return false;
-            }
-        }
-
-        // 如果进程已经在运行，也要做健康检查
+       
         const savedProcess = this.getJavaProcess();
-        if (savedProcess) {
+        if (!savedProcess) return false;
+
+        try {
+            // 首先检查进程是否存在
+            process.kill(savedProcess.pid, 0);
+
+            // 进程存在，继续检查健康状态
             const isHealthy = await this.checkHealth(savedProcess.port);
+
             if (!isHealthy) {
-                logger.warn('[ProcessCheck] Running process health check failed');
-                this.javaProcess = null;
-                this.deleteJavaProcess();
+                logger.warn('[ProcessCheck] Process exists but health check failed');
                 return false;
             }
-        }
+            // 进程正常且健康
+            return true;
 
-        return true;
+        } catch (e) {
+            logger.warn('[ProcessCheck] Process check failed:', e.message);
+            this.deleteJavaProcess();
+            return false;
+        }
     }
 
     // 查找 jar 文件的辅助方法

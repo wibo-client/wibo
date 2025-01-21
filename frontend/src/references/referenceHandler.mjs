@@ -9,8 +9,9 @@ export default class ReferenceHandler {
     this.globalContext = globalContext;
   }
 
-  buildReferenceData(aggregatedContent) {
-    return {
+  buildReferenceData(message, path, requestContext) {
+    const aggregatedContent = requestContext.results.searchResults;
+    const referenceData = {
       fullContent: aggregatedContent.map((doc, index) => ({
         index: index + 1,
         title: doc.title,
@@ -24,6 +25,8 @@ export default class ReferenceHandler {
       })),
       totalCount: aggregatedContent.length
     };
+    
+    requestContext.results.referenceData = referenceData;
   }
 
   async searchOrFullScan(message, path, requestContext) {
@@ -65,11 +68,8 @@ export default class ReferenceHandler {
     } else {
       requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
     }
-    return searchResults;
-
+    requestContext.results.searchResults = searchResults;
   }
-
-
 
   async searchAndRerank(message, path, requestContext) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
@@ -111,22 +111,26 @@ export default class ReferenceHandler {
     }
 
     requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
-    return searchResults;
+    requestContext.results.searchResults = searchResults;
   }
 
-  async fetchDetails(searchResults, path, requestContext) {
+  async fetchDetails(message, path, requestContext) {
+    const searchResults = requestContext.results.searchResults;
+    
     requestContext.sendSystemLog('📑 获取详细内容...');
     if (!searchResults || searchResults.length === 0) {
       requestContext.sendSystemLog('ℹ️ 未找到相关内容');
-      return [];
+      requestContext.results.detailsSearchResults = [];
+      return;
     }
     const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(searchResults);
     requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
-    return detailsSearchResults;
+    
+    requestContext.results.detailsSearchResults = detailsSearchResults;
   }
 
-
-  async extractKeyFacts(detailsSearchResults, message, requestContext) {
+  async extractKeyFacts(message, path, requestContext) {
+    const detailsSearchResults = requestContext.results.detailsSearchResults;
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -134,7 +138,8 @@ export default class ReferenceHandler {
         // 检查聚合内容是否为空
         if (!detailsSearchResults || detailsSearchResults.length === 0) {
           requestContext.sendSystemLog('ℹ️ 无法获取详细内容');
-          return [];
+          requestContext.results.parsedFacts = [];
+          return;
         }
 
         let currentLength = 0;
@@ -313,7 +318,8 @@ export default class ReferenceHandler {
             ? `✅ 成功解析 ${parsedFacts.length} 条事实`
             : '✅ 未发现相关事实';
           requestContext.sendSystemLog(resultMessage);
-          return parsedFacts;
+          requestContext.results.parsedFacts = parsedFacts;
+          return;
         }
 
         // 如果没有有效响应，但还有重试机会
@@ -323,19 +329,19 @@ export default class ReferenceHandler {
 
         // 最后一次尝试也失败了，返回空数组
         requestContext.sendSystemLog('ℹ️ 未能获取有效内容');
-        return [];
+        requestContext.results.parsedFacts = [];
+        return;
 
       } catch (error) {
         console.error(`第 ${attempt + 1} 次尝试失败:`, error.message);
         requestContext.sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : ''}`);
 
         if (attempt === 2) {
-          return [];
+          requestContext.results.parsedFacts = [];
+          return;
         }
       }
     }
-
-    return [];
   }
 
   async refineBatch(currentBatch, message, requestContext) {
@@ -364,7 +370,8 @@ export default class ReferenceHandler {
     }
   }
 
-  async refineParsedFacts(parsedFacts, message, requestContext) {
+  async refineParsedFacts(message, path, requestContext) {
+    const parsedFacts = requestContext.results.parsedFacts;
     requestContext.sendSystemLog(' 🔄 开始精炼数据......');
     // 1. 提取所有 URL，并保持原始顺序
     const allUrls = Array.from(new Set(
@@ -378,10 +385,11 @@ export default class ReferenceHandler {
     if (totalLength <= this.MAX_CONTENT_SIZE) {
       // 如果内容长度已经符合要求，直接返回
       requestContext.sendSystemLog('✅ 精炼完毕 ');
-      return {
+      requestContext.results.refinedFacts = {
         fact: factsContent.join('\n\n'),
         urls: allUrls
       };
+      return;
     }
 
     // 3. 需要精炼的情况
@@ -421,13 +429,14 @@ export default class ReferenceHandler {
     }
 
     // 4. 返回精炼后的结果
-    return {
+    requestContext.results.refinedFacts = {
       fact: refinedContent.join('\n\n'),
       urls: allUrls
     };
   }
 
-  async buildPromptFromContent(aggregatedContent, message) {
+  async buildPromptFromContent(message, path, requestContext) {
+    const aggregatedContent = requestContext.results.detailsSearchResults;
     const contextBuilder = [];
     let currentLength = 0;
     let partIndex = 1;
@@ -455,11 +464,11 @@ export default class ReferenceHandler {
     }
 
     const suggestionContext = contextBuilder.join('');
-    return `尽可能依托于如下参考信息：\n${suggestionContext}\n\n处理用户的请求：\n${message}`;
+    requestContext.results.finalPrompt = `尽可能依托于如下参考信息：\n${suggestionContext}\n\n处理用户的请求：\n${message}`;
   }
 
-
-  async buildSearchResultsString(searchResults) {
+  async buildSearchResultsString(message, path, requestContext) {
+    const searchResults = requestContext.results.searchResults;
     let sb = '';
     let fileNumber = 1;
     searchResults.forEach(result => {
@@ -470,7 +479,8 @@ export default class ReferenceHandler {
         sb += `${result.date}\n`;
       }
     });
-    return sb;
+    
+    requestContext.results.markdownResult = sb;
   }
 
   // async callLLMRemoteAsync(messages, requestContext, sendLLMStream) {

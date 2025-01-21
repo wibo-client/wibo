@@ -156,6 +156,33 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         });
     }
 
+    async waitForSelectorWithRetry(page, selector, timeout, maxRetries = 3) {
+        let lastError;
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                await page.waitForSelector(selector, {
+                    timeout: timeout * 1000,
+                    visible: true
+                });
+                return true;
+            } catch (error) {
+                lastError = error;
+                console.warn(`等待选择器 ${selector} 失败 (${i + 1}/${maxRetries}): ${error.message}`);
+                
+                // 如果不是最后一次重试，则等待后重试
+                if (i < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                    try {
+                        await page.reload({ waitUntil: 'networkidle0' });
+                    } catch (reloadError) {
+                        console.warn(`页面重载失败: ${reloadError.message}`);
+                    }
+                }
+            }
+        }
+        throw lastError;
+    }
+
     async handleNextPage(page, browserTimeout) {
         const nextPageSelector = 'a.n';
         let retryCount = 0;
@@ -163,8 +190,8 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
 
         while (retryCount < maxRetries) {
             try {
-                // 检查下一页按钮是否存在
-                const nextPageExists = await page.$(nextPageSelector);
+                // 检查并选择包含“下一页”文本的 a.n 元素
+                const nextPageExists = await page.$eval(nextPageSelector, el => el && el.textContent.includes('下一页') ? el : null);
                 if (!nextPageExists) return false;
 
                 // 等待元素可交互
@@ -183,10 +210,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
                 await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 500) + 500));
 
                 // 等待新页面加载完成
-                await page.waitForSelector('h3', {
-                    timeout: browserTimeout * 1000,
-                    visible: true
-                });
+                await this.waitForSelectorWithRetry(page, 'h3', browserTimeout);
 
                 return true;
             } catch (error) {
@@ -244,7 +268,7 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
             await this.navigateToPage(page, 'https://www.baidu.com', 'input[name="wd"]');
             await page.type('input[name="wd"]', query);
             await page.keyboard.press('Enter');
-            await page.waitForSelector('h3', { timeout: browserTimeout * 1000 });
+            await this.waitForSelectorWithRetry(page, 'h3', browserTimeout);
 
             const results = [];
             const seenUrls = new Set();
