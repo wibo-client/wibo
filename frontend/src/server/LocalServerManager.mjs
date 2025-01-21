@@ -24,7 +24,7 @@ export default class LocalServerManager {
     constructor() {
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
 
         // 启动状态同步任务
         this.startStateSyncTask();
@@ -194,7 +194,10 @@ export default class LocalServerManager {
 
     // 新增：执行对应动作
     async executeAction(action, serverInfo) {
-        logger.info(`[StateManager] Executing action: ${action}`);
+        // 只有2%概率输出日志
+        if (Math.random() < 0.02) {
+            logger.info(`[StateManager] Executing action: ${action}`);
+        }
 
         switch (action) {
             case 'CONTINUE':

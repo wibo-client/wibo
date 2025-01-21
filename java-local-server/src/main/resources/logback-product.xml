@@ -16,8 +16,8 @@
     </appender>
 
     <!-- 设置特定包的日志级别 -->
-    <logger name="org.springframework" level="INFO"/>
-    <logger name="org.hibernate" level="INFO"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
 
     <!-- root配置需要同时引用两个appender -->
     <root level="INFO">
