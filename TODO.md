@@ -15,17 +15,14 @@
 ## 要支持对单文件的能力 那也就要增加对单文件的返回 ok
 ## 百度的Rerwite 搞起来。 ok 
 ## [Object object]问题优化 ok
-
 ## 预研：考虑减少包大小，主要是chrome的可行方法 ok. need test
 ## 预研：减少jvm和spirng的大小
 ## 预研：提高spring启动速度 
-
-## 优先windows release
-## 增加日志能力
-
+## 优先windows release ok
+## 增加日志能力 ok
 ## 支持用 / *xxx的方式，来允许用户使用特定的文档全量做处理。 ok 
 
-V1.6.0
+# V1.6.0
 
 ## 增加一个停止当前任务的能力
 ## 增加删除 聊天记录
@@ -33,7 +30,7 @@ V1.6.0
 ## 增加对日期的识别考虑日期问题 ，尤其是在local
 ## 基于精炼事实，来做summary
 
-暂时不做了
+# 暂时不做了
 ## 本地优先作为 default 
 
 ## TODO 把extractKeyFacts 和 refineContent 移动到java端。提高性能
