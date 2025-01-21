@@ -10,7 +10,7 @@ export class PluginHandlerImpl {
     constructor() {
         this.pluginInstanceMap = new Map();
         this.pathSuggestionService = new PathSuggestionService();
-        this.updateInterval = 1 * 60 * 1000; // 5分钟更新一次
+        this.updateInterval = 30 * 1000; //30秒更新一次
         this.lastUpdateTime = 0;
     }
 

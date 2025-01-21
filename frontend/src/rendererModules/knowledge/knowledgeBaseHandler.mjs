@@ -25,7 +25,7 @@ export default class KnowledgeBaseHandler {
   startUpdateTimer() {
     if (!this.updateTimer) {
       this.updateMonitoredDirs(); // 立即执行一次
-      this.updateTimer = setInterval(() => this.updateMonitoredDirs(), 30000); // 改为30秒轮询一次
+      this.updateTimer = setInterval(() => this.updateMonitoredDirs(), 10000); // 改为30秒轮询一次
       console.log('[KnowledgeBase] Started update timer');
     }
   }
