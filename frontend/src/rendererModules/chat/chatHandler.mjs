@@ -464,12 +464,23 @@ export default class ChatHandler {
         </div>
         <div class="system-actions">
           <span class="system-toggle">展开详情</span>
+          <span class="system-stop">终止任务</span>
         </div>
       `;
       messageGroup.appendChild(systemMessageElement);
 
       const systemContent = systemMessageElement.querySelector('.system-content');
       const systemToggle = systemMessageElement.querySelector('.system-toggle');
+      const systemStop = systemMessageElement.querySelector('.system-stop');
+
+      // 添加终止任务的点击处理
+      systemStop.addEventListener('click', async () => {
+        try {
+          await window.electron.stopCurrentTask(requestId);
+        } catch (error) {
+          console.error('终止任务失败:', error);
+        }
+      });
 
       // 修改展开/折叠功能的绑定方式
       const toggleSystemContent = () => {

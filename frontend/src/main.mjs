@@ -339,6 +339,18 @@ app.whenReady().then(async () => {
     }
   });
 
+  // 添加终止任务的处理器
+  ipcMain.handle('stop-current-task', async (event, requestId) => {
+    try {
+      // TODO: 实现终止任务的具体逻辑
+      console.log('收到终止任务请求:', requestId);
+      return { success: true };
+    } catch (error) {
+      console.error('终止任务失败:', error);
+      throw error;
+    }
+  });
+
   // 确保在应用退出时清理 Java 进程
   app.on('before-quit', async () => {
     try {

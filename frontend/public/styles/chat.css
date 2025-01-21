@@ -62,6 +62,37 @@
 
 .system-actions {
     margin-top: 4px;
+    display: flex;
+    gap: 12px;
+}
+
+.system-toggle,
+.system-stop {
+    cursor: pointer;
+    color: #2196F3;
+    font-size: 0.8em;
+    display: inline-block;
+    user-select: none;
+    padding: 2px 4px;
+}
+
+.system-stop {
+    color: #dc3545;  /* 使用红色来表示终止操作 */
+}
+
+.system-toggle:hover,
+.system-stop:hover {
+    text-decoration: underline;
+    background-color: #f0f8ff;
+    border-radius: 3px;
+}
+
+.system-stop:hover {
+    background-color: #fff5f5;  /* 红色背景hover效果 */
+}
+
+.system-actions {
+    margin-top: 4px;
 }
 
 .system-toggle {

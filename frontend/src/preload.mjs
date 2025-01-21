@@ -76,7 +76,10 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   // 添加 setDefaultHandler 方法
-  setDefaultHandler: (pathPrefix) => ipcRenderer.invoke('set-default-handler', pathPrefix)
+  setDefaultHandler: (pathPrefix) => ipcRenderer.invoke('set-default-handler', pathPrefix),
+
+  // 添加终止任务方法
+  stopCurrentTask: (requestId) => ipcRenderer.invoke('stop-current-task', requestId)
 });
 
 // 认证相关 API
