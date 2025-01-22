@@ -13,14 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wibot.persistence.DocumentDataRepository;
-import com.wibot.persistence.MarkdownBasedContentRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
 import com.wibot.persistence.RefineryTaskRepository;
-import com.wibot.persistence.entity.MarkdownBasedContentPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import com.wibot.persistence.entity.RefineryTaskDO;
+import com.wibot.service.dto.ExtractFactResponse;
 import com.wibot.service.dto.ExtractedFact;
-import com.alibaba.dashscope.utils.JsonUtils;
+import com.wibot.utils.JsonExtractor;
 import com.wibot.controller.vo.RefineryTaskVO;
 
 import java.time.LocalDateTime;
@@ -30,6 +29,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.dashscope.utils.JsonUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Service
 public class RefineryService {
@@ -50,6 +53,8 @@ public class RefineryService {
 
     @Autowired
     private MarkdownParagraphRepository markdownParagraphRepository;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
         // 转换VO到DO
@@ -137,26 +142,9 @@ public class RefineryService {
     private void processTask(RefineryTaskDO task) {
         String checkpoint = task.getProcessingCheckpoint();
         try {
-            List<Long> sortedParagraphIds = getSortedParagraphIds(task.getDirectoryPath());
+            List<MarkdownParagraphPO> sortedParagraphIds = getSortedParagraphIds(task.getDirectoryPath());
 
-            // 从断点继续处理
-            int startIndex = 0;
-            if (checkpoint != null) {
-                startIndex = Integer.parseInt(checkpoint);
-            }
-
-            List<MarkdownParagraphPO> paragraphs = new ArrayList<>();
-            for (int i = startIndex; i < sortedParagraphIds.size(); i++) {
-                Optional<MarkdownParagraphPO> paragraph = markdownParagraphRepository.findById(sortedParagraphIds.get(i));
-                if (paragraph.isPresent()) {
-                    paragraphs.add(paragraph.get());
-                }
-
-                task.setProcessingCheckpoint(String.valueOf(i));
-                task = refineryTaskRepository.save(task);
-            }
-
-            List<ExtractedFact> facts = extractFactsFromParagraph(paragraphs, task.getKeyQuestion());
+            List<ExtractedFact> facts = extractFactsFromParagraph(sortedParagraphIds, task.getKeyQuestion());
             // TODO: 保存提取的事实到数据库
 
         } catch (Exception e) {
@@ -222,11 +210,27 @@ public class RefineryService {
                         .call()
                         .content();
 
-                    ExtractFactResponse factResponse = JsonUtils.parseJson(response, ExtractFactResponse.class);
-                    if (factResponse != null && factResponse.getFacts() != null) {
-                        allFacts.addAll(factResponse.getFacts());
-                        logger.info("Successfully processed batch {}, extracted {} facts", batchIndex, factResponse.getFacts().size());
-                        break;
+                    // 先提取JSON字符串
+                    String jsonStr = JsonExtractor.extractJsonFromResponse(response);
+                    if (jsonStr == null) {
+                        logger.error("Failed to extract JSON from response: {}", response);
+                        continue;
+                    }
+
+                    // 解析JSON
+                    try {
+                        ExtractFactResponse factResponse = objectMapper.readValue(jsonStr, ExtractFactResponse.class);
+                        if (factResponse != null && factResponse.getFacts() != null) {
+                            allFacts.addAll(factResponse.getFacts());
+                            logger.info("Successfully processed batch {}, extracted {} facts", 
+                                batchIndex, factResponse.getFacts().size());
+                            break;
+                        }
+                    } catch (JsonProcessingException e) {
+                        logger.error("Failed to parse extracted JSON: {}", jsonStr, e);
+                        if (attempt == 2) {
+                            throw e;
+                        }
                     }
                 } catch (Exception e) {
                     if (attempt == 2) {
@@ -248,21 +252,21 @@ public class RefineryService {
      * @param directoryPath 目录路径
      * @return 已排序的段落ID列表
      */
-    private List<Long> getSortedParagraphIds(String directoryPath) {
-        List<Long> paragraphIds = new ArrayList<>();
+    private List<MarkdownParagraphPO> getSortedParagraphIds(String directoryPath) {
+        List<MarkdownParagraphPO> paragraphs = new ArrayList<>();
 
         documentDataRepository.findByFilePathStartingWith(directoryPath)
             .forEach(doc -> {
                 markdownParagraphRepository.findByDocumentDataId(doc.getId())
                     .forEach(paragraph -> {
-                        paragraphIds.add(paragraph.getId());
+                        paragraphs.add(paragraph);
                     });
             });
 
         // 排序以方便断点续传
-        paragraphIds.sort(Long::compareTo);
+        paragraphs.sort((p1, p2) -> Long.compare(p1.getId(), p2.getId()));
 
-        return paragraphIds;
+        return paragraphs;
     }
 
     private RefineryTaskVO convertToVO(RefineryTaskDO taskDO) {
