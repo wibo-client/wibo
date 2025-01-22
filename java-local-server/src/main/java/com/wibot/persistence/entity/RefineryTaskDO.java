@@ -40,6 +40,17 @@ public class RefineryTaskDO {
     @Column(length = 2000)
     private String processingCheckpoint;  // 断点续传信息
 
+    // 任务状态常量
+    public static final String STATUS_PENDING = "PENDING";      // 待处理
+    public static final String STATUS_ACTIVE = "ACTIVE";        // 活跃
+    public static final String STATUS_PROCESSING = "PROCESSING"; // 处理中
+    public static final String STATUS_FAILED = "FAILED";        // 失败
+
+    // 更新周期常量
+    public static final String CYCLE_DAILY = "DAILY";     // 每日
+    public static final String CYCLE_WEEKLY = "WEEKLY";   // 每周
+    public static final String CYCLE_MONTHLY = "MONTHLY"; // 每月
+
     public String getId() {
         return id;
     }
