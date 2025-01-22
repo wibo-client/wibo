@@ -257,7 +257,7 @@ export default class LocalServerManager {
 
     // 修改检查进程状态方法
     async checkProcessStatus() {
-       
+
         const savedProcess = this.getJavaProcess();
         if (!savedProcess) return false;
 

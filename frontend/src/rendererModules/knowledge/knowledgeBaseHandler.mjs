@@ -26,7 +26,7 @@ export default class KnowledgeBaseHandler {
     if (!this.updateTimer) {
       this.updateMonitoredDirs(); // 立即执行一次
       this.updateTimer = setInterval(() => this.updateMonitoredDirs(), 10000); // 改为30秒轮询一次
-      console.log('[KnowledgeBase] Started update timer');
+      console.log('[本地索引服务] 启动监控定时器');
     }
   }
 
@@ -34,7 +34,7 @@ export default class KnowledgeBaseHandler {
     if (this.updateTimer) {
       clearInterval(this.updateTimer);
       this.updateTimer = null;
-      console.log('[KnowledgeBase] Stopped update timer');
+      console.log('[本地索引服务] 停止监控定时器');
     }
   }
 
@@ -106,7 +106,11 @@ export default class KnowledgeBaseHandler {
           return false;
         }
       } catch (error) {
-        console.error('Failed to get server status:', error);
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+          console.debug('[本地索引服务] 服务离线，等待重新连接...');
+        } else {
+          console.error('[本地索引服务] 获取服务状态失败:', error.message);
+        }
         this.BASE_URL = null;
         this.stopUpdateTimer();
         return false;
@@ -125,11 +129,11 @@ export default class KnowledgeBaseHandler {
   // 添加初始化索引设置方法
   async initializeIndexSettings() {
     if (!this.BASE_URL) {
-      console.warn('[KnowledgeBase] Service not available, cannot fetch index settings');
+      console.warn('[本地索引服务] 服务未就绪，跳过获取索引设置');
       return;
     }
     if (this.isUpdatingUI) {
-      console.log('[KnowledgeBase] UI is locked, skipping update');
+      console.log('[本地索引服务] UI正在更新中，跳过获取索引设置');
       return; // 如果UI正在被用户操作，跳过更新
     }
 
@@ -169,9 +173,14 @@ export default class KnowledgeBaseHandler {
         ignoredDirs.value = settings.ignoredDirectories.join('\n');
       }
 
-      console.log('[KnowledgeBase] Index settings initialized');
+      console.log('[本地索引服务] 索引设置初始化完成');
     } catch (error) {
-      console.error('[KnowledgeBase] Failed to fetch index settings:', error);
+      // 只在非离线错误时打印详细信息
+      if (error.name !== 'TypeError' || error.message !== 'Failed to fetch') {
+        console.error('[本地索引服务] 获取索引设置失败:', error.message);
+      } else {
+        console.debug('[本地索引服务] 服务离线，无法获取索引设置');
+      }
     }
   }
 
@@ -188,11 +197,11 @@ export default class KnowledgeBaseHandler {
 
         // 如果期望状态是开启，但实际状态是关闭，显示提示
         if (serverStatus.desiredState && !serverStatus.isHealthy) {
-          console.log('[KnowledgeBase] Service is starting...');
+          console.log('[本地索引服务] 正在启动中...');
         }
       }
     } catch (error) {
-      console.error('[KnowledgeBase] Failed to initialize state:', error);
+      console.error('[本地索引服务] 初始化状态失败:', error.message);
     }
   }
 
@@ -406,7 +415,7 @@ export default class KnowledgeBaseHandler {
         document.getElementById('uploadDir').value = data.uploadDir || 'remoteFile';
       }
     } catch (error) {
-      console.error('获取上传配置失败:', error);
+      console.error('[本地索引服务] 获取上传配置失败:', error.message);
     }
   }
 
@@ -458,7 +467,7 @@ export default class KnowledgeBaseHandler {
   // 修改 updateMonitoredDirs 方法
   async updateMonitoredDirs() {
     if (!this.BASE_URL) {
-      console.warn('Service not available, cannot update monitored dirs');
+      console.warn('[本地索引服务] 服务未就绪，无法更新监控目录');
       return;
     }
     try {
@@ -481,7 +490,7 @@ export default class KnowledgeBaseHandler {
         row.insertCell(5).appendChild(deleteButton);
       });
     } catch (error) {
-      console.warn('[KnowledgeBase] Failed to update monitored dirs:', error.message);
+      console.warn('[本地索引服务] 更新监控目录失败:', error.message);
       // 不再记录详细错误，因为服务离线时这是预期的行为
     }
   }
@@ -512,7 +521,7 @@ export default class KnowledgeBaseHandler {
         // console.log('Server not healthy:', serverStatus); // 添加调试日志
       }
     } catch (error) {
-      console.error('服务状态检查失败:', error);
+      console.error('[本地索引服务] 状态检查失败:', error.message);
       statusDot.classList.remove('online');
       statusDot.classList.add('offline');
       statusText.textContent = '检查失败';
