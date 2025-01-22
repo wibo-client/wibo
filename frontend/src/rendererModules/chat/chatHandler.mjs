@@ -13,6 +13,7 @@ export default class ChatHandler {
     this.inputHistory = [];           // 添加输入历史数组
     this.historyIndex = -1;          // 添加历史索引
     this.currentInput = '';          // 添加当前输入缓存
+    this.setupContextMenuHandler();
   }
 
   async loadInitialHistory() {
@@ -156,6 +157,7 @@ export default class ChatHandler {
   createMessageGroupFromData(messageData) {
     const messageGroup = document.createElement('div');
     messageGroup.className = 'message-group';
+    messageGroup.setAttribute('data-message-id', messageData.id); // 改用 id 而不是 timestamp
     messageGroup.innerHTML = messageData.html;
     return messageGroup;
   }
@@ -448,6 +450,8 @@ export default class ChatHandler {
       // 创建消息组容器
       const messageGroup = document.createElement('div');
       messageGroup.className = 'message-group';
+      const messageId = uuidv4(); // 使用UUID替代timestamp
+      messageGroup.setAttribute('data-message-id', messageId);  // 使用data-message-id属性
 
       // 用户输入信息
       const userMessageElement = document.createElement('div');
@@ -478,7 +482,7 @@ export default class ChatHandler {
         try {
           const result = await window.electron.stopCurrentTask(requestId);
           systemContent.querySelector('.execution-log:last-child').textContent = `⏳ 终止命令已提交...`;
-          
+
           if (!result.success) {
             console.error('终止任务失败:', result);
           }
@@ -658,13 +662,19 @@ export default class ChatHandler {
 
       // 在创建消息组后，保存到历史记录
       const messageData = {
-        timestamp: Date.now(),
+        id: messageId,  // 添加UUID作为消息ID
+        timestamp: Date.now(),  // 保留timestamp用于显示时间
         type: type,
         path: path,
         html: messageGroup.innerHTML
       };
 
-      await window.electron.chatHistory.saveMessage(messageData);
+      const savedMessage = await window.electron.chatHistory.saveMessage(messageData);
+
+      // 如果后端返回了新的ID,更新DOM元素的ID
+      if (savedMessage && savedMessage.id !== messageId) {
+        messageGroup.setAttribute('data-message-id', savedMessage.id);
+      }
 
     } catch (error) {
       console.error('发送消息错误:', error);
@@ -680,6 +690,105 @@ export default class ChatHandler {
     const chatInput = document.getElementById('chatInput');
     if (chatInput) {
       chatInput.value = '';
+    }
+  }
+
+  setupContextMenuHandler() {
+    // 监听右键菜单命令
+    window.electron.onContextMenuCommand(async (command, elementInfo) => {
+      switch (command) {
+        case 'delete-current-message':
+          let selectedMessage = document.querySelector('.message-group.selected');
+
+          // 如果没有选中的消息，尝试通过坐标找到最近的消息组
+          if (!selectedMessage && elementInfo.x && elementInfo.y) {
+            // 获取所有消息组
+            const messageGroups = document.querySelectorAll('.message-group');
+
+            // 计算每个消息组中心点到鼠标的距离
+            let nearestDistance = Infinity;
+            let nearestElement = null;
+
+            messageGroups.forEach(group => {
+              const rect = group.getBoundingClientRect();
+              const centerX = rect.left + rect.width / 2;
+              const centerY = rect.top + rect.height / 2;
+
+              // 计算欧几里得距离
+              const distance = Math.sqrt(
+                Math.pow(centerX - elementInfo.x, 2) +
+                Math.pow(centerY - elementInfo.y, 2)
+              );
+
+              if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestElement = group;
+              }
+            });
+
+            // 如果找到最近的元素，将其设置为选中状态
+            if (nearestElement) {
+              // 移除其他消息的选中状态
+              document.querySelectorAll('.message-group.selected').forEach(el => {
+                el.classList.remove('selected');
+              });
+              // 为最近的消息添加选中状态
+              nearestElement.classList.add('selected');
+              selectedMessage = nearestElement;
+            }
+          }
+
+          // 处理选中的消息
+          if (selectedMessage) {
+            const messageId = selectedMessage.getAttribute('data-message-id');
+            if (messageId) {
+              await this.deleteMessage(messageId);
+              selectedMessage.remove();
+            }
+          }
+          break;
+
+        case 'clear-all-messages':
+          if (confirm('确定要清空所有对话记录吗？')) {
+            await this.clearAllMessages();
+          }
+          break;
+      }
+    });
+
+    // 添加消息选中状态处理
+    document.getElementById('messages').addEventListener('click', (e) => {
+      const messageGroup = e.target.closest('.message-group');
+      if (messageGroup) {
+        // 移除其他消息的选中状态
+        document.querySelectorAll('.message-group.selected').forEach(el => {
+          el.classList.remove('selected');
+        });
+        // 为当前消息添加选中状态
+        messageGroup.classList.add('selected');
+      }
+    });
+  }
+
+  async deleteMessage(messageId) {
+    try {
+      await window.electron.chatHistory.deleteMessage(messageId);
+      const element = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (element) {
+        element.remove();
+      }
+    } catch (error) {
+      console.error('删除消息失败:', error);
+    }
+  }
+
+  async clearAllMessages() {
+    try {
+      await window.electron.chatHistory.clearAllMessages();
+      const messagesContainer = document.getElementById('messages');
+      messagesContainer.innerHTML = '';
+    } catch (error) {
+      console.error('清空消息失败:', error);
     }
   }
 }

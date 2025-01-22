@@ -170,7 +170,7 @@ app.whenReady().then(async () => {
       sendReference: (referenceData) => event.sender.send('add-reference', referenceData, requestId),
       results: {},
       // 添加检查终止的函数
-      checkAborted: function() {
+      checkAborted: function () {
         if (this.abortSignal.aborted) {
           this.sendSystemLog('⚠️ 任务正在被终止...');
           throw new Error('任务已被终止');
@@ -192,16 +192,16 @@ app.whenReady().then(async () => {
 
       } else if (type === 'highQuilityRAGChat') {
         requestContext.sendSystemLog('🔍 进入深问模式，大模型会遍历所有的文档片段，回答将更全面，但消耗的token相对较多，时间较慢');
-        
+
         await globalContext.referenceHandler.searchOrFullScan(message, path, requestContext);
         requestContext.checkAborted();
-        
+
         await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
         requestContext.checkAborted();
-        
+
         await globalContext.referenceHandler.extractKeyFacts(message, path, requestContext);
         requestContext.checkAborted();
-        
+
         await globalContext.referenceHandler.refineParsedFacts(message, path, requestContext);
         requestContext.checkAborted();
 
@@ -226,10 +226,10 @@ app.whenReady().then(async () => {
 
         await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();
-        
+
         await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
         requestContext.checkAborted();
-        
+
         await globalContext.referenceHandler.buildPromptFromContent(message, path, requestContext);
 
         await callLLMAsync(
@@ -276,7 +276,7 @@ app.whenReady().then(async () => {
         console.log('当前活跃任务列表:', Array.from(activeRequests.keys()));
         throw new Error('任务未找到，可能是终止已经提交了');
       }
-      
+
       abortController.abort();
       activeRequests.delete(requestId);
       console.log('成功终止任务:', requestId);
@@ -352,13 +352,21 @@ app.whenReady().then(async () => {
     await globalContext.configHandler.setGlobalConfig(value);
   });
 
-  // 添加IPC处理器
+  // 修改IPC处理器
   ipcMain.handle('save-chat-message', async (event, message) => {
-    globalContext.chatStore.addMessage(message);
+    return globalContext.chatStore.addMessage(message);
   });
 
   ipcMain.handle('get-chat-messages', async (event, offset, limit) => {
     return globalContext.chatStore.getMessages(offset, limit);
+  });
+
+  ipcMain.handle('delete-chat-message', async (event, messageId) => {
+    return globalContext.chatStore.deleteMessage(messageId);
+  });
+
+  ipcMain.handle('clear-all-chat-messages', async () => {
+    return globalContext.chatStore.clearAllMessages();
   });
 
   ipcMain.handle('set-default-handler', async (event, pathPrefix) => {

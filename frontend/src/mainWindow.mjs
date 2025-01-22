@@ -8,6 +8,7 @@ class MainWindow {
     this.baseDir = null;
     this.window = null;
     this.preloadPath = null;
+    this.rightClickPosition = null; // 存储右键点击的位置
   }
 
   init() {
@@ -53,10 +54,38 @@ class MainWindow {
         label: '粘贴',
         accelerator: 'CmdOrCtrl+V',
         role: 'paste'
+      },
+      { type: 'separator' },
+      {
+        label: '删除当前对话',
+        click: (menuItem, browserWindow, event) => {
+          // 获取右键点击时的坐标位置
+          const position = this.rightClickPosition;
+          if (position) {
+            this.window.webContents.send('context-menu-command', 'delete-current-message', {
+              x: position.x,
+              y: position.y
+            });
+          } else {
+            // 如果没有坐标信息，仍然发送命令但不带坐标
+            this.window.webContents.send('context-menu-command', 'delete-current-message', {});
+          }
+        }
+      },
+      {
+        label: '清空全部对话',
+        click: () => {
+          this.window.webContents.send('context-menu-command', 'clear-all-messages');
+        }
       }
     ]);
 
-    this.window.webContents.on('context-menu', (event) => {
+    // 监听右键点击事件以获取坐标
+    this.window.webContents.on('context-menu', (event, params) => {
+      this.rightClickPosition = {
+        x: params.x,
+        y: params.y
+      };
       contextMenu.popup();
     });
 

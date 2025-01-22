@@ -65,7 +65,9 @@ contextBridge.exposeInMainWorld('electron', {
   chatHistory: {
     saveMessage: (message) => ipcRenderer.invoke('save-chat-message', message),
     getMessages: (offset, limit) => ipcRenderer.invoke('get-chat-messages', offset, limit),
-    getMessageCount: () => ipcRenderer.invoke('get-chat-message-count')
+    getMessageCount: () => ipcRenderer.invoke('get-chat-message-count'),
+    deleteMessage: (messageId) => ipcRenderer.invoke('delete-chat-message', messageId),
+    clearAllMessages: () => ipcRenderer.invoke('clear-all-chat-messages')
   },
 
   // 添加日志相关方法
@@ -79,7 +81,14 @@ contextBridge.exposeInMainWorld('electron', {
   setDefaultHandler: (pathPrefix) => ipcRenderer.invoke('set-default-handler', pathPrefix),
 
   // 添加终止任务方法
-  stopCurrentTask: (requestId) => ipcRenderer.invoke('stop-current-task', requestId)
+  stopCurrentTask: (requestId) => ipcRenderer.invoke('stop-current-task', requestId),
+
+  // 更新上下文菜单命令监听器
+  onContextMenuCommand: (callback) => {
+    ipcRenderer.on('context-menu-command', (event, command, elementInfo) => {
+      callback(command, elementInfo);
+    });
+  }
 });
 
 // 认证相关 API
