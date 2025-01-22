@@ -145,3 +145,53 @@
 
 我现在需要：
 1）构建一个可以处理上面内容的controller。 只需要空接口
+
+
+
+
+public class RefineryFactDO {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false)
+    private String refineryTaskId;  // 关联的精炼任务ID
+    
+    @Column(nullable = false)
+    private Long paragraphId;       // 关联的段落ID
+    
+    @Column(nullable = false, length = 4000)
+    private String fact;            // 提取的事实内容
+    
+    @Column(nullable = false)
+    private LocalDateTime createdTime;
+    
+
+    探讨一个设计问题。
+    我现在需要额外的构建一个以上面三个为一组的索引。
+    或者对既有的以paragraphid （在这个SimpleLocalLuceneIndex里面是docId) 为目标的索引，做增量更新。
+
+    新的查询会根据
+
+
+索引设计选项：
+Option A: 在现有文档中添加新字段
+Option B: 创建独立索引
+Option C: 使用复合主键
+推荐方案：Option A
+
+为什么扩展现有方法而不是新建方法？
+
+避免代码重复
+保持索引一致性
+便于维护和升级
+为什么使用同一个indexWriter？
+
+减少资源消耗
+保证原子性操作
+便于事务管理
+为什么基于现有search改造？
+
+复用已有的高亮、排序等功能
+保持一致的搜索体验
+减少维护成本

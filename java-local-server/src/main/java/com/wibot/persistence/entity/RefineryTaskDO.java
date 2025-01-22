@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 @Table(name = "refinery_task")
 public class RefineryTaskDO {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     
     @Column(nullable = false)
     private String directoryPath;
@@ -51,11 +51,11 @@ public class RefineryTaskDO {
     public static final String CYCLE_WEEKLY = "WEEKLY";   // 每周
     public static final String CYCLE_MONTHLY = "MONTHLY"; // 每月
 
-    public String getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

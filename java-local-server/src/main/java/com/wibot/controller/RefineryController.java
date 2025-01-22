@@ -72,7 +72,7 @@ public class RefineryController {
     public Map<String, Object> getTaskProgress(@PathVariable String taskId) {
         Map<String, Object> response = new HashMap<>();
         try {
-            RefineryTaskVO task = refineryService.getTask(taskId);
+            RefineryTaskVO task = refineryService.getTask(Long.valueOf(taskId));
             response.put("success", true);
             response.put("status", task.getStatus());
             response.put("checkpoint", task.getProcessingCheckpoint());

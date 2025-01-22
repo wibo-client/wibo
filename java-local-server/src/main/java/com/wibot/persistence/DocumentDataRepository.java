@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,7 +18,7 @@ import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface DocumentDataRepository
-                extends ListCrudRepository<DocumentDataPO, Long>, JpaSpecificationExecutor<DocumentDataPO> {
+                extends JpaRepository<DocumentDataPO, Long>, JpaSpecificationExecutor<DocumentDataPO> {
 
         /**
          * Uses {@link Optional} as return and parameter type.
@@ -133,4 +134,6 @@ public interface DocumentDataRepository
                                              @Param("newState") String newState);
 
         List<DocumentDataPO> findByFilePathLike(String filePathPattern);
+        
+        long countByFilePathStartingWith(String pathPrefix);
 }

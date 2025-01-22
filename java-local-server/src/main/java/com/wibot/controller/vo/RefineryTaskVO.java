@@ -3,7 +3,7 @@ package com.wibot.controller.vo;
 import java.time.LocalDateTime;
 
 public class RefineryTaskVO {
-    private String id;                     // 任务ID
+    private Long id;                     // 任务ID
     private String directoryPath;          // 作用目录（递归）
     private String keyQuestion;            // 关键问题
     private int coveredFileCount;          // 涵盖文件数
@@ -18,8 +18,8 @@ public class RefineryTaskVO {
     private String processingCheckpoint;
 
     // Getters and Setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public String getDirectoryPath() { return directoryPath; }
     public void setDirectoryPath(String directoryPath) { this.directoryPath = directoryPath; }

@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface RefineryTaskRepository extends JpaRepository<RefineryTaskDO, String> {
+public interface RefineryTaskRepository extends JpaRepository<RefineryTaskDO, Long> {
     
     // 基础查询方法
     List<RefineryTaskDO> findByStatus(String status);

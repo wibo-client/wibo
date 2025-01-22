@@ -14,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
+import com.wibot.persistence.RefineryFactRepository;
 import com.wibot.persistence.RefineryTaskRepository;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
+import com.wibot.persistence.entity.RefineryFactDO;
 import com.wibot.persistence.entity.RefineryTaskDO;
 import com.wibot.service.dto.ExtractFactResponse;
 import com.wibot.service.dto.ExtractedFact;
@@ -28,10 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.alibaba.dashscope.utils.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Service
@@ -53,6 +52,9 @@ public class RefineryService {
 
     @Autowired
     private MarkdownParagraphRepository markdownParagraphRepository;
+
+    @Autowired
+    private RefineryFactRepository refineryFactRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -79,14 +81,13 @@ public class RefineryService {
         return convertToVO(savedTask);
     }
 
-    public RefineryTaskVO getTask(String taskId) {
+    public RefineryTaskVO getTask(Long taskId) {
         return refineryTaskRepository.findById(taskId)
             .map(this::convertToVO)
             .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
     }
 
     @Scheduled(fixedDelay = 60000) // 每分钟执行一次
-    @Transactional
     public void processScheduledTasks() {
         logger.info("Starting scheduled task processing");
 
@@ -142,22 +143,52 @@ public class RefineryService {
     private void processTask(RefineryTaskDO task) {
         String checkpoint = task.getProcessingCheckpoint();
         try {
-            List<MarkdownParagraphPO> sortedParagraphIds = getSortedParagraphIds(task.getDirectoryPath());
+            // 统计文件数
+            long coveredFileCount = documentDataRepository.countByFilePathStartingWith(task.getDirectoryPath());
+            task.setCoveredFileCount((int) coveredFileCount);
+            
+            List<MarkdownParagraphPO> paragraphs = getSortedParagraphIds(task.getDirectoryPath());
+            
+            // 如果有断点，过滤出断点之后的段落
+            if (checkpoint != null && !checkpoint.isEmpty()) {
+                Long checkpointId = Long.parseLong(checkpoint);
+                paragraphs = paragraphs.stream()
+                    .filter(p -> p.getId() > checkpointId)
+                    .toList();
+            }
 
-            List<ExtractedFact> facts = extractFactsFromParagraph(sortedParagraphIds, task.getKeyQuestion());
-            // TODO: 保存提取的事实到数据库
-
+            List<ExtractedFact> facts = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+            
+            // 保存提取的事实 - 简化版本
+            for (ExtractedFact fact : facts) {
+                Long paragraphId = Long.parseLong(fact.getId());
+                
+                // 直接删除旧记录，不做查询
+                refineryFactRepository.deleteByRefineryTaskIdAndParagraphId(task.getId(), paragraphId);
+                
+                // 直接保存新记录
+                RefineryFactDO factDO = new RefineryFactDO(
+                    Long.valueOf(task.getId()),
+                    paragraphId,
+                    fact.getFact()
+                );
+                refineryFactRepository.save(factDO);
+            }
+            
         } catch (Exception e) {
+            // 保持原有的checkpoint不变，便于后续续传
             task.setProcessingCheckpoint(checkpoint);
             throw new RuntimeException("Task processing failed: " + e.getMessage(), e);
         }
     }
 
-    private List<ExtractedFact> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question) {
+    private List<ExtractedFact> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question, RefineryTaskDO task) {
         List<ExtractedFact> allFacts = new ArrayList<>();
         int currentLength = 0;
         int batchIndex = 1;
         List<Map<String, Object>> currentBatch = new ArrayList<>();
+        Long lastProcessedId = null;
+        int totalTokenCost = 0;
 
         for (MarkdownParagraphPO paragraph : paragraphs) {
             Map<String, Object> reference = new HashMap<>();
@@ -167,32 +198,60 @@ public class RefineryService {
             reference.put("paragraphOrder", paragraph.getParagraphOrder());
             reference.put("date", paragraph.getCreatedDateTime());
 
-            String jsonStr = JsonUtils.toJson(reference);
-            if (currentLength + jsonStr.length() < MAX_CONTENT_SIZE) {
+            try {
+                String jsonStr = objectMapper.writeValueAsString(reference);
+                totalTokenCost += jsonStr.length(); // 累加输入token成本
+                
+                if (currentLength + jsonStr.length() < MAX_CONTENT_SIZE) {
+                    currentBatch.add(reference);
+                    currentLength += jsonStr.length();
+                    continue;
+                }
+
+                // Process current batch and add response token cost
+                totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, allFacts, batchIndex);
+                lastProcessedId = updateCheckpoint(currentBatch, task);
+
+                // Reset batch
+                currentBatch = new ArrayList<>();
                 currentBatch.add(reference);
-                currentLength += jsonStr.length();
-                continue;
+                currentLength = jsonStr.length();
+                batchIndex++;
+            } catch (JsonProcessingException e) {
+                logger.error("Failed to serialize reference to JSON", e);
+                throw new RuntimeException(e);
             }
-
-            // Process current batch
-            processBatch(currentBatch, question, allFacts, batchIndex);
-
-            // Reset for next batch
-            currentBatch = new ArrayList<>();
-            currentBatch.add(reference);
-            currentLength = jsonStr.length();
-            batchIndex++;
         }
 
-        // Process final batch if exists
+        // Process final batch
         if (!currentBatch.isEmpty()) {
-            processBatch(currentBatch, question, allFacts, batchIndex);
+            totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, allFacts, batchIndex);
+            lastProcessedId = updateCheckpoint(currentBatch, task);
         }
+
+        // Update token cost
+        task.setFullUpdateTokenCost(totalTokenCost);
+        refineryTaskRepository.save(task);
 
         return allFacts;
     }
 
-    private void processBatch(List<Map<String, Object>> batch, String question, List<ExtractedFact> allFacts, int batchIndex) {
+    private Long updateCheckpoint(List<Map<String, Object>> batch, RefineryTaskDO task) {
+        // 获取当前批次中最大的ID
+        Long maxId = batch.stream()
+            .map(ref -> Long.valueOf(ref.get("id").toString()))
+            .max(Long::compareTo)
+            .orElse(null);
+        
+        if (maxId != null) {
+            task.setProcessingCheckpoint(maxId.toString());
+            refineryTaskRepository.save(task);
+        }
+        
+        return maxId;
+    }
+
+    private int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question, List<ExtractedFact> allFacts, int batchIndex) {
         Map<String, Object> params = new HashMap<>();
         params.put("references", batch);
         params.put("question", question);
@@ -217,20 +276,15 @@ public class RefineryService {
                         continue;
                     }
 
-                    // 解析JSON
-                    try {
-                        ExtractFactResponse factResponse = objectMapper.readValue(jsonStr, ExtractFactResponse.class);
-                        if (factResponse != null && factResponse.getFacts() != null) {
-                            allFacts.addAll(factResponse.getFacts());
-                            logger.info("Successfully processed batch {}, extracted {} facts", 
-                                batchIndex, factResponse.getFacts().size());
-                            break;
-                        }
-                    } catch (JsonProcessingException e) {
-                        logger.error("Failed to parse extracted JSON: {}", jsonStr, e);
-                        if (attempt == 2) {
-                            throw e;
-                        }
+                    // 解析JSON并处理事实
+                    ExtractFactResponse factResponse = objectMapper.readValue(jsonStr, ExtractFactResponse.class);
+                    if (factResponse != null && factResponse.getFacts() != null) {
+                        allFacts.addAll(factResponse.getFacts());
+                        logger.info("Successfully processed batch {}, extracted {} facts", 
+                            batchIndex, factResponse.getFacts().size());
+                        
+                        // 返回响应token成本
+                        return response.length();
                     }
                 } catch (Exception e) {
                     if (attempt == 2) {
@@ -245,6 +299,7 @@ public class RefineryService {
             logger.error("Error processing batch {}", batchIndex, e);
             throw new RuntimeException("Failed to process batch " + batchIndex, e);
         }
+        return 0;
     }
 
     /**
