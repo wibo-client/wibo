@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles/quickLink.css">
   <link rel="stylesheet" href="styles/knowledgebase.css">
   <link rel="stylesheet" href="styles/logs.css">
+  <link rel="stylesheet" href="styles/knowledge-refinery.css">
 </head>
 
 <body>
@@ -19,6 +20,7 @@
   <h3>围脖 WIBO 你的个人知识助手</h3>
   <div class="tabs">
     <div class="tab active" data-tab="interaction">对话</div>
+    <div class="tab" data-tab="refinery">知识精炼</div>
     <div class="tab" data-tab="config">配置</div>
     <div class="tab" data-tab="navigation">快捷导航</div>
   </div>
@@ -46,6 +48,76 @@
         </div>
         <button id="send-message">Send</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 添加知识精炼内容区域 -->
+  <div id="refinery" class="tab-content">
+    <div class="refinery-container">
+      <div class="refinery-header">
+        <h3>知识精炼管理</h3>
+        <button class="add-refinery-task">新增精炼任务</button>
+      </div>
+      <table class="refinery-table">
+        <thead>
+          <tr>
+            <th>作用目录</th>
+            <th>关键问题</th>
+            <th>涵盖文件数</th>
+            <th>全量Token消耗</th>
+            <th>增量Token消耗</th>
+            <th>更新周期</th>
+            <th>命中次数</th>
+            <th>最后更新</th>
+            <th>创建日期</th>
+            <th>当前状态</th>
+            <th>任务处理信息</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>/docs/project-a</td>
+            <td>如何实现项目部署？</td>
+            <td class="stats-number">156</td>
+            <td class="stats-number token-cost">2.3k</td>
+            <td class="stats-number token-cost">0.5k</td>
+            <td>每日</td>
+            <td class="stats-number">42</td>
+            <td>2024-01-20</td>
+            <td>2024-01-15</td>
+            <td><span class="status-badge status-active">活跃</span></td>
+            <td class="task-info">最近更新成功</td>
+            <td>
+              <div class="action-buttons">
+                <button class="action-btn update-full">全量更新</button>
+                <button class="action-btn update-incremental">增量更新</button>
+                <button class="action-btn delete-btn">删除</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>/docs/guides</td>
+            <td>系统架构设计原则？</td>
+            <td class="stats-number">89</td>
+            <td class="stats-number token-cost">1.8k</td>
+            <td class="stats-number token-cost">0.3k</td>
+            <td>每周</td>
+            <td class="stats-number">27</td>
+            <td>2024-01-19</td>
+            <td>2024-01-10</td>
+            <td><span class="status-badge status-processing">处理中</span></td>
+            <td class="task-info error">文件访问权限不足: /docs/guides/restricted/*</td>
+            <td>
+              <div class="action-buttons">
+                <button class="action-btn update-full">全量更新</button>
+                <button class="action-btn update-incremental">增量更新</button>
+                <button class="action-btn delete-btn">删除</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
