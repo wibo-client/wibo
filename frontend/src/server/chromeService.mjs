@@ -34,17 +34,17 @@ class ChromeService {
         }
 
         this.chromePath = this.findChromePath(this.baseDir);
-
-        // 确保进程退出时关闭浏览器
-        process.on('exit', this.forceCloseBrowser.bind(this));
-        process.on('SIGINT', this.forceCloseBrowser.bind(this));
-        process.on('SIGTERM', this.forceCloseBrowser.bind(this));
-        process.on('uncaughtException', this.forceCloseBrowser.bind(this));
+        console.info('[ChromeService] 完成chrome初始化');
     }
 
     async init(globalContext) {
         this.globalContext = globalContext;
         logger.info('[ChromeService] 已初始化全局上下文');
+
+        // 确保进程退出时关闭浏览器
+        process.on('exit', this.forceCloseBrowser.bind(this));
+        process.on('SIGINT', this.forceCloseBrowser.bind(this));
+        process.on('SIGTERM', this.forceCloseBrowser.bind(this));
     }
 
     findChromePath(baseDir) {
