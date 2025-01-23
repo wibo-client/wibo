@@ -126,7 +126,63 @@ export default class KnowledgeBaseHandler {
     }, 5000);
   }
 
- 
+  // 添加初始化索引设置方法
+  async initializeIndexSettings() {
+    if (!this.BASE_URL) {
+      console.warn('[本地索引服务] 服务未就绪，跳过获取索引设置');
+      return;
+    }
+    if (this.isUpdatingUI) {
+      console.log('[本地索引服务] UI正在更新中，跳过获取索引设置');
+      return; // 如果UI正在被用户操作，跳过更新
+    }
+
+    try {
+      const response = await fetch(`${this.BASE_URL}/admin/current-index-settings`);
+      const settings = await response.json();
+
+      // 更新文件类型开关状态
+      if (settings.fileTypes) {
+        // 基础文件类型
+        const simpleTypes = ['text', 'spreadsheet', 'web', 'code', 'config', 'archive'];
+        simpleTypes.forEach(type => {
+          const toggle = document.getElementById(`${type}FilesToggle`);
+          if (toggle) {
+            toggle.checked = settings.fileTypes[type] || false;
+          }
+        });
+
+        // 带增强选项的文件类型
+        const enhancedTypes = ['presentation', 'pdf', 'image'];
+        enhancedTypes.forEach(type => {
+          const typeToggle = document.getElementById(`${type}FilesToggle`);
+          const enhanceToggle = document.getElementById(`${type}EnhanceToggle`);
+
+          if (typeToggle && settings.fileTypes[type]) {
+            typeToggle.checked = settings.fileTypes[type].enabled || false;
+          }
+          if (enhanceToggle && settings.fileTypes[type]) {
+            enhanceToggle.checked = settings.fileTypes[type].enhanced || false;
+          }
+        });
+      }
+
+      // 更新忽略目录设置
+      const ignoredDirs = document.getElementById('ignoredDirectories');
+      if (ignoredDirs && settings.ignoredDirectories) {
+        ignoredDirs.value = settings.ignoredDirectories.join('\n');
+      }
+
+      console.log('[本地索引服务] 索引设置初始化完成');
+    } catch (error) {
+      // 只在非离线错误时打印详细信息
+      if (error.name !== 'TypeError' || error.message !== 'Failed to fetch') {
+        console.error('[本地索引服务] 获取索引设置失败:', error.message);
+      } else {
+        console.debug('[本地索引服务] 服务离线，无法获取索引设置');
+      }
+    }
+  }
 
   async componentDidMount() {
     try {
