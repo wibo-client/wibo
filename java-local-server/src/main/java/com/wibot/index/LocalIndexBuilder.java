@@ -1,14 +1,19 @@
 package com.wibot.index;
 
+import com.wibot.index.builder.DocumentBuilder;
+
 public interface LocalIndexBuilder {
     /**
-     * 构建文档索引
-     * 
-     * @param documents 需要建立索引的Markdown文档内容
-     * @return 构建结果描述信息
+     * 插入或更新索引
+     * @param builder 文档构建器
+     * @return 操作结果描述
      */
-    public String buildIndex(String paragraphId, String filePath, String content);
-
-    boolean deleteIndex(String filePath);
-
+    String insertOrUpdateByParagraphId(DocumentBuilder builder);
+    
+    /**
+     * 根据段落ID删除索引
+     * @param paragraphId 段落ID
+     * @return 操作是否成功
+     */
+    boolean deleteByParagraphId(String paragraphId);
 }

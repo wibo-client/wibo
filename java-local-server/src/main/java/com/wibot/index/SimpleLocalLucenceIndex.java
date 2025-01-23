@@ -16,14 +16,8 @@ import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.FieldType;
-import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.NumericDocValuesField;
-import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
@@ -50,6 +44,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+import com.wibot.index.builder.DocumentBuilder;
+import com.wibot.index.operation.IndexOperation;
 import com.wibot.index.search.SearchQuery;
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
@@ -91,7 +87,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     private MarkdownParagraphRepository markdownParagraphRepository;
 
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
-    private final List<Document> pendingDocuments = new ArrayList<>();
+    private final List<IndexOperation> pendingOperations = new ArrayList<>();
     private final Object commitLock = new Object();
 
     @PostConstruct
@@ -120,7 +116,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             while (true) {
                 try {
                     Thread.sleep(5000);
-                    commitPendingDocuments();
+                    commitPendingOperations();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -129,17 +125,24 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         });
     }
 
-    private void commitPendingDocuments() {
+    private void commitPendingOperations() {
         synchronized (commitLock) {
-            if (!pendingDocuments.isEmpty()) {
+            if (!pendingOperations.isEmpty()) {
                 try {
-                    for (Document doc : pendingDocuments) {
-                        indexWriter.addDocument(doc);
+                    for (IndexOperation op : pendingOperations) {
+                        switch (op.getType()) {
+                            case INSERT:
+                                indexWriter.addDocument(op.getDocument());
+                                break;
+                            case DELETE:
+                                indexWriter.deleteDocuments(new Term("id", op.getId()));
+                                break;
+                        }
                     }
                     indexWriter.commit();
-                    pendingDocuments.clear();
+                    pendingOperations.clear();
                 } catch (IOException e) {
-                    logger.error("提交文档失败", e);
+                    logger.error("提交操作失败", e);
                 }
             }
         }
@@ -148,7 +151,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     @PreDestroy
     public void close() {
         try {
-            commitPendingDocuments();
+            commitPendingOperations();
             if (indexWriter != null) {
                 indexWriter.close();
             }
@@ -172,71 +175,6 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             return "";
         }
         return SYMBOL_PATTERN.matcher(text).replaceAll(" ");
-    }
-
-    @Override
-    public String buildIndex(String docId, String filePath, String content) {
-        try {
-            Document doc = new Document();
-            if (docId == null || docId.isEmpty() || docId.equals("null")) {
-                throw new RuntimeException("Document ID is empty");
-            }
-            doc.add(new StringField("id", docId, Field.Store.YES));
-            logger.debug("Adding file path to index: {}", filePath);
-            doc.add(new StringField("file_path", filePath, Field.Store.YES));
-
-            // 添加文档创建时间
-            Optional<DocumentDataPO> documentData = documentDataRepository.findById(Long.parseLong(docId));
-            if (documentData.isPresent()) {
-                LocalDateTime createTime = documentData.get().getCreateTime();
-                // 存储为毫秒时间戳用于排序
-                doc.add(new NumericDocValuesField("create_time",
-                        createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
-                // 存储原始时间便于展示
-                doc.add(new StoredField("create_time_display", createTime.toString()));
-            }
-
-            // 修改：使用组合分析器处理内容
-            String cleanedContent = cleanText(content);
-            logger.debug("Building index for content: {}", cleanedContent); // 添加日志
-
-            FieldType contentFieldType = new FieldType();
-            contentFieldType.setStored(true);
-            contentFieldType.setTokenized(true);
-            contentFieldType.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
-            contentFieldType.setStoreTermVectors(true);
-            contentFieldType.setStoreTermVectorPositions(true);
-            contentFieldType.setStoreTermVectorOffsets(true);
-
-            // 修改：确保内容被正确分词和索引
-            Field contentField = new Field("content", cleanedContent, contentFieldType);
-            doc.add(contentField);
-
-            // 添加分词调试
-            logger.debug("Building index for content: {} with raw content: {}", cleanedContent, content);
-            logger.debug("Document ID: {}, Path: {}", docId, filePath);
-
-            synchronized (commitLock) {
-                // 添加调试日志
-                try (TokenStream ts = analyzer.tokenStream("content", cleanedContent)) {
-                    CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
-                    ts.reset();
-                    StringBuilder terms = new StringBuilder("Indexed terms: ");
-                    while (ts.incrementToken()) {
-                        terms.append(termAttr.toString()).append(", ");
-                    }
-                    logger.debug(terms.toString());
-                }
-                pendingDocuments.add(doc);
-                if (pendingDocuments.size() >= MAX_PENDING_DOCUMENTS) {
-                    commitPendingDocuments();
-                }
-            }
-            return "Index build request submitted";
-        } catch (Exception e) {
-            logger.error("构建索引失败", e);
-            return "Failed to submit index build request";
-        }
     }
 
     /**
@@ -772,6 +710,66 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
             logger.error("获取路径建议失败: {}", path, e);
         }
         return suggestions;
+    }
+
+
+    @Override
+    public boolean deleteByParagraphId(String paragraphId) {
+        try {
+            synchronized (commitLock) {
+                pendingOperations.add(IndexOperation.createDelete(paragraphId));
+                if (pendingOperations.size() >= MAX_PENDING_DOCUMENTS) {
+                    commitPendingOperations();
+                }
+            }
+            logger.info("段落删除请求已提交 ID: {}", paragraphId);
+            return true;
+        } catch (Exception e) {
+            logger.error("提交段落删除请求失败 ID: {}", paragraphId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public String insertOrUpdateByParagraphId(DocumentBuilder builder) {
+        try {
+            // 构建文档并添加到队列
+            Document doc = builder.build();
+            String paragraphId = doc.get("id");
+
+            if (paragraphId == null || paragraphId.isEmpty() || paragraphId.equals("null")) {
+                throw new RuntimeException("Paragraph ID is empty");
+            }
+
+            synchronized (commitLock) {
+                pendingOperations.add(IndexOperation.createDelete(paragraphId));
+                pendingOperations.add(IndexOperation.createInsert(doc));
+                
+                if (pendingOperations.size() >= MAX_PENDING_DOCUMENTS) {
+                    commitPendingOperations();
+                }
+            }
+
+            return "Index update request submitted";
+        } catch (Exception e) {
+            logger.error("更新索引失败", e);
+            return "Failed to submit index update request";
+        }
+    }
+
+    // 辅助方法：记录分词日志
+    private void logTokenization(String content) {
+        // try (TokenStream ts = analyzer.tokenStream("content", content)) {
+        //     CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
+        //     ts.reset();
+        //     StringBuilder terms = new StringBuilder("Indexed terms: ");
+        //     while (ts.incrementToken()) {
+        //         terms.append(termAttr.toString()).append(", ");
+        //     }
+        //     logger.debug(terms.toString());
+        // } catch (IOException e) {
+        //     logger.error("分词日志记录失败", e);
+        // }
     }
 
 }

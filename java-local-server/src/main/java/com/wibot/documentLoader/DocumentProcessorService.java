@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.wibot.documentParser.DocumentParserInterface;
 import com.wibot.documentParserSelector.DocumentParserSelectorInterface;
 import com.wibot.index.LocalIndexBuilder;
+import com.wibot.index.builder.DocumentBuilder;
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownBasedContentRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
@@ -141,9 +142,18 @@ public class DocumentProcessorService {
         logger.info("Thread {} starts processing deleted document: {}", threadName, document.getFileName());
 
         try {
-            // 1. 删除索引
-            index.deleteIndex(document.getFilePath());
-            logger.debug("Thread {} completed index deletion: {}", threadName, document.getFilePath());
+            // 1. 删除索引 - 使用新接口，遍历段落删除
+            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(document.getId());
+            for (MarkdownParagraphPO paragraph : paragraphs) {
+                try {
+                    index.deleteByParagraphId(String.valueOf(paragraph.getId()));
+                    logger.debug("Thread {} deleted paragraph index: {}", threadName, paragraph.getId());
+                } catch (Exception e) {
+                    logger.warn("Thread {} failed to delete paragraph index: {}", threadName, paragraph.getId(), e);
+                }
+            }
+            logger.debug("Thread {} completed all paragraph index deletions for document: {}", 
+                        threadName, document.getFilePath());
 
             // 2. 删除markdown段落数据
             markdownParagraphRepository.deleteByDocumentDataId(document.getId());
@@ -163,6 +173,68 @@ public class DocumentProcessorService {
         }
     }
 
+    private List<MarkdownParagraphPO> updateDocumentParagraphs(String markdown, Long documentId, Long markdownContentId) {
+        String threadName = Thread.currentThread().getName();
+        
+        // 1. 删除旧段落
+        List<MarkdownParagraphPO> oldParagraphs = markdownParagraphRepository.findByDocumentDataId(documentId);
+        for (MarkdownParagraphPO oldParagraph : oldParagraphs) {
+            try {
+                index.deleteByParagraphId(String.valueOf(oldParagraph.getId()));
+                logger.debug("Thread {} deleted old paragraph index: {}", threadName, oldParagraph.getId());
+            } catch (Exception e) {
+                logger.error("Thread {} failed to delete old paragraph: {}", threadName, oldParagraph.getId(), e);
+            }
+        }
+    
+        // 2. 创建新段落
+        List<MarkdownParagraphPO> newParagraphs = MarkdownBasedContentPO
+                .splitContentIntoParagraphs(markdown, documentId, markdownContentId);
+        
+        // 3. 保存新段落到数据库
+        return newParagraphs.stream()
+                .map(markdownParagraphRepository::save)
+                .toList();
+    }
+    
+    /**
+     * 构建文档的索引
+     * @param filePath 文件路径
+     * @param paragraphs 段落列表
+     * @param createTime 文档创建时间
+     * @return 是否成功
+     */
+    public boolean buildDocumentIndex(String filePath, List<MarkdownParagraphPO> paragraphs, LocalDateTime createTime) {
+        String threadName = Thread.currentThread().getName();
+        boolean success = true;
+    
+        for (MarkdownParagraphPO paragraph : paragraphs) {
+            try {
+                String paragraphId = String.valueOf(paragraph.getId());
+                logger.debug("Thread {} building index for paragraph: {}", threadName, paragraphId);
+    
+                // 构建索引文档
+                DocumentBuilder builder = new DocumentBuilder(paragraphId)
+                    .withFilePath(filePath)
+                    .withContent(paragraph.getContent());
+                
+                // 添加创建时间
+                if (createTime != null) {
+                    builder.withCreateTime(createTime);
+                }
+                
+                // 提交索引更新
+                index.insertOrUpdateByParagraphId(builder);
+            } catch (Exception e) {
+                logger.error("Thread {} failed to build index for paragraph: {}", 
+                           threadName, paragraph.getId(), e);
+                success = false;
+            }
+        }
+    
+        return success;
+    }
+
     private boolean processDocument(DocumentDataPO document) {
         String threadName = Thread.currentThread().getName();
         logger.info("Thread {} starts processing document: {}", threadName, document.getFileName());
@@ -171,71 +243,58 @@ public class DocumentProcessorService {
         while (retryCount < MAX_RETRY_ATTEMPTS) {
             try {
                 if (retryCount > 0) {
-                    logger.info("Thread {} retrying document processing attempt {}: {}", threadName, retryCount, document.getFileName());
-                    Thread.sleep(RETRY_DELAY_MS * retryCount); // 递增重试延迟
+                    logger.info("Thread {} retrying document processing attempt {}: {}", 
+                              threadName, retryCount, document.getFileName());
+                    Thread.sleep(RETRY_DELAY_MS * retryCount);
                 }
 
+                // 1. 解析文档
                 DocumentParserInterface parser = selector.select(document.getExtension());
-                logger.debug("Thread {} selected parser: {}", threadName, parser.getClass().getName());
-
                 String markdown = parser.parseDocument(document);
-                logger.debug("Thread {} parsed Markdown content length: {}", threadName, markdown.length());
-                MarkdownBasedContentPO markdownAfter;
-                Optional<MarkdownBasedContentPO> existingContent = markdownRepo.findByDocumentDataId(document.getId());
-                if (existingContent.isPresent()) {
-                    // 更新现有记录
-                    MarkdownBasedContentPO content = existingContent.get();
-
-                    content.setContent(markdown);
-                    content.setCreatedDateTime(LocalDateTime.now());
-                    markdownAfter = markdownRepo.save(content);
-
-                } else {
-                    // 插入新记录
-                    MarkdownBasedContentPO content = new MarkdownBasedContentPO();
-                    content.setCreatedDateTime(LocalDateTime.now());
-                    content.setDocumentDataId(document.getId());
-                    content.setContent(markdown);
-                    content.setCreatedDateTime(LocalDateTime.now());
-                    markdownAfter = markdownRepo.save(content);
-                }
-
-                // 创建并保存文档索引
-                logger.debug("Thread {} creating document index", threadName);
-                String filePath = document.getFilePath();
-
-                logger.debug("Thread {} deleting existing index: {}", threadName, filePath);
-                index.deleteIndex(filePath);
-
-                List<MarkdownParagraphPO> markdownParagraphs = MarkdownBasedContentPO
-                        .splitContentIntoParagraphs(markdown, document.getId(), markdownAfter.getId());
-
-                for (MarkdownParagraphPO paragraph : markdownParagraphs) {
-                    paragraph = markdownParagraphRepository.save(paragraph);
-                    String paragraphId = String.valueOf(paragraph.getId());
-                    String documentDataId = String.valueOf(paragraph.getDocumentDataId());
-                    logger.debug("Thread {} saving paragraph index for {}: {}", threadName, documentDataId, paragraphId);
-                    try {
-                        index.buildIndex(paragraphId, filePath, paragraph.getContent());
-                    } catch (Exception e) {
-                        logger.error("Thread {} failed to save paragraph index: {}", threadName, paragraphId, e);
-                        // 处理保存段落索引失败的情况
-                    }
-                }
-
-                return true; // 处理成功则直接返回
+                
+                // 2. 保存Markdown内容
+                MarkdownBasedContentPO markdownAfter = saveMarkdownContent(document, markdown);
+                
+                // 3. 更新段落
+                List<MarkdownParagraphPO> paragraphs = updateDocumentParagraphs(
+                    markdown, document.getId(), markdownAfter.getId());
+                
+                // 4. 构建索引
+                return buildDocumentIndex(
+                    document.getFilePath(), 
+                    paragraphs, 
+                    document.getCreateTime()
+                );
 
             } catch (Exception e) {
                 retryCount++;
                 if (retryCount >= MAX_RETRY_ATTEMPTS) {
-                    logger.error("Thread {} failed to process document after {} attempts: {}", threadName, retryCount, document.getFilePath(), e);
+                    logger.error("Thread {} failed to process document after {} attempts: {}", 
+                               threadName, retryCount, document.getFilePath(), e);
                     return false;
-                } else {
-                    logger.warn("Thread {} failed to process document, preparing for retry attempt {}: {}", threadName, retryCount + 1, document.getFilePath(), e);
                 }
+                logger.warn("Thread {} failed to process document, preparing for retry attempt {}: {}", 
+                          threadName, retryCount + 1, document.getFilePath(), e);
             }
         }
         return false;
+    }
+
+    // 辅助方法：保存Markdown内容
+    private MarkdownBasedContentPO saveMarkdownContent(DocumentDataPO document, String markdown) {
+        Optional<MarkdownBasedContentPO> existingContent = markdownRepo.findByDocumentDataId(document.getId());
+        if (existingContent.isPresent()) {
+            MarkdownBasedContentPO content = existingContent.get();
+            content.setContent(markdown);
+            content.setCreatedDateTime(LocalDateTime.now());
+            return markdownRepo.save(content);
+        } else {
+            MarkdownBasedContentPO content = new MarkdownBasedContentPO();
+            content.setCreatedDateTime(LocalDateTime.now());
+            content.setDocumentDataId(document.getId());
+            content.setContent(markdown);
+            return markdownRepo.save(content);
+        }
     }
 
     @PreDestroy
