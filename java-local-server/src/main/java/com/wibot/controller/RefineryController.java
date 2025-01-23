@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/refinery")
+@RequestMapping("/api/refinery")
 public class RefineryController {
     private static final Logger logger = LoggerFactory.getLogger(RefineryController.class);
 
@@ -46,25 +46,65 @@ public class RefineryController {
 
     @PostMapping("/task/{taskId}/update-full")
     public Map<String, Object> updateTaskFull(@PathVariable String taskId) {
-        // 执行全量更新
-        return null;
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long id = Long.parseLong(taskId);
+            refineryService.updateTaskFull(id);
+            response.put("success", true);
+            response.put("message", "Task update initiated successfully");
+        } catch (NumberFormatException e) {
+            response.put("success", false);
+            response.put("error", "Invalid task ID format");
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+
+    @PostMapping("/task/{taskId}/delete")
+    public Map<String, Object> deleteTask(@PathVariable String taskId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long id = Long.parseLong(taskId);
+            refineryService.deleteTask(id);
+            response.put("success", true);
+            response.put("message", "Task deleted successfully");
+        } catch (NumberFormatException e) {
+            response.put("success", false);
+            response.put("error", "Invalid task ID format");
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/task/{taskId}/status")
+    public Map<String, Object> getTaskStatus(@PathVariable String taskId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long id = Long.parseLong(taskId);
+            RefineryTaskVO task = refineryService.getTask(id);
+            response.put("success", true);
+            response.put("status", task.getStatus());
+            response.put("errorMessage", task.getErrorMessage());
+            response.put("coveredFileCount", task.getCoveredFileCount());
+            response.put("lastUpdateTime", task.getLastUpdateTime());
+            response.put("processingCheckpoint", task.getProcessingCheckpoint());
+        } catch (NumberFormatException e) {
+            response.put("success", false);
+            response.put("error", "Invalid task ID format");
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+        }
+        return response;
     }
 
     @PostMapping("/task/{taskId}/update-incremental")
     public Map<String, Object> updateTaskIncremental(@PathVariable String taskId) {
         // 执行增量更新
-        return null;
-    }
-
-    @PostMapping("/task/{taskId}/delete")
-    public Map<String, Object> deleteTask(@PathVariable String taskId) {
-        // 删除任务
-        return null;
-    }
-
-    @GetMapping("/task/{taskId}/status")
-    public Map<String, Object> getTaskStatus(@PathVariable String taskId) {
-        // 获取任务状态
         return null;
     }
 

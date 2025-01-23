@@ -41,8 +41,24 @@ public class DocumentBuilder {
 
     public DocumentBuilder withRefineryTask(Long refineryTaskId) {
         if (refineryTaskId != null) {
+            // 只需要存储taskId作为一个单独的term
             doc.add(new StringField("refinery_task_id", String.valueOf(refineryTaskId), Field.Store.YES));
-            doc.add(new NumericDocValuesField("refinery_task_id_sort", refineryTaskId));
+        }
+        return this;
+    }
+
+    public DocumentBuilder withFact(String fact) {
+        if (fact != null) {
+            // 创建与content相同的字段类型，用于模糊查找
+            FieldType factFieldType = new FieldType();
+            factFieldType.setStored(true);
+            factFieldType.setTokenized(true);
+            factFieldType.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+            factFieldType.setStoreTermVectors(true);
+            factFieldType.setStoreTermVectorPositions(true);
+            factFieldType.setStoreTermVectorOffsets(true);
+
+            doc.add(new Field("fact", fact, factFieldType));
         }
         return this;
     }

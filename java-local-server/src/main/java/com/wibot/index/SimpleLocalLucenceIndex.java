@@ -540,179 +540,6 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         return "SimpleLocalLucenceIndex";
     }
 
-    // 添加诊断方法
-    public String diagnoseIndex() throws IOException {
-        StringBuilder diagnosis = new StringBuilder();
-        try (DirectoryReader reader = DirectoryReader.open(directory)) {
-            diagnosis.append("Index diagnosis:\n");
-            diagnosis.append(String.format("Total documents: %d\n", reader.numDocs()));
-
-            // 检查几个示例文档
-            int maxDocs = Math.min(1, reader.maxDoc());
-            diagnosis.append(String.format("Checking first %d documents:\n", maxDocs));
-
-            for (int i = 0; i < maxDocs; i++) {
-                Document doc = reader.document(i);
-                String content = doc.get("content");
-                diagnosis.append(String.format("\nDocument %d:\n", i));
-                diagnosis.append(String.format("ID: %s\n", doc.get("id")));
-                diagnosis.append(String.format("Path: %s\n", doc.get("file_path")));
-                diagnosis.append(String.format("Content preview: %s\n",
-                        content != null ? content.substring(0, Math.min(100, content.length())) : "null"));
-
-                // 分析文档的词条
-                diagnosis.append("Terms:\n");
-                Terms terms = reader.getTermVector(i, "content");
-                if (terms != null) {
-                    TermsEnum termsEnum = terms.iterator();
-                    BytesRef term;
-                    while ((term = termsEnum.next()) != null) {
-                        diagnosis.append(term.utf8ToString()).append(", ");
-                    }
-                }
-
-                // 使用 SmartChineseAnalyzer 分词
-                diagnosis.append("\nSmartChineseAnalyzer terms:\n");
-                try (TokenStream ts = new SmartChineseAnalyzer().tokenStream("content", content)) {
-                    CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
-                    ts.reset();
-                    while (ts.incrementToken()) {
-                        diagnosis.append(termAttr.toString()).append(", ");
-                    }
-                    ts.end();
-                }
-
-                // 使用 StandardAnalyzer 分词
-                diagnosis.append("\nStandardAnalyzer terms:\n");
-                try (TokenStream ts = new StandardAnalyzer().tokenStream("content", content)) {
-                    CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
-                    ts.reset();
-                    while (ts.incrementToken()) {
-                        diagnosis.append(termAttr.toString()).append(", ");
-                    }
-                    ts.end();
-                }
-                diagnosis.append("\n");
-            }
-
-            // 添加详细诊断信息
-            diagnosis.append("\n=== 详细诊断信息 ===\n");
-            diagnosis.append(detailedDiagnose());
-
-            return diagnosis.toString();
-        }
-    }
-
-    public String detailedDiagnose() throws IOException {
-        StringBuilder diagnosis = new StringBuilder();
-
-        // 1. 检查索引状态
-        try (DirectoryReader reader = DirectoryReader.open(directory)) {
-            diagnosis.append("=== 索引状态 ===\n");
-            diagnosis.append(String.format("NumDocs: %d\n", reader.numDocs()));
-            diagnosis.append(String.format("MaxDoc: %d\n", reader.maxDoc()));
-            diagnosis.append(String.format("DeletedDocs: %d\n", reader.numDeletedDocs()));
-
-            // 2. 检查文档字段
-            diagnosis.append("\n=== 文档字段检查 ===\n");
-            for (int i = 0; i < Math.min(2, reader.maxDoc()); i++) {
-                Document doc = reader.document(i);
-                diagnosis.append(String.format("\nDoc %d:\n", i));
-                // 检查所有字段
-                for (IndexableField field : doc.getFields()) {
-                    diagnosis.append(String.format("Field: %s, Type: %s, Stored: %b\n",
-                            field.name(),
-                            field.fieldType().getClass().getSimpleName(),
-                            field.fieldType().stored()));
-                }
-
-                // 3. 检查词向量
-                Terms terms = reader.getTermVector(i, "content");
-                if (terms != null) {
-                    diagnosis.append("Has term vector for 'content'\n");
-                    TermsEnum termsEnum = terms.iterator();
-                    while (termsEnum.next() != null) {
-                        diagnosis.append(String.format("Term: %s, Freq: %d\n",
-                                termsEnum.term().utf8ToString(),
-                                termsEnum.totalTermFreq()));
-                    }
-                } else {
-                    diagnosis.append("No term vector for 'content'\n");
-                }
-            }
-
-            // 4. 检查索引的词项统计
-            diagnosis.append("\n=== 索引词项统计 ===\n");
-            Terms contentTerms = MultiTerms.getTerms(reader, "content");
-            if (contentTerms != null) {
-                diagnosis.append(String.format("Unique terms: %d\n", contentTerms.size()));
-                diagnosis.append(String.format("Total terms: %d\n", contentTerms.getSumTotalTermFreq()));
-            }
-        }
-
-        return diagnosis.toString();
-    }
-
-    public String searchDiagnose(String query) throws IOException {
-        // 1. 打印原始查询
-        StringBuilder diagnosis = new StringBuilder();
-        diagnosis.append("Search diagnosis for query: " + query + "\n");
-
-        // 2. 构建BooleanQuery
-        BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
-
-        // 3. 添加精确匹配
-        queryBuilder.add(new BooleanClause(
-                new TermQuery(new Term("content", query)),
-                BooleanClause.Occur.SHOULD));
-
-        // 4. 添加分词匹配
-        try (TokenStream ts = analyzer.tokenStream("content", query)) {
-            ts.reset();
-            CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
-            while (ts.incrementToken()) {
-                String term = termAttr.toString();
-                queryBuilder.add(new BooleanClause(
-                        new TermQuery(new Term("content", term)),
-                        BooleanClause.Occur.SHOULD));
-            }
-        }
-        DirectoryReader reader = DirectoryReader.open(directory);
-        // 5. 执行查询并返回诊断信息
-        IndexSearcher searcher = new IndexSearcher(reader);
-        TopDocs results = searcher.search(queryBuilder.build(), 10);
-
-        diagnosis.append("Found " + results.totalHits.value + " matching documents\n");
-        return diagnosis.toString();
-    }
-
-    @Override
-    public List<String> getPossiblePath(String path) {
-        List<String> suggestions = new ArrayList<>();
-        try {
-            List<DocumentDataPO> documents = documentDataRepository.findByFilePathStartingWith(path);
-            for (DocumentDataPO document : documents) {
-                String filePath = document.getFilePath();
-                String relativePath = filePath.substring(path.length());
-                int nextSlashIndex = relativePath.indexOf('/');
-                if (nextSlashIndex != -1) {
-                    String nextPath = relativePath.substring(0, nextSlashIndex + 1);
-                    if (!suggestions.contains(nextPath)) {
-                        suggestions.add(nextPath);
-                    }
-                } else {
-                    if (!suggestions.contains(relativePath)) {
-                        suggestions.add(relativePath);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            logger.error("获取路径建议失败: {}", path, e);
-        }
-        return suggestions;
-    }
-
-
     @Override
     public boolean deleteByParagraphId(String paragraphId) {
         try {
@@ -733,18 +560,39 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     @Override
     public String insertOrUpdateByParagraphId(DocumentBuilder builder) {
         try {
-            // 构建文档并添加到队列
-            Document doc = builder.build();
-            String paragraphId = doc.get("id");
+            Document newDoc = builder.build();
+            String paragraphId = newDoc.get("id");
 
             if (paragraphId == null || paragraphId.isEmpty() || paragraphId.equals("null")) {
                 throw new RuntimeException("Paragraph ID is empty");
             }
 
             synchronized (commitLock) {
+                Document finalDoc = newDoc; // 默认使用新文档
+
+                // 1. 尝试获取已存在的文档
+                try (DirectoryReader reader = DirectoryReader.open(directory)) {
+                    IndexSearcher searcher = new IndexSearcher(reader);
+                    Term term = new Term("id", paragraphId);
+                    TopDocs docs = searcher.search(new TermQuery(term), 1);
+
+                    if (docs.totalHits.value > 0) {
+                        // 1.2 文档存在，合并字段
+                        Document existingDoc = searcher.doc(docs.scoreDocs[0].doc);
+                        finalDoc = mergeDocuments(existingDoc, newDoc);
+                        logger.debug("Merging existing document with new data for ID: {}", paragraphId);
+                    } else {
+                        // 1.1 文档不存在，使用新文档
+                        logger.debug("Creating new document for ID: {}", paragraphId);
+                    }
+                }
+
+                // 2. 删除旧文档
                 pendingOperations.add(IndexOperation.createDelete(paragraphId));
-                pendingOperations.add(IndexOperation.createInsert(doc));
-                
+
+                // 3. 插入合并后的文档
+                pendingOperations.add(IndexOperation.createInsert(finalDoc));
+
                 if (pendingOperations.size() >= MAX_PENDING_DOCUMENTS) {
                     commitPendingOperations();
                 }
@@ -757,19 +605,82 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         }
     }
 
+    /**
+     * 合并两个文档，保留原有文档的字段，用新文档的字段覆盖
+     */
+    private Document mergeDocuments(Document existingDoc, Document newDoc) {
+        Document mergedDoc = new Document();
+
+        // 保存所有已存在的字段
+        for (IndexableField field : existingDoc.getFields()) {
+            mergedDoc.add(field);
+        }
+
+        // 用新文档的字段覆盖或添加
+        for (IndexableField field : newDoc.getFields()) {
+            String fieldName = field.name();
+            // 如果字段已存在，先删除旧值
+            mergedDoc.removeFields(fieldName);
+            // 添加新值
+            mergedDoc.add(field);
+        }
+
+        return mergedDoc;
+    }
+
     // 辅助方法：记录分词日志
     private void logTokenization(String content) {
         // try (TokenStream ts = analyzer.tokenStream("content", content)) {
-        //     CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
-        //     ts.reset();
-        //     StringBuilder terms = new StringBuilder("Indexed terms: ");
-        //     while (ts.incrementToken()) {
-        //         terms.append(termAttr.toString()).append(", ");
-        //     }
-        //     logger.debug(terms.toString());
-        // } catch (IOException e) {
-        //     logger.error("分词日志记录失败", e);
+        // CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);
+        // ts.reset();
+        // StringBuilder terms = new StringBuilder("Indexed terms: ");
+        // while (ts.incrementToken()) {
+        // terms.append(termAttr.toString()).append(", ");
         // }
+        // logger.debug(terms.toString());
+        // } catch (IOException e) {
+        // logger.error("分词日志记录失败", e);
+        // }
+    }
+
+    @Override
+    public void deleteByRefineryTaskId(Long taskId, Long paragraphId) throws IOException {
+        try {
+            synchronized (commitLock) {
+                // 先删除原有文档
+                pendingOperations.add(IndexOperation.createDelete(paragraphId.toString()));
+
+                // 重建文档，但不包含refineryTaskId字段
+                try (DirectoryReader reader = DirectoryReader.open(directory)) {
+                    IndexSearcher searcher = new IndexSearcher(reader);
+                    Term term = new Term("id", paragraphId.toString());
+                    TopDocs docs = searcher.search(new TermQuery(term), 1);
+
+                    if (docs.totalHits.value > 0) {
+                        Document oldDoc = searcher.doc(docs.scoreDocs[0].doc);
+                        Document newDoc = new Document();
+
+                        // 复制所有字段，除了refinery_task_id
+                        for (IndexableField field : oldDoc.getFields()) {
+                            if (!field.name().equals("refinery_task_id")) {
+                                newDoc.add(field);
+                            }
+                        }
+
+                        // 添加新文档到待处理队列
+                        pendingOperations.add(IndexOperation.createInsert(newDoc));
+                    }
+                }
+
+                if (pendingOperations.size() >= MAX_PENDING_DOCUMENTS) {
+                    commitPendingOperations();
+                }
+            }
+            logger.info("已提交清除任务ID的请求 - TaskID: {}, ParagraphID: {}", taskId, paragraphId);
+        } catch (Exception e) {
+            logger.error("清除任务ID失败 - TaskID: {}, ParagraphID: {}", taskId, paragraphId, e);
+            throw new IOException("Failed to clear refinery task ID", e);
+        }
     }
 
 }

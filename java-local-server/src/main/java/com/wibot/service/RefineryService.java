@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
@@ -24,6 +23,7 @@ import com.wibot.service.dto.ExtractFactResponse;
 import com.wibot.service.dto.ExtractedFact;
 import com.wibot.utils.JsonExtractor;
 import com.wibot.controller.vo.RefineryTaskVO;
+import com.wibot.documentLoader.DocumentIndexService;
 import com.wibot.documentLoader.event.DocumentEventListener;
 import com.wibot.documentLoader.event.DocumentProcessEvent;
 
@@ -58,6 +58,9 @@ public class RefineryService implements DocumentEventListener {
 
     @Autowired
     private RefineryFactRepository refineryFactRepository;
+
+    @Autowired
+    private DocumentIndexService documentIndexService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -348,7 +351,6 @@ public class RefineryService implements DocumentEventListener {
     }
 
     @Override
-    @Transactional
     public void onDocumentProcessed(DocumentProcessEvent event) {
         try {
             switch (event.getEventType()) {
@@ -445,5 +447,53 @@ public class RefineryService implements DocumentEventListener {
 
         // 截取到最后一个分隔符的位置
         return filePath.substring(0, lastSeparator);
+    }
+
+    /**
+     * 执行任务的全量更新
+     */
+    public void updateTaskFull(Long taskId) {
+        RefineryTaskDO task = refineryTaskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+
+        // 清除checkpoint，以便重新处理所有内容
+        task.setProcessingCheckpoint(null);
+
+        // 将状态设置为待处理
+        task.setStatus(RefineryTaskDO.STATUS_PENDING);
+        task.setLastUpdateTime(LocalDateTime.now());
+        task.setErrorMessage(null);
+
+        refineryTaskRepository.save(task);
+
+        // 删除现有的事实和索引
+        refineryFactRepository.deleteByRefineryTaskId(taskId);
+        try {
+            List<RefineryFactDO> facts = refineryFactRepository.findByRefineryTaskId(taskId);
+            for (RefineryFactDO fact : facts) {
+                documentIndexService.deleteRefineryTaskIndex(taskId, fact.getParagraphId());
+            }
+        } catch (Exception e) {
+            logger.error("Error cleaning up old indices for task {}", taskId, e);
+        }
+    }
+
+    /**
+     * 删除任务及其相关数据
+     */
+    public void deleteTask(Long taskId) {
+        // 删除事实数据前先清理索引
+        try {
+            List<RefineryFactDO> facts = refineryFactRepository.findByRefineryTaskId(taskId);
+            for (RefineryFactDO fact : facts) {
+                documentIndexService.deleteRefineryTaskIndex(taskId, fact.getParagraphId());
+            }
+        } catch (Exception e) {
+            logger.error("Error deleting indices for task {}", taskId, e);
+        }
+
+        // 删除数据库中的数据
+        refineryFactRepository.deleteByRefineryTaskId(taskId);
+        refineryTaskRepository.deleteById(taskId);
     }
 }

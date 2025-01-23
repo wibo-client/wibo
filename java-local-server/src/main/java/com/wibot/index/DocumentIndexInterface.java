@@ -11,7 +11,7 @@ public interface DocumentIndexInterface {
 
     String getInterfaceDescription();
 
-    List<String> getPossiblePath(String path);
+    // List<String> getPossiblePath(String path);
 
     public List<SearchDocumentResult> searchWithStrategy(SearchQuery searchQuery);
 

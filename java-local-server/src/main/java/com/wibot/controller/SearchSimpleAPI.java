@@ -32,8 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 
 @RestController
 @RequestMapping("") // 添加基础路径
@@ -77,57 +75,6 @@ public class SearchSimpleAPI {
             return new SearchResultVO(item.getId(), item.getTitle(), item.getHighLightContentPart(),
                     LocalDateTime.now(), url);
         }).collect(Collectors.toList());
-    }
-
-    @GetMapping("/diagnose") // 简化路径
-    @ResponseBody // 确保返回值被正确处理
-    public Map<String, Object> diagnoseIndex(
-            @RequestParam(required = false, defaultValue = "") String pathPrefix // 使参数可选
-    ) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
-                    .selectIndexHandler(pathPrefix);
-            if (documentIndexInterface instanceof SimpleLocalLucenceIndex) {
-                String result = ((SimpleLocalLucenceIndex) documentIndexInterface).diagnoseIndex();
-                response.put("success", true);
-                response.put("data", result);
-            } else {
-                response.put("success", false);
-                response.put("error", "当前索引处理器不支持诊断功能");
-            }
-        } catch (Exception e) {
-            logger.error("索引诊断失败", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-        }
-        return response;
-    }
-
-    @GetMapping("/search/diagnose")
-    @ResponseBody
-    public Map<String, Object> diagnoseSearch(
-            @RequestParam String query,
-            @RequestParam(required = false) String pathPrefix) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            // 添加编码处理
-            String decodedQuery = URLDecoder.decode(query, StandardCharsets.UTF_8.name());
-
-            DocumentIndexInterface indexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(pathPrefix);
-            if (indexInterface instanceof SimpleLocalLucenceIndex) {
-                String diagnosis = ((SimpleLocalLucenceIndex) indexInterface).searchDiagnose(decodedQuery);
-                response.put("success", true);
-                response.put("diagnosis", diagnosis);
-            } else {
-                response.put("success", false);
-                response.put("error", "Unsupported index type");
-            }
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("error", e.getMessage());
-        }
-        return response;
     }
 
     private SearchQuery buildSearchQuery(Map<String, Object> searchParams) {
@@ -314,10 +261,10 @@ public class SearchSimpleAPI {
         return searchResults;
     }
 
-    private List<DocumentDataPO> findDocumentsWithWildcard(String pathPrefix) {    
-        //for h2 only
+    private List<DocumentDataPO> findDocumentsWithWildcard(String pathPrefix) {
+        // for h2 only
         String sqlPattern = pathPrefix.replace("\\", "\\\\").replace("*", "%");
-  
+
         return documentDataRepository.findByFilePathLike(sqlPattern);
     }
 
