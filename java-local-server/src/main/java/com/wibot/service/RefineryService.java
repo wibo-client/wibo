@@ -16,6 +16,7 @@ import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
 import com.wibot.persistence.RefineryFactRepository;
 import com.wibot.persistence.RefineryTaskRepository;
+import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import com.wibot.persistence.entity.RefineryFactDO;
 import com.wibot.persistence.entity.RefineryTaskDO;
@@ -23,6 +24,8 @@ import com.wibot.service.dto.ExtractFactResponse;
 import com.wibot.service.dto.ExtractedFact;
 import com.wibot.utils.JsonExtractor;
 import com.wibot.controller.vo.RefineryTaskVO;
+import com.wibot.documentLoader.event.DocumentEventListener;
+import com.wibot.documentLoader.event.DocumentProcessEvent;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,7 +37,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Service
-public class RefineryService {
+public class RefineryService implements DocumentEventListener {
     private static final Logger logger = LoggerFactory.getLogger(RefineryService.class);
     private static final int MAX_CONTENT_SIZE = 28720;
 
@@ -83,8 +86,8 @@ public class RefineryService {
 
     public RefineryTaskVO getTask(Long taskId) {
         return refineryTaskRepository.findById(taskId)
-            .map(this::convertToVO)
-            .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+                .map(this::convertToVO)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
     }
 
     @Scheduled(fixedDelay = 60000) // 每分钟执行一次
@@ -146,35 +149,34 @@ public class RefineryService {
             // 统计文件数
             long coveredFileCount = documentDataRepository.countByFilePathStartingWith(task.getDirectoryPath());
             task.setCoveredFileCount((int) coveredFileCount);
-            
+
             List<MarkdownParagraphPO> paragraphs = getSortedParagraphIds(task.getDirectoryPath());
-            
+
             // 如果有断点，过滤出断点之后的段落
             if (checkpoint != null && !checkpoint.isEmpty()) {
                 Long checkpointId = Long.parseLong(checkpoint);
                 paragraphs = paragraphs.stream()
-                    .filter(p -> p.getId() > checkpointId)
-                    .toList();
+                        .filter(p -> p.getId() > checkpointId)
+                        .toList();
             }
 
             List<ExtractedFact> facts = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
-            
+
             // 保存提取的事实 - 简化版本
             for (ExtractedFact fact : facts) {
                 Long paragraphId = Long.parseLong(fact.getId());
-                
+
                 // 直接删除旧记录，不做查询
                 refineryFactRepository.deleteByRefineryTaskIdAndParagraphId(task.getId(), paragraphId);
-                
+
                 // 直接保存新记录
                 RefineryFactDO factDO = new RefineryFactDO(
-                    Long.valueOf(task.getId()),
-                    paragraphId,
-                    fact.getFact()
-                );
+                        Long.valueOf(task.getId()),
+                        paragraphId,
+                        fact.getFact());
                 refineryFactRepository.save(factDO);
             }
-            
+
         } catch (Exception e) {
             // 保持原有的checkpoint不变，便于后续续传
             task.setProcessingCheckpoint(checkpoint);
@@ -182,7 +184,8 @@ public class RefineryService {
         }
     }
 
-    private List<ExtractedFact> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question, RefineryTaskDO task) {
+    private List<ExtractedFact> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question,
+            RefineryTaskDO task) {
         List<ExtractedFact> allFacts = new ArrayList<>();
         int currentLength = 0;
         int batchIndex = 1;
@@ -201,7 +204,7 @@ public class RefineryService {
             try {
                 String jsonStr = objectMapper.writeValueAsString(reference);
                 totalTokenCost += jsonStr.length(); // 累加输入token成本
-                
+
                 if (currentLength + jsonStr.length() < MAX_CONTENT_SIZE) {
                     currentBatch.add(reference);
                     currentLength += jsonStr.length();
@@ -239,19 +242,20 @@ public class RefineryService {
     private Long updateCheckpoint(List<Map<String, Object>> batch, RefineryTaskDO task) {
         // 获取当前批次中最大的ID
         Long maxId = batch.stream()
-            .map(ref -> Long.valueOf(ref.get("id").toString()))
-            .max(Long::compareTo)
-            .orElse(null);
-        
+                .map(ref -> Long.valueOf(ref.get("id").toString()))
+                .max(Long::compareTo)
+                .orElse(null);
+
         if (maxId != null) {
             task.setProcessingCheckpoint(maxId.toString());
             refineryTaskRepository.save(task);
         }
-        
+
         return maxId;
     }
 
-    private int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question, List<ExtractedFact> allFacts, int batchIndex) {
+    private int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question,
+            List<ExtractedFact> allFacts, int batchIndex) {
         Map<String, Object> params = new HashMap<>();
         params.put("references", batch);
         params.put("question", question);
@@ -265,9 +269,9 @@ public class RefineryService {
                 try {
                     Prompt prompt = new Prompt(messages);
                     String response = singletonLLMChat.getChatClient()
-                        .prompt(prompt)
-                        .call()
-                        .content();
+                            .prompt(prompt)
+                            .call()
+                            .content();
 
                     // 先提取JSON字符串
                     String jsonStr = JsonExtractor.extractJsonFromResponse(response);
@@ -280,9 +284,9 @@ public class RefineryService {
                     ExtractFactResponse factResponse = objectMapper.readValue(jsonStr, ExtractFactResponse.class);
                     if (factResponse != null && factResponse.getFacts() != null) {
                         allFacts.addAll(factResponse.getFacts());
-                        logger.info("Successfully processed batch {}, extracted {} facts", 
-                            batchIndex, factResponse.getFacts().size());
-                        
+                        logger.info("Successfully processed batch {}, extracted {} facts",
+                                batchIndex, factResponse.getFacts().size());
+
                         // 返回响应token成本
                         return response.length();
                     }
@@ -304,6 +308,7 @@ public class RefineryService {
 
     /**
      * 获取指定目录下所有Markdown段落ID的有序列表
+     * 
      * @param directoryPath 目录路径
      * @return 已排序的段落ID列表
      */
@@ -311,12 +316,12 @@ public class RefineryService {
         List<MarkdownParagraphPO> paragraphs = new ArrayList<>();
 
         documentDataRepository.findByFilePathStartingWith(directoryPath)
-            .forEach(doc -> {
-                markdownParagraphRepository.findByDocumentDataId(doc.getId())
-                    .forEach(paragraph -> {
-                        paragraphs.add(paragraph);
-                    });
-            });
+                .forEach(doc -> {
+                    markdownParagraphRepository.findByDocumentDataId(doc.getId())
+                            .forEach(paragraph -> {
+                                paragraphs.add(paragraph);
+                            });
+                });
 
         // 排序以方便断点续传
         paragraphs.sort((p1, p2) -> Long.compare(p1.getId(), p2.getId()));
@@ -340,5 +345,105 @@ public class RefineryService {
         vo.setErrorMessage(taskDO.getErrorMessage());
         vo.setProcessingCheckpoint(taskDO.getProcessingCheckpoint());
         return vo;
+    }
+
+    @Override
+    @Transactional
+    public void onDocumentProcessed(DocumentProcessEvent event) {
+        try {
+            switch (event.getEventType()) {
+                case DocumentProcessEvent.TYPE_BEFORE_DELETE:
+                    handleBeforeDocumentDelete(event.getDocument());
+                    break;
+                case DocumentProcessEvent.TYPE_AFTER_MODIFY:
+                    handleAfterDocumentModify(event.getDocument());
+                    break;
+            }
+        } catch (Exception e) {
+            logger.error("Error handling document event: {}", event.getEventType(), e);
+        }
+    }
+
+    private void handleBeforeDocumentDelete(DocumentDataPO document) {
+        logger.info("Handling document deletion: {}", document.getFilePath());
+
+        // 获取文档相关的所有段落
+        List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(document.getId());
+
+        // 获取段落ID列表
+        List<Long> paragraphIds = paragraphs.stream()
+                .map(MarkdownParagraphPO::getId)
+                .toList();
+
+        // 删除这些段落相关的所有事实
+        if (!paragraphIds.isEmpty()) {
+            refineryFactRepository.deleteByParagraphIdIn(paragraphIds);
+        }
+    }
+
+    private void handleAfterDocumentModify(DocumentDataPO document) {
+        logger.info("Handling document modification: {}", document.getFilePath());
+
+        // 修改这行代码，使用 findByDirectoryPathLikeAndStatus 方法
+        String directoryPathPattern = getParentPath(document.getFilePath()) + "%";
+        List<RefineryTaskDO> relatedTasks = refineryTaskRepository.findByDirectoryPathLikeAndStatus(
+                directoryPathPattern,
+                RefineryTaskDO.STATUS_ACTIVE);
+
+        for (RefineryTaskDO task : relatedTasks) {
+            try {
+                // 获取文档的所有段落
+                List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository
+                        .findByDocumentDataId(document.getId());
+
+                // 删除旧的事实
+                List<Long> paragraphIds = paragraphs.stream()
+                        .map(MarkdownParagraphPO::getId)
+                        .toList();
+                if (!paragraphIds.isEmpty()) {
+                    refineryFactRepository.deleteByRefineryTaskIdAndParagraphIdIn(task.getId(), paragraphIds);
+                }
+
+                // 重新提取事实
+                List<ExtractedFact> facts = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+
+                // 保存新的事实
+                for (ExtractedFact fact : facts) {
+                    Long paragraphId = Long.parseLong(fact.getId());
+                    RefineryFactDO factDO = new RefineryFactDO(task.getId(), paragraphId, fact.getFact());
+                    refineryFactRepository.save(factDO);
+                }
+
+                // 更新任务统计信息
+                int incrementalTokenCost = task.getIncrementalTokenCost() + facts.size() * 100; // 估算token消耗
+                task.setIncrementalTokenCost(incrementalTokenCost);
+                task.setLastUpdateTime(LocalDateTime.now());
+                refineryTaskRepository.save(task);
+
+            } catch (Exception e) {
+                logger.error("Error processing modified document for task {}: {}", task.getId(), e.getMessage());
+                task.setStatus(RefineryTaskDO.STATUS_FAILED);
+                task.setErrorMessage("Error processing modified document: " + e.getMessage());
+                refineryTaskRepository.save(task);
+            }
+        }
+    }
+
+    private String getParentPath(String filePath) {
+        // 同时处理 Windows 和 Unix 风格的路径分隔符
+        int lastUnixSeparator = filePath.lastIndexOf('/');
+        int lastWindowsSeparator = filePath.lastIndexOf('\\');
+        int lastColon = filePath.lastIndexOf(':');
+
+        // 获取最后一个分隔符的位置
+        int lastSeparator = Math.max(lastUnixSeparator, Math.max(lastWindowsSeparator, lastColon));
+
+        // 如果找不到分隔符或分隔符在开头，返回原路径
+        if (lastSeparator <= 0) {
+            return filePath;
+        }
+
+        // 截取到最后一个分隔符的位置
+        return filePath.substring(0, lastSeparator);
     }
 }

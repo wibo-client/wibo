@@ -7,10 +7,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
 
+import com.wibot.documentLoader.event.DocumentEventListener;
+import com.wibot.documentLoader.event.DocumentProcessEvent;
 import com.wibot.documentParser.DocumentParserInterface;
 import com.wibot.documentParserSelector.DocumentParserSelectorInterface;
-import com.wibot.index.LocalIndexBuilder;
-import com.wibot.index.builder.DocumentBuilder;
+
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownBasedContentRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
@@ -23,6 +24,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -43,18 +45,35 @@ public class DocumentProcessorService {
     private DocumentParserSelectorInterface selector;
     @Autowired
     private MarkdownBasedContentRepository markdownRepo;
-    @Autowired
-    private LocalIndexBuilder index;
 
     @Autowired
     private MarkdownParagraphRepository markdownParagraphRepository;
 
+    @Autowired
+    private DocumentIndexService documentIndexService;
+
     private final ExecutorService executorService;
+
+    private final List<DocumentEventListener> listeners = new ArrayList<>();
 
     public DocumentProcessorService() {
         ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("doc-processor-%d").build();
         this.executorService = Executors.newFixedThreadPool(CORE_POOL_SIZE, threadFactory);
 
+    }
+
+    public void addListener(DocumentEventListener listener) {
+        listeners.add(listener);
+    }
+
+    private void notifyListeners(DocumentProcessEvent event) {
+        listeners.forEach(listener -> {
+            try {
+                listener.onDocumentProcessed(event);
+            } catch (Exception e) {
+                logger.error("Error notifying listener", e);
+            }
+        });
     }
 
     @PostConstruct
@@ -78,7 +97,8 @@ public class DocumentProcessorService {
         DocumentDataPO currentDoc = null;
         while (true) {
             try {
-                logger.debug("Thread {} (Processor {}) starts looking for unprocessed tasks", Thread.currentThread().getName(), processorId);
+                logger.debug("Thread {} (Processor {}) starts looking for unprocessed tasks",
+                        Thread.currentThread().getName(), processorId);
 
                 // 查找未处理的任务，包括新文件和已删除文件
                 List<DocumentDataPO> allDocuments = documentDataRepository
@@ -93,7 +113,8 @@ public class DocumentProcessorService {
                         .toList();
 
                 if (documents.isEmpty()) {
-                    logger.debug("Thread {} (Processor {}) found no tasks, sleeping for 10 seconds", Thread.currentThread().getName(), processorId);
+                    logger.debug("Thread {} (Processor {}) found no tasks, sleeping for 10 seconds",
+                            Thread.currentThread().getName(), processorId);
                     Thread.sleep(10000);
                     continue;
                 }
@@ -108,11 +129,13 @@ public class DocumentProcessorService {
                     currentDoc = document;
                     boolean success = processDocument(document);
                     if (success) {
-                        logger.debug("Thread {} (Processor {}) successfully processed document: {}", Thread.currentThread().getName(), processorId,
+                        logger.debug("Thread {} (Processor {}) successfully processed document: {}",
+                                Thread.currentThread().getName(), processorId,
                                 document.getFilePath());
                         document.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_INDEXED);
                     } else {
-                        logger.error("Thread {} (Processor {}) failed to process document: {}", Thread.currentThread().getName(), processorId,
+                        logger.error("Thread {} (Processor {}) failed to process document: {}",
+                                Thread.currentThread().getName(), processorId,
                                 document.getFilePath());
                         document.setProcessedState(DocumentDataPO.PROCESSED_ERROR);
                     }
@@ -124,14 +147,14 @@ public class DocumentProcessorService {
                     // }
                 }
             } catch (Exception e) {
-                
+
                 logger.atError()
-                      .setMessage("Thread {} (Processor {}) encountered an error while processing document: {}")
-                      .addArgument(Thread.currentThread().getName())
-                      .addArgument(processorId)
-                      .addArgument(currentDoc != null ? currentDoc.getFilePath() : "Unknown document")
-                      .setCause(e)
-                      .log();
+                        .setMessage("Thread {} (Processor {}) encountered an error while processing document: {}")
+                        .addArgument(Thread.currentThread().getName())
+                        .addArgument(processorId)
+                        .addArgument(currentDoc != null ? currentDoc.getFilePath() : "Unknown document")
+                        .setCause(e)
+                        .log();
             }
 
         }
@@ -142,18 +165,14 @@ public class DocumentProcessorService {
         logger.info("Thread {} starts processing deleted document: {}", threadName, document.getFileName());
 
         try {
-            // 1. 删除索引 - 使用新接口，遍历段落删除
+            // 删除前通知
+            notifyListeners(new DocumentProcessEvent(document, DocumentProcessEvent.TYPE_BEFORE_DELETE));
+
+            // 1. 删除索引
             List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(document.getId());
-            for (MarkdownParagraphPO paragraph : paragraphs) {
-                try {
-                    index.deleteByParagraphId(String.valueOf(paragraph.getId()));
-                    logger.debug("Thread {} deleted paragraph index: {}", threadName, paragraph.getId());
-                } catch (Exception e) {
-                    logger.warn("Thread {} failed to delete paragraph index: {}", threadName, paragraph.getId(), e);
-                }
-            }
-            logger.debug("Thread {} completed all paragraph index deletions for document: {}", 
-                        threadName, document.getFilePath());
+            documentIndexService.deleteParagraphsIndex(paragraphs);
+            logger.debug("Thread {} completed all paragraph index deletions for document: {}",
+                    threadName, document.getFilePath());
 
             // 2. 删除markdown段落数据
             markdownParagraphRepository.deleteByDocumentDataId(document.getId());
@@ -167,72 +186,29 @@ public class DocumentProcessorService {
             documentDataRepository.delete(document);
             logger.info("Thread {} completed document deletion: {}", threadName, document.getFileName());
 
+            // 删除后通知
+            notifyListeners(new DocumentProcessEvent(document, DocumentProcessEvent.TYPE_AFTER_DELETE));
+
         } catch (Exception e) {
             logger.error("Thread {} failed to process deleted document: {}", threadName, document.getFilePath(), e);
             throw new RuntimeException("Failed to process deleted document", e);
         }
     }
 
-    private List<MarkdownParagraphPO> updateDocumentParagraphs(String markdown, Long documentId, Long markdownContentId) {
-        String threadName = Thread.currentThread().getName();
-        
+    private List<MarkdownParagraphPO> updateDocumentParagraphs(String markdown, Long documentId,
+            Long markdownContentId) {
         // 1. 删除旧段落
         List<MarkdownParagraphPO> oldParagraphs = markdownParagraphRepository.findByDocumentDataId(documentId);
-        for (MarkdownParagraphPO oldParagraph : oldParagraphs) {
-            try {
-                index.deleteByParagraphId(String.valueOf(oldParagraph.getId()));
-                logger.debug("Thread {} deleted old paragraph index: {}", threadName, oldParagraph.getId());
-            } catch (Exception e) {
-                logger.error("Thread {} failed to delete old paragraph: {}", threadName, oldParagraph.getId(), e);
-            }
-        }
-    
+        documentIndexService.deleteParagraphsIndex(oldParagraphs);
+
         // 2. 创建新段落
         List<MarkdownParagraphPO> newParagraphs = MarkdownBasedContentPO
                 .splitContentIntoParagraphs(markdown, documentId, markdownContentId);
-        
+
         // 3. 保存新段落到数据库
         return newParagraphs.stream()
                 .map(markdownParagraphRepository::save)
                 .toList();
-    }
-    
-    /**
-     * 构建文档的索引
-     * @param filePath 文件路径
-     * @param paragraphs 段落列表
-     * @param createTime 文档创建时间
-     * @return 是否成功
-     */
-    public boolean buildDocumentIndex(String filePath, List<MarkdownParagraphPO> paragraphs, LocalDateTime createTime) {
-        String threadName = Thread.currentThread().getName();
-        boolean success = true;
-    
-        for (MarkdownParagraphPO paragraph : paragraphs) {
-            try {
-                String paragraphId = String.valueOf(paragraph.getId());
-                logger.debug("Thread {} building index for paragraph: {}", threadName, paragraphId);
-    
-                // 构建索引文档
-                DocumentBuilder builder = new DocumentBuilder(paragraphId)
-                    .withFilePath(filePath)
-                    .withContent(paragraph.getContent());
-                
-                // 添加创建时间
-                if (createTime != null) {
-                    builder.withCreateTime(createTime);
-                }
-                
-                // 提交索引更新
-                index.insertOrUpdateByParagraphId(builder);
-            } catch (Exception e) {
-                logger.error("Thread {} failed to build index for paragraph: {}", 
-                           threadName, paragraph.getId(), e);
-                success = false;
-            }
-        }
-    
-        return success;
     }
 
     private boolean processDocument(DocumentDataPO document) {
@@ -243,38 +219,45 @@ public class DocumentProcessorService {
         while (retryCount < MAX_RETRY_ATTEMPTS) {
             try {
                 if (retryCount > 0) {
-                    logger.info("Thread {} retrying document processing attempt {}: {}", 
-                              threadName, retryCount, document.getFileName());
+                    logger.info("Thread {} retrying document processing attempt {}: {}",
+                            threadName, retryCount, document.getFileName());
                     Thread.sleep(RETRY_DELAY_MS * retryCount);
                 }
+
+                // 修改前通知
+                notifyListeners(new DocumentProcessEvent(document, DocumentProcessEvent.TYPE_BEFORE_MODIFY));
 
                 // 1. 解析文档
                 DocumentParserInterface parser = selector.select(document.getExtension());
                 String markdown = parser.parseDocument(document);
-                
+
                 // 2. 保存Markdown内容
                 MarkdownBasedContentPO markdownAfter = saveMarkdownContent(document, markdown);
-                
+
                 // 3. 更新段落
                 List<MarkdownParagraphPO> paragraphs = updateDocumentParagraphs(
-                    markdown, document.getId(), markdownAfter.getId());
-                
+                        markdown, document.getId(), markdownAfter.getId());
+
                 // 4. 构建索引
-                return buildDocumentIndex(
-                    document.getFilePath(), 
-                    paragraphs, 
-                    document.getCreateTime()
-                );
+                boolean success = documentIndexService.buildDocumentIndex(
+                        document.getFilePath(),
+                        paragraphs,
+                        document.getCreateTime());
+
+                // 修改后通知
+                notifyListeners(new DocumentProcessEvent(document, DocumentProcessEvent.TYPE_AFTER_MODIFY));
+
+                return success;
 
             } catch (Exception e) {
                 retryCount++;
                 if (retryCount >= MAX_RETRY_ATTEMPTS) {
-                    logger.error("Thread {} failed to process document after {} attempts: {}", 
-                               threadName, retryCount, document.getFilePath(), e);
+                    logger.error("Thread {} failed to process document after {} attempts: {}",
+                            threadName, retryCount, document.getFilePath(), e);
                     return false;
                 }
-                logger.warn("Thread {} failed to process document, preparing for retry attempt {}: {}", 
-                          threadName, retryCount + 1, document.getFilePath(), e);
+                logger.warn("Thread {} failed to process document, preparing for retry attempt {}: {}",
+                        threadName, retryCount + 1, document.getFilePath(), e);
             }
         }
         return false;
