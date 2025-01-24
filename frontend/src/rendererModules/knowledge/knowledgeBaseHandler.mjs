@@ -1,207 +1,49 @@
+
 export default class KnowledgeBaseHandler {
   constructor() {
-    this.BASE_URL = null;
-    this.updateTimer = null;  // 添加定时器引用
     this.isUpdatingUI = false; // 添加UI更新锁定标志
     this.uiLockTimeout = null; // 添加UI锁定计时器
     this.setupEventListeners();
-    this.lastServerState = null; // 添加状态缓存
-    this.lastKnownState = {
-      isHealthy: false,
-      port: null,
-      desiredState: false,
-      debugMode: false
-    };
-    this.stateChangeCallbacks = new Set();
-
-    // 不再直接启动定时更新，而是通过状态检查来控制
-    this.setupPortCheck();
-    this.componentDidMount(); // 在构造函数中调用
-    this.initializeIndexSettings(); // 在构造函数中调用初始化方法
     this.setupIndexSettingsListeners(); // 添加新的方法调用
+    this.updateTimer = null; // 添加定时器引用
   }
 
-  // 添加定时器控制方法
+  init(knowledgeLocalServerStatusHandler) {
+    this.knowledgeLocalServerStatusHandler = knowledgeLocalServerStatusHandler;
+    this.knowledgeLocalServerStatusHandler.addStateChangeListener(state => {
+      this.BASE_URL = state.baseUrl;
+      this.lastKnownState = state;
+
+      // 根据服务健康状态管理定时任务
+      if (state.isHealthy) {
+        this.startUpdateTimer();
+        // 立即执行一次更新
+
+        this.initializeIndexSettings(); // 在构造函数中调用初始化方法
+        this.updateMonitoredDirs();
+        this.updateUploadConfig();
+      } else {
+        this.stopUpdateTimer();
+      }
+    });
+  }
+
   startUpdateTimer() {
     if (!this.updateTimer) {
-      this.updateMonitoredDirs(); // 立即执行一次
-      this.updateTimer = setInterval(() => this.updateMonitoredDirs(), 10000); // 改为30秒轮询一次
-      console.log('[本地索引服务] 启动监控定时器');
+      console.log('[本地索引服务] 启动定时更新任务');
+      this.updateTimer = setInterval(() => {
+        this.updateMonitoredDirs();
+        this.updateUploadConfig();
+        this.initializeIndexSettings
+      }, 3000);
     }
   }
 
   stopUpdateTimer() {
     if (this.updateTimer) {
+      console.log('[本地索引服务] 停止定时更新任务');
       clearInterval(this.updateTimer);
       this.updateTimer = null;
-      console.log('[本地索引服务] 停止监控定时器');
-    }
-  }
-
-  // 新增：状态变化处理方法
-  handleStateChange(newState) {
-    const stateChanged = JSON.stringify(newState) !== JSON.stringify(this.lastKnownState);
-
-    if (stateChanged) {
-      this.lastKnownState = { ...newState };
-      this.updateUIState(newState);
-      this.stateChangeCallbacks.forEach(callback => callback(newState));
-    }
-  }
-
-  // 新增：UI状态更新方法
-  updateUIState(state) {
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const configSection = document.getElementById('localKnowledgeBaseConfig');
-    const toggle = document.getElementById('localKnowledgeBaseToggle');
-
-    if (statusDot && statusText) {
-      if (state.isHealthy) {
-        statusDot.style.backgroundColor = '#4CAF50';
-        statusText.textContent = state.debugMode ? '调试模式运行中' : '正常运行中';
-      } else if (state.desiredState) {
-        statusDot.style.backgroundColor = '#FFA500';
-        statusText.textContent = '启动中...';
-      } else {
-        statusDot.style.backgroundColor = '#9E9E9E';
-        statusText.textContent = '已关闭';
-      }
-    }
-
-    if (configSection && toggle) {
-      toggle.checked = state.desiredState;
-      configSection.style.display = state.desiredState ? 'block' : 'none';
-    }
-  }
-
-  // 修改 setupPortCheck 方法
-  async setupPortCheck() {
-    const updateBaseUrl = async () => {
-      try {
-        const serverStatus = await window.electron.getServerDesiredState();
-        const debugMode = Boolean(serverStatus.debugPort);
-
-        // 调试模式下使用调试端口
-        const activePort = debugMode ? serverStatus.debugPort : serverStatus.port;
-
-        const newState = {
-          isHealthy: serverStatus.isHealthy || debugMode,  // 调试模式下默认为健康
-          port: activePort,
-          desiredState: serverStatus.desiredState || debugMode,  // 调试模式下视为已开启
-          debugMode
-        };
-
-        this.handleStateChange(newState);
-
-        // 更新 BASE_URL
-        if (activePort) {
-          this.BASE_URL = `http://localhost:${activePort}`;
-          this.startUpdateTimer();
-          await this.initializeIndexSettings();
-          return true;
-        } else {
-          this.BASE_URL = null;
-          this.stopUpdateTimer();
-          return false;
-        }
-      } catch (error) {
-        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-          console.debug('[本地索引服务] 服务离线，等待重新连接...');
-        } else {
-          console.error('[本地索引服务] 获取服务状态失败:', error.message);
-        }
-        this.BASE_URL = null;
-        this.stopUpdateTimer();
-        return false;
-      }
-    };
-
-    // 初始检查
-    await updateBaseUrl();
-
-    // 定期检查
-    setInterval(async () => {
-      await updateBaseUrl();
-    }, 5000);
-  }
-
-  // 添加初始化索引设置方法
-  async initializeIndexSettings() {
-    if (!this.BASE_URL) {
-      console.warn('[本地索引服务] 服务未就绪，跳过获取索引设置');
-      return;
-    }
-    if (this.isUpdatingUI) {
-      console.log('[本地索引服务] UI正在更新中，跳过获取索引设置');
-      return; // 如果UI正在被用户操作，跳过更新
-    }
-
-    try {
-      const response = await fetch(`${this.BASE_URL}/admin/current-index-settings`);
-      const settings = await response.json();
-
-      // 更新文件类型开关状态
-      if (settings.fileTypes) {
-        // 基础文件类型
-        const simpleTypes = ['text', 'spreadsheet', 'web', 'code', 'config', 'archive'];
-        simpleTypes.forEach(type => {
-          const toggle = document.getElementById(`${type}FilesToggle`);
-          if (toggle) {
-            toggle.checked = settings.fileTypes[type] || false;
-          }
-        });
-
-        // 带增强选项的文件类型
-        const enhancedTypes = ['presentation', 'pdf', 'image'];
-        enhancedTypes.forEach(type => {
-          const typeToggle = document.getElementById(`${type}FilesToggle`);
-          const enhanceToggle = document.getElementById(`${type}EnhanceToggle`);
-
-          if (typeToggle && settings.fileTypes[type]) {
-            typeToggle.checked = settings.fileTypes[type].enabled || false;
-          }
-          if (enhanceToggle && settings.fileTypes[type]) {
-            enhanceToggle.checked = settings.fileTypes[type].enhanced || false;
-          }
-        });
-      }
-
-      // 更新忽略目录设置
-      const ignoredDirs = document.getElementById('ignoredDirectories');
-      if (ignoredDirs && settings.ignoredDirectories) {
-        ignoredDirs.value = settings.ignoredDirectories.join('\n');
-      }
-
-      console.log('[本地索引服务] 索引设置初始化完成');
-    } catch (error) {
-      // 只在非离线错误时打印详细信息
-      if (error.name !== 'TypeError' || error.message !== 'Failed to fetch') {
-        console.error('[本地索引服务] 获取索引设置失败:', error.message);
-      } else {
-        console.debug('[本地索引服务] 服务离线，无法获取索引设置');
-      }
-    }
-  }
-
-  async componentDidMount() {
-    try {
-      const serverStatus = await window.electron.getServerDesiredState();
-      const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
-      const localKnowledgeBaseConfig = document.getElementById('localKnowledgeBaseConfig');
-
-      if (localKnowledgeBaseToggle && localKnowledgeBaseConfig) {
-        // 保持开关状态与期望状态一致
-        localKnowledgeBaseToggle.checked = serverStatus.desiredState;
-        localKnowledgeBaseConfig.style.display = serverStatus.desiredState ? 'block' : 'none';
-
-        // 如果期望状态是开启，但实际状态是关闭，显示提示
-        if (serverStatus.desiredState && !serverStatus.isHealthy) {
-          console.log('[本地索引服务] 正在启动中...');
-        }
-      }
-    } catch (error) {
-      console.error('[本地索引服务] 初始化状态失败:', error.message);
     }
   }
 
@@ -277,6 +119,66 @@ export default class KnowledgeBaseHandler {
       this.isUpdatingUI = false;
     }, 1800000);
   }
+
+
+  // 添加初始化索引设置方法
+  async initializeIndexSettings() {
+    if (!this.BASE_URL) {
+      console.warn('[本地索引服务] 服务未就绪，跳过获取索引设置');
+      return;
+    }
+    if (this.isUpdatingUI) {
+      console.log('[本地索引服务] UI正在更新中，跳过获取索引设置');
+      return; // 如果UI正在被用户操作，跳过更新
+    }
+
+    try {
+      const response = await fetch(`${this.BASE_URL}/admin/current-index-settings`);
+      const settings = await response.json();
+
+      // 更新文件类型开关状态
+      if (settings.fileTypes) {
+        // 基础文件类型
+        const simpleTypes = ['text', 'spreadsheet', 'web', 'code', 'config', 'archive'];
+        simpleTypes.forEach(type => {
+          const toggle = document.getElementById(`${type}FilesToggle`);
+          if (toggle) {
+            toggle.checked = settings.fileTypes[type] || false;
+          }
+        });
+
+        // 带增强选项的文件类型
+        const enhancedTypes = ['presentation', 'pdf', 'image'];
+        enhancedTypes.forEach(type => {
+          const typeToggle = document.getElementById(`${type}FilesToggle`);
+          const enhanceToggle = document.getElementById(`${type}EnhanceToggle`);
+
+          if (typeToggle && settings.fileTypes[type]) {
+            typeToggle.checked = settings.fileTypes[type].enabled || false;
+          }
+          if (enhanceToggle && settings.fileTypes[type]) {
+            enhanceToggle.checked = settings.fileTypes[type].enhanced || false;
+          }
+        });
+      }
+
+      // 更新忽略目录设置
+      const ignoredDirs = document.getElementById('ignoredDirectories');
+      if (ignoredDirs && settings.ignoredDirectories) {
+        ignoredDirs.value = settings.ignoredDirectories.join('\n');
+      }
+
+      console.log('[本地索引服务] 索引设置初始化完成');
+    } catch (error) {
+      // 只在非离线错误时打印详细信息
+      if (error.name !== 'TypeError' || error.message !== 'Failed to fetch') {
+        console.error('[本地索引服务] 获取索引设置失败:', error.message);
+      } else {
+        console.debug('[本地索引服务] 服务离线，无法获取索引设置');
+      }
+    }
+  }
+
 
   // 修改 syncIndexSettings 方法
   async syncIndexSettings() {
@@ -493,46 +395,5 @@ export default class KnowledgeBaseHandler {
       console.warn('[本地索引服务] 更新监控目录失败:', error.message);
       // 不再记录详细错误，因为服务离线时这是预期的行为
     }
-  }
-
-  // 添加服务状态检查函数
-  async checkServerStatus() {
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const processPid = document.getElementById('processPid');
-    const processPort = document.getElementById('processPort');
-
-    try {
-      const serverStatus = await electron.getServerDesiredState();
-      //console.log('Server status:', serverStatus); // 添加调试日志
-
-      if (serverStatus.isHealthy && serverStatus.pid && serverStatus.port) {
-        statusDot.classList.remove('offline');
-        statusDot.classList.add('online');
-        statusText.textContent = '在线';
-        processPid.textContent = serverStatus.pid;
-        processPort.textContent = serverStatus.port;
-      } else {
-        statusDot.classList.remove('online');
-        statusDot.classList.add('offline');
-        statusText.textContent = '尝试启动中';
-        processPid.textContent = '-';
-        processPort.textContent = '-';
-        // console.log('Server not healthy:', serverStatus); // 添加调试日志
-      }
-    } catch (error) {
-      console.error('[本地索引服务] 状态检查失败:', error.message);
-      statusDot.classList.remove('online');
-      statusDot.classList.add('offline');
-      statusText.textContent = '检查失败';
-      processPid.textContent = '-';
-      processPort.textContent = '-';
-    }
-  }
-
-  // 添加定期检查服务状态的函数
-  startServerStatusCheck() {
-    this.checkServerStatus();
-    setInterval(() => this.checkServerStatus(), 5000);
   }
 }

@@ -24,7 +24,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
     updateBaseUrl(serverInfo) {
         if (serverInfo.isHealthy && serverInfo.port) {
             this.BASE_URL = `http://localhost:${serverInfo.port}`;
-            console.log('[LocalServerIndexHandler] Base URL updated:', this.BASE_URL);
+            //console.log('[LocalServerIndexHandler] Base URL updated:', this.BASE_URL);
         } else {
             this.BASE_URL = null;
             console.log('[LocalServerIndexHandler] Server is not available');
