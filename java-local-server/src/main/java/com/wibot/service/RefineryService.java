@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,7 +66,8 @@ public class RefineryService implements DocumentEventListener {
     @Autowired
     private DocumentIndexService documentIndexService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper objectMapper; // 替换原有的 private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
         // 转换VO到DO
@@ -107,7 +109,8 @@ public class RefineryService implements DocumentEventListener {
 
         // 正常查询逻辑
         List<RefineryTaskDO> tasksToProcess = refineryTaskRepository
-                .findByStatusIn(Arrays.asList(RefineryTaskDO.STATUS_PENDING, RefineryTaskDO.STATUS_ACTIVE));
+                .findByStatusIn(Arrays.asList(RefineryTaskDO.STATUS_PENDING, RefineryTaskDO.STATUS_PROCESSING,
+                        RefineryTaskDO.STATUS_FAILED));
         logger.info("Found {} pending tasks", tasksToProcess.size());
 
         for (RefineryTaskDO task : tasksToProcess) {
@@ -155,33 +158,18 @@ public class RefineryService implements DocumentEventListener {
                         .toList();
             }
 
-            List<ExtractedFact> facts = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+            extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
 
-            // 保存提取的事实 - 简化版本
-            for (ExtractedFact fact : facts) {
-                Long paragraphId = Long.parseLong(fact.getId());
-
-                // 直接删除旧记录，不做查询
-                refineryFactRepository.deleteByRefineryTaskIdAndParagraphId(task.getId(), paragraphId);
-
-                // 直接保存新记录
-                RefineryFactDO factDO = new RefineryFactDO(
-                        Long.valueOf(task.getId()),
-                        paragraphId,
-                        fact.getFact());
-                refineryFactRepository.save(factDO);
-            }
+            // 不再需要这里的批量保存，因为已经在处理批次时保存了
+            // 只需要更新任务状态即可
 
         } catch (Exception e) {
-            // 保持原有的checkpoint不变，便于后续续传
-            task.setProcessingCheckpoint(checkpoint);
             throw new RuntimeException("Task processing failed: " + e.getMessage(), e);
         }
     }
 
-    private List<ExtractedFact> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question,
+    private void extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question,
             RefineryTaskDO task) {
-        List<ExtractedFact> allFacts = new ArrayList<>();
         int currentLength = 0;
         int batchIndex = 1;
         List<Map<String, Object>> currentBatch = new ArrayList<>();
@@ -195,7 +183,7 @@ public class RefineryService implements DocumentEventListener {
             reference.put("content", paragraph.getContent());
             reference.put("paragraphOrder", paragraph.getParagraphOrder());
             reference.put("date", paragraph.getCreatedDateTime());
-
+            batchIndex++;
             try {
                 String jsonStr = objectMapper.writeValueAsString(reference);
                 totalTokenCost += jsonStr.length(); // 累加输入token成本
@@ -207,14 +195,13 @@ public class RefineryService implements DocumentEventListener {
                 }
 
                 // Process current batch and add response token cost
-                totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, allFacts, batchIndex);
+                totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, task, batchIndex);
                 lastProcessedId = updateCheckpoint(currentBatch, task);
 
                 // Reset batch
                 currentBatch = new ArrayList<>();
-                currentBatch.add(reference);
-                currentLength = jsonStr.length();
-                batchIndex++;
+                currentLength = 0;
+
             } catch (JsonProcessingException e) {
                 logger.error("Failed to serialize reference to JSON", e);
                 throw new RuntimeException(e);
@@ -223,15 +210,14 @@ public class RefineryService implements DocumentEventListener {
 
         // Process final batch
         if (!currentBatch.isEmpty()) {
-            totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, allFacts, batchIndex);
+            totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, task, batchIndex);
             lastProcessedId = updateCheckpoint(currentBatch, task);
         }
 
         // Update token cost
-        task.setFullUpdateTokenCost(totalTokenCost);
+        task.setFullUpdateTokenCost(totalTokenCost); 这里更新一下，fullUpdateTokenCost放 外面，这里只返回cost 。这样可以兼容两种情况
         refineryTaskRepository.save(task);
 
-        return allFacts;
     }
 
     private Long updateCheckpoint(List<Map<String, Object>> batch, RefineryTaskDO task) {
@@ -250,9 +236,18 @@ public class RefineryService implements DocumentEventListener {
     }
 
     private int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question,
-            List<ExtractedFact> allFacts, int batchIndex) {
+            RefineryTaskDO task, int batchIndex) {
         Map<String, Object> params = new HashMap<>();
-        params.put("references", batch);
+
+        String jsonInput;
+        try {
+            jsonInput = objectMapper.writeValueAsString(batch);
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to serialize params to JSON", e);
+            throw new RuntimeException(e);
+        }
+
+        params.put("references", jsonInput);
         params.put("question", question);
 
         PromptTemplate promptTemplate = new PromptTemplate(extractFactsPrompt);
@@ -278,11 +273,30 @@ public class RefineryService implements DocumentEventListener {
                     // 解析JSON并处理事实
                     ExtractFactResponse factResponse = objectMapper.readValue(jsonStr, ExtractFactResponse.class);
                     if (factResponse != null && factResponse.getFacts() != null) {
-                        allFacts.addAll(factResponse.getFacts());
-                        logger.info("Successfully processed batch {}, extracted {} facts",
+                        // 立即处理每个事实
+                        for (ExtractedFact fact : factResponse.getFacts()) {
+                            Long paragraphId = Long.parseLong(fact.getId());
+
+                            // 查找现有的事实
+                            Optional<RefineryFactDO> existingFact = refineryFactRepository
+                                    .findByRefineryTaskIdAndParagraphId(task.getId(), paragraphId)
+                                    .stream()
+                                    .findFirst();
+
+                            if (existingFact.isPresent()) {
+                                // 更新现有事实
+                                RefineryFactDO factDO = existingFact.get();
+                                factDO.setFact(fact.getFact());
+                                refineryFactRepository.save(factDO);
+                            } else {
+                                // 创建新事实
+                                RefineryFactDO factDO = new RefineryFactDO(task.getId(), paragraphId, fact.getFact());
+                                refineryFactRepository.save(factDO);
+                            }
+                        }
+                        logger.info("Successfully processed and saved batch {}, extracted {} facts",
                                 batchIndex, factResponse.getFacts().size());
 
-                        // 返回响应token成本
                         return response.length();
                     }
                 } catch (Exception e) {
@@ -398,15 +412,7 @@ public class RefineryService implements DocumentEventListener {
                     refineryFactRepository.deleteByRefineryTaskIdAndParagraphIdIn(task.getId(), paragraphIds);
                 }
 
-                // 重新提取事实
-                List<ExtractedFact> facts = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
-
-                // 保存新的事实
-                for (ExtractedFact fact : facts) {
-                    Long paragraphId = Long.parseLong(fact.getId());
-                    RefineryFactDO factDO = new RefineryFactDO(task.getId(), paragraphId, fact.getFact());
-                    refineryFactRepository.save(factDO);
-                }
+                extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
 
                 // 更新任务统计信息
                 int incrementalTokenCost = task.getIncrementalTokenCost() + facts.size() * 100; // 估算token消耗
