@@ -9,47 +9,42 @@ public class RefineryTaskDO {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(nullable = false)
     private String directoryPath;
-    
+
     @Column(nullable = false, length = 1000)
     private String keyQuestion;
-    
+
     private int coveredFileCount;
     private int fullUpdateTokenCost;
     private int incrementalTokenCost;
-    
+
     @Column(nullable = false)
     private String updateCycle;
-    
+
     private int hitCount;
-    
+
     @Column(nullable = false)
     private LocalDateTime lastUpdateTime;
-    
+
     @Column(nullable = false)
     private LocalDateTime createTime;
-    
+
     @Column(nullable = false)
     private String status;
-    
+
     @Column(length = 2000)
-    private String errorMessage;  // 错误信息
-    
+    private String errorMessage; // 错误信息
+
     @Column(length = 2000)
-    private String processingCheckpoint;  // 断点续传信息
+    private String processingCheckpoint; // 断点续传信息
 
     // 任务状态常量
-    public static final String STATUS_PENDING = "PENDING";      // 待处理
-    public static final String STATUS_ACTIVE = "ACTIVE";        // 活跃
+    public static final String STATUS_PENDING = "PENDING"; // 待处理
+    public static final String STATUS_ACTIVE = "ACTIVE"; // 活跃
     public static final String STATUS_PROCESSING = "PROCESSING"; // 处理中
-    public static final String STATUS_FAILED = "FAILED";        // 失败
-
-    // 更新周期常量
-    public static final String CYCLE_DAILY = "DAILY";     // 每日
-    public static final String CYCLE_WEEKLY = "WEEKLY";   // 每周
-    public static final String CYCLE_MONTHLY = "MONTHLY"; // 每月
+    public static final String STATUS_FAILED = "FAILED"; // 失败
 
     public Long getId() {
         return id;
@@ -97,14 +92,6 @@ public class RefineryTaskDO {
 
     public void setIncrementalTokenCost(int incrementalTokenCost) {
         this.incrementalTokenCost = incrementalTokenCost;
-    }
-
-    public String getUpdateCycle() {
-        return updateCycle;
-    }
-
-    public void setUpdateCycle(String updateCycle) {
-        this.updateCycle = updateCycle;
     }
 
     public int getHitCount() {

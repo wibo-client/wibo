@@ -20,8 +20,8 @@
   <h3>围脖 WIBO 你的个人知识助手</h3>
   <div class="tabs">
     <div class="tab active" data-tab="interaction">对话</div>
-    <div class="tab" data-tab="refinery">知识精炼</div>
-    <div class="tab" data-tab="config">配置</div>
+    <div class="tab" data-tab="config">基础配置</div>
+    <div class="tab" data-tab="knowledge">本地知识库配置</div>
     <div class="tab" data-tab="navigation">快捷导航</div>
   </div>
 
@@ -33,8 +33,8 @@
         <textarea id="user-input" placeholder="输入你的问题" rows="1"></textarea>
         <div class="input-group">
           <select id="request-type">
-            <option value="searchAndChat">捡问 shift+enter</option>
-            <option value="highQuilityRAGChat">深问 alt+enter</option>
+            <option value="searchAndChat">快速检问 shift+enter</option>
+            <option value="highQuilityRAGChat">深度检问 alt+enter</option>
             <option value="chat">模型直答 ctrl+enter</option>
             <option value="search">搜索直出 ctrl+\</option>
           </select>
@@ -51,185 +51,96 @@
     </div>
   </div>
 
-  <!-- 添加知识精炼内容区域 -->
-  <div id="refinery" class="tab-content">
-    <div class="refinery-container">
-      <div class="refinery-header">
-        <h3>知识精炼管理</h3>
-        <button class="add-refinery-task">新增精炼任务</button>
+  <!-- 本地知识库内容区域 -->
+  <div id="knowledge" class="tab-content">
+    <h3 class="knowledge-title">本地知识库配置</h3>
+    <div class="knowledge-base-header">
+      <div class="switch-label-group">
+        <label class="switch">
+          <input type="checkbox" id="localKnowledgeBaseToggle">
+          <span class="slider"></span>
+        </label>
+        <span>启用本地知识库，可以让您依托于您本地的文件来进行检索和问题回答，在聊天界面以输入/local 后，问问题即可。</span>
       </div>
-      <table class="refinery-table">
+    </div>
+
+    <div id="localKnowledgeBaseConfig">
+      <hr>
+      <!-- 子栏目0：服务状态 -->
+      <h4>服务状态</h4>
+      <div class="service-status">
+        <div class="status-indicator">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="statusText">检查中...</span>
+        </div>
+        <div id="serviceDetails" class="service-details">
+          <div>进程 ID: <span id="processPid">-</span></div>
+          <div>端口: <span id="processPort">-</span></div>
+        </div>
+      </div>
+      <hr>
+
+      <!-- 子栏目1：知识库管理 -->
+      <h4>知识库管理</h4>
+      <div class="form-group">
+        <div class="directory-input-group">
+          <input type="text" id="localDirectory" class="form-control" placeholder="输入或选择本地目录">
+          <button id="selectDirectoryBtn" class="btn btn-select-dir">选择目录</button>
+          <button id="submitLocalDirectory" class="btn btn-submit">提交</button>
+        </div>
+      </div>
+      <table class="monitored-dirs-table">
         <thead>
           <tr>
-            <th>作用目录</th>
-            <th>关键问题</th>
-            <th>涵盖文件数</th>
-            <th>全量Token消耗</th>
-            <th>增量Token消耗</th>
-            <th>更新周期</th>
-            <th>命中次数</th>
-            <th>最后更新</th>
-            <th>创建日期</th>
-            <th>当前状态</th>
-            <th>任务处理信息</th>
+            <th>已监控目录</th>
+            <th>监控文件数</th>
+            <th>忽略文件数</th>
+            <th>索引文件数</th>
+            <th>完成比率</th>
             <th>操作</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td>/docs/project-a</td>
-            <td>如何实现项目部署？</td>
-            <td class="stats-number">156</td>
-            <td class="stats-number token-cost">2.3k</td>
-            <td class="stats-number token-cost">0.5k</td>
-            <td>每日</td>
-            <td class="stats-number">42</td>
-            <td>2024-01-20</td>
-            <td>2024-01-15</td>
-            <td><span class="status-badge status-active">活跃</span></td>
-            <td class="task-info">最近更新成功</td>
-            <td>
-              <div class="action-buttons">
-                <button class="action-btn update-full">全量更新</button>
-                <button class="action-btn update-incremental">增量更新</button>
-                <button class="action-btn delete-btn">删除</button>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td>/docs/guides</td>
-            <td>系统架构设计原则？</td>
-            <td class="stats-number">89</td>
-            <td class="stats-number token-cost">1.8k</td>
-            <td class="stats-number token-cost">0.3k</td>
-            <td>每周</td>
-            <td class="stats-number">27</td>
-            <td>2024-01-19</td>
-            <td>2024-01-10</td>
-            <td><span class="status-badge status-processing">处理中</span></td>
-            <td class="task-info error">文件访问权限不足: /docs/guides/restricted/*</td>
-            <td>
-              <div class="action-buttons">
-                <button class="action-btn update-full">全量更新</button>
-                <button class="action-btn update-incremental">增量更新</button>
-                <button class="action-btn delete-btn">删除</button>
-              </div>
-            </td>
-          </tr>
+        <tbody id="directoryTableBody">
+          <!-- 动态生成的表格内容 -->
         </tbody>
       </table>
-    </div>
-  </div>
+      <hr>
 
-  <!-- 配置内容区域 -->
-  <div id="config" class="tab-content">
-    <div class="section">
-      <h3>AK设置</h3>
-      <div class="form-group">
-        <label for="accessKey">Access Key：</label>
-        <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
-        <div id="masked-ak" class="small-text"></div>
-      </div>
-      <button id="saveConfigButton" class="btn">保存</button>
-    </div>
-    <div class="section">
-      <h3>后台执行用浏览器设置</h3>
-      <div class="form-group">
-        <label for="browserTimeout">浏览器超时时间(秒)：</label>
-        <input type="number" id="browserTimeout" class="form-control" placeholder="请输入浏览器超时时间" />
-      </div>
-      <div class="form-group">
-        <label for="searchItemNumbers">单次查询摘要条目数：</label>
-        <input type="number" id="searchItemNumbers" class="form-control" placeholder="请输入单次查询摘要条目数" />
-      </div>
-      <div class="form-group">
-        <label for="pageFetchLimit">单次查询详情页抓取数量：</label>
-        <input type="number" id="pageFetchLimit" class="form-control" placeholder="请输入单次查询页面抓取数量" />
-      </div>
-      <button id="saveBrowserConfigButton" class="btn">保存</button>
-    </div>
-
-    <!-- 新增本地知识库栏目 -->
-    <div class="section">
-      <div class="knowledge-base-header">
-        <h3>本地知识库</h3>
-        <div class="switch-label-group">
-          <label class="switch">
-            <input type="checkbox" id="localKnowledgeBaseToggle">
-            <span class="slider"></span>
-          </label>
-          <span>启用本地知识库，可以让您依托于您本地的文件来进行检索和问题回答</span>
+      <!-- 新增知识精炼管理部分 -->
+      <h4>常问问题加速</h4>
+      <div class="refinery-container">
+        <div class="refinery-header">
+          <button class="add-refinery-task">新增常问加速任务</button>
         </div>
-      </div>
-
-      <div id="localKnowledgeBaseConfig" style="display: none;">
-        <hr>
-        <!-- 子栏目0：服务状态 -->
-        <h4>服务状态</h4>
-        <div class="service-status">
-          <div class="status-indicator">
-            <span id="statusDot" class="status-dot"></span>
-            <span id="statusText">检查中...</span>
-          </div>
-          <div id="serviceDetails" class="service-details">
-            <div>进程 ID: <span id="processPid">-</span></div>
-            <div>端口: <span id="processPort">-</span></div>
-          </div>
-        </div>
-        <hr>
-
-        <!-- 子栏目1：知识库管理 -->
-        <h4>知识库管理</h4>
-        <div class="form-group">
-          <div class="directory-input-group">
-            <input type="text" id="localDirectory" class="form-control" placeholder="输入或选择本地目录">
-            <button id="selectDirectoryBtn" class="btn btn-select-dir">选择目录</button>
-            <button id="submitLocalDirectory" class="btn btn-submit">提交</button>
-          </div>
-        </div>
-        <table class="monitored-dirs-table">
+        <table class="refinery-table">
           <thead>
             <tr>
-              <th>已监控目录</th>
-              <th>监控文件数</th>
-              <th>忽略文件数</th>
-              <th>索引文件数</th>
-              <th>完成比率</th>
+              <th>作用目录</th>
+              <th>关键问题</th>
+              <th>涵盖文件数</th>
+              <th>全量Token消耗</th>
+              <th>增量Token消耗</th>
+              <th>命中次数</th>
+              <th>创建日期</th>
+              <th>当前状态</th>
+              <th>任务处理信息</th>
               <th>操作</th>
             </tr>
           </thead>
-          <tbody id="directoryTableBody">
-            <!-- 动态生成的表格内容 -->
+          <tbody>
+            <!-- 动态内容将通过 JavaScript 填充 -->
           </tbody>
         </table>
-        <hr>
+      </div>
+      <hr>
 
-        <!-- 子栏目2：远程上传文件 -->
-        <div class="form-group">
-          <div class="switch-label-group">
-            <label class="switch">
-              <input type="checkbox" id="remoteUploadToggle">
-              <span class="slider"></span>
-            </label>
-            <span>启用远程上传</span>
-          </div>
-          <div id="remoteUploadConfig" style="display: none;">
-            <div class="form-group">
-              <label>上传地址:</label>
-              <div id="uploadUrl" style="padding: 10px; background: #f5f5f5; border-radius: 5px;"></div>
-            </div>
-            <div class="form-group">
-              <label for="uploadDir">上传文件默认目录:</label>
-              <input type="text" id="uploadDir" class="form-control" value="remoteFile">
-            </div>
-          </div>
-        </div>
-
-        <hr>
-        <!-- 子栏目3：索引设置 -->
-        <div class="form-group index-settings-section">
+      <!-- 子栏目3：索引设置 -->
+      <div class="form-group index-settings-section">
+        <div class="collapsible-header">
+          <span class="toggle-icon">▶</span>
           <h4>索引设置</h4>
-
+        </div>
+        <div id="indexSettingsContent" class="collapsible-content">
           <!-- 文件类型索引设置 -->
           <div class="file-types-container">
             <div class="file-type-group">
@@ -355,22 +266,74 @@
             </div>
           </div>
 
+          <!-- 忽略目录设置 -->
+          <div class="ignore-directories-section">
+            <h4>忽略特定目录文件</h4>
+            <textarea id="ignoredDirectories" class="ignore-directories-input"
+              placeholder="每行输入一个要忽略的目录路径&#10;例如:&#10;node_modules&#10;.git&#10;temp"></textarea>
+          </div>
+          
           <!-- 增加保存按钮 -->
           <div class="index-settings-actions">
             <button id="saveIndexSettings" class="btn">保存索引设置</button>
             <button id="viewLogsButton" class="log-viewer-button">查看日志</button>
           </div>
         </div>
+      </div>
 
-        <!-- 忽略目录设置 -->
-        <div class="ignore-directories-section">
-          <h4>忽略特定目录文件</h4>
-          <textarea id="ignoredDirectories" class="ignore-directories-input"
-            placeholder="每行输入一个要忽略的目录路径&#10;例如:&#10;node_modules&#10;.git&#10;temp"></textarea>
+      <hr>
+
+      <!-- 子栏目2：远程上传文件 -->
+      <div class="form-group">
+        <div class="switch-label-group">
+          <label class="switch">
+            <input type="checkbox" id="remoteUploadToggle">
+            <span class="slider"></span>
+          </label>
+          <span>启用远程上传</span>
+        </div>
+        <div id="remoteUploadConfig" style="display: none;">
+          <div class="form-group">
+            <label>上传地址:</label>
+            <div id="uploadUrl" style="padding: 10px; background: #f5f5f5; border-radius: 5px;"></div>
+          </div>
+          <div class="form-group">
+            <label for="uploadDir">上传文件默认目录:</label>
+            <input type="text" id="uploadDir" class="form-control" value="remoteFile">
+          </div>
         </div>
       </div>
+
     </div>
   </div>
+
+  <!-- 配置内容区域 -->
+  <div id="config" class="tab-content">
+    <div class="section">
+      <h3>AK设置</h3>
+      <div class="form-group">
+        <label for="accessKey">Access Key：</label>
+        <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
+        <div id="masked-ak" class="small-text"></div>
+      </div>
+      <button id="saveConfigButton" class="btn">保存</button>
+    </div>
+    <div class="section">
+      <h3>后台执行用浏览器设置</h3>
+      <div class="form-group">
+        <label for="browserTimeout">浏览器超时时间(秒)：</label>
+        <input type="number" id="browserTimeout" class="form-control" placeholder="请输入浏览器超时时间" />
+      </div>
+      <div class="form-group">
+        <label for="searchItemNumbers">单次查询摘要条目数：</label>
+        <input type="number" id="searchItemNumbers" class="form-control" placeholder="请输入单次查询摘要条目数" />
+      </div>
+      <div class="form-group">
+        <label for="pageFetchLimit">单次查询详情页抓取数量：</label>
+        <input type="number" id="pageFetchLimit" class="form-control" placeholder="请输入单次查询页面抓取数量" />
+      </div>
+      <button id="saveBrowserConfigButton" class="btn">保存</button>
+    </div>
   </div>
 
   <!-- 添加日志查看对话框 -->

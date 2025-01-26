@@ -1,51 +1,28 @@
-
 export default class KnowledgeBaseHandler {
   constructor() {
     this.isUpdatingUI = false; // 添加UI更新锁定标志
     this.uiLockTimeout = null; // 添加UI锁定计时器
     this.setupEventListeners();
     this.setupIndexSettingsListeners(); // 添加新的方法调用
-    this.updateTimer = null; // 添加定时器引用
+    this.setupIndexSettingsCollapsible();
   }
 
   init(knowledgeLocalServerStatusHandler) {
     this.knowledgeLocalServerStatusHandler = knowledgeLocalServerStatusHandler;
-    this.knowledgeLocalServerStatusHandler.addStateChangeListener(state => {
+    this.knowledgeLocalServerStatusHandler.addStateCheckListener(state => {
       this.BASE_URL = state.baseUrl;
       this.lastKnownState = state;
 
       // 根据服务健康状态管理定时任务
       if (state.isHealthy) {
-        this.startUpdateTimer();
-        // 立即执行一次更新
 
         this.initializeIndexSettings(); // 在构造函数中调用初始化方法
         this.updateMonitoredDirs();
         this.updateUploadConfig();
-      } else {
-        this.stopUpdateTimer();
       }
     });
   }
 
-  startUpdateTimer() {
-    if (!this.updateTimer) {
-      console.log('[本地索引服务] 启动定时更新任务');
-      this.updateTimer = setInterval(() => {
-        this.updateMonitoredDirs();
-        this.updateUploadConfig();
-        this.initializeIndexSettings
-      }, 3000);
-    }
-  }
-
-  stopUpdateTimer() {
-    if (this.updateTimer) {
-      console.log('[本地索引服务] 停止定时更新任务');
-      clearInterval(this.updateTimer);
-      this.updateTimer = null;
-    }
-  }
 
   setupEventListeners() {
     const localKnowledgeBaseToggle = document.getElementById('localKnowledgeBaseToggle');
@@ -394,6 +371,23 @@ export default class KnowledgeBaseHandler {
     } catch (error) {
       console.warn('[本地索引服务] 更新监控目录失败:', error.message);
       // 不再记录详细错误，因为服务离线时这是预期的行为
+    }
+  }
+
+  // 添加新方法
+  setupIndexSettingsCollapsible() {
+    // 移除内联的 onclick 处理器，改用事件监听
+    const header = document.querySelector('.collapsible-header');
+    if (header) {
+      header.addEventListener('click', () => {
+        const content = document.getElementById('indexSettingsContent');
+        const icon = header.querySelector('.toggle-icon');
+        
+        if (content && icon) {
+          content.classList.toggle('expanded');
+          icon.classList.toggle('expanded');
+        }
+      });
     }
   }
 }

@@ -12,7 +12,7 @@ import com.wibot.service.RefineryService;
 import com.wibot.controller.vo.RefineryTaskVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.HashMap;
-
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -25,8 +25,17 @@ public class RefineryController {
 
     @GetMapping("/tasks")
     public Map<String, Object> getAllTasks() {
-        // 获取所有精炼任务
-        return null;
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<RefineryTaskVO> tasks = refineryService.getAllTasks();
+            response.put("success", true);
+            response.put("data", tasks);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            logger.error("获取精炼任务列表失败", e);
+        }
+        return response;
     }
 
     @PostMapping("/task")

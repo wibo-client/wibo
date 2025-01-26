@@ -29,10 +29,13 @@ import com.wibot.documentLoader.event.DocumentProcessEvent;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -69,7 +72,6 @@ public class RefineryService implements DocumentEventListener {
         RefineryTaskDO taskDO = new RefineryTaskDO();
         taskDO.setDirectoryPath(taskVO.getDirectoryPath());
         taskDO.setKeyQuestion(taskVO.getKeyQuestion());
-        taskDO.setUpdateCycle(taskVO.getUpdateCycle());
 
         // 设置初始值
         taskDO.setCoveredFileCount(0);
@@ -93,19 +95,24 @@ public class RefineryService implements DocumentEventListener {
                 .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
     }
 
-    @Scheduled(fixedDelay = 60000) // 每分钟执行一次
-    public void processScheduledTasks() {
+    public List<RefineryTaskVO> getAllTasks() {
+        return refineryTaskRepository.findAll().stream()
+                .map(this::convertToVO)
+                .collect(Collectors.toList());
+    }
+
+    @Scheduled(fixedDelay = 60000) // 每分钟执行一次,为了简化，这个任务是单线程的，以后再看看要不要改多线程，短期就单线程做分发，节省同步难度。
+    public synchronized void processScheduledTasks() {
         logger.info("Starting scheduled task processing");
 
-        // 1. 只获取待处理状态的任务
-        List<RefineryTaskDO> tasksToProcess = refineryTaskRepository.findByStatus(RefineryTaskDO.STATUS_PENDING);
+        // 正常查询逻辑
+        List<RefineryTaskDO> tasksToProcess = refineryTaskRepository
+                .findByStatusIn(Arrays.asList(RefineryTaskDO.STATUS_PENDING, RefineryTaskDO.STATUS_ACTIVE));
+        logger.info("Found {} pending tasks", tasksToProcess.size());
 
         for (RefineryTaskDO task : tasksToProcess) {
             try {
                 // 2. 检查是否需要执行（根据更新周期）
-                if (!shouldProcessTask(task)) {
-                    continue;
-                }
 
                 // 3. 更新状态为处理中
                 task.setStatus(RefineryTaskDO.STATUS_PROCESSING);
@@ -129,21 +136,6 @@ public class RefineryService implements DocumentEventListener {
                 refineryTaskRepository.save(task);
             }
         }
-    }
-
-    private boolean shouldProcessTask(RefineryTaskDO task) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime lastUpdate = task.getLastUpdateTime();
-
-        return switch (task.getUpdateCycle()) {
-            case RefineryTaskDO.CYCLE_DAILY ->
-                lastUpdate.plusDays(1).isBefore(now);
-            case RefineryTaskDO.CYCLE_WEEKLY ->
-                lastUpdate.plusWeeks(1).isBefore(now);
-            case RefineryTaskDO.CYCLE_MONTHLY ->
-                lastUpdate.plusMonths(1).isBefore(now);
-            default -> false;
-        };
     }
 
     private void processTask(RefineryTaskDO task) {
@@ -340,7 +332,7 @@ public class RefineryService implements DocumentEventListener {
         vo.setCoveredFileCount(taskDO.getCoveredFileCount());
         vo.setFullUpdateTokenCost(taskDO.getFullUpdateTokenCost());
         vo.setIncrementalTokenCost(taskDO.getIncrementalTokenCost());
-        vo.setUpdateCycle(taskDO.getUpdateCycle());
+
         vo.setHitCount(taskDO.getHitCount());
         vo.setLastUpdateTime(taskDO.getLastUpdateTime());
         vo.setCreateTime(taskDO.getCreateTime());

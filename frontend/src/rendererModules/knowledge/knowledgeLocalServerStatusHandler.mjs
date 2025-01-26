@@ -8,7 +8,7 @@ export default class KnowledgeLocalServerStatusHandler {
             debugMode: false,
             baseUrl : null
         };
-        this.stateChangeCallbacks = new Set();
+        this.statesCheckCallbacks = new Set();
 
         // 不再直接启动定时更新，而是通过状态检查来控制
         this.checkServerStatus();
@@ -35,7 +35,7 @@ export default class KnowledgeLocalServerStatusHandler {
                     
                 };
                 this.currentState = newState;
-                this.handleStateChange(newState);
+                this.handleStateCheck(newState);
             } catch (error) {
                 if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                     console.debug('[本地索引服务] 服务离线，等待重新连接...');
@@ -63,9 +63,9 @@ export default class KnowledgeLocalServerStatusHandler {
     }
 
     // 新增：状态变化处理方法
-    handleStateChange(newState) {
+    handleStateCheck(newState) {
         this.updateUIState(newState);
-        this.notifyStateChange(newState)
+        this.triggerStateCheckCallbacks(newState)
     }
 
 
@@ -106,19 +106,19 @@ export default class KnowledgeLocalServerStatusHandler {
 
 
     // 添加注册状态变化监听器的方法
-    addStateChangeListener(callback) {
-        this.stateChangeCallbacks.add(callback);
-        return () => this.removeStateChangeListener(callback);
+    addStateCheckListener(callback) {
+        this.statesCheckCallbacks.add(callback);
+        return () => this.removeStateCheckListener(callback);
     }
 
     // 移除状态变化监听器
-    removeStateChangeListener(callback) {
-        this.stateChangeCallbacks.delete(callback);
+    removeStateCheckListener(callback) {
+        this.statesCheckCallbacks.delete(callback);
     }
 
     // 通知所有监听器
-    notifyStateChange(newState) {
-        this.stateChangeCallbacks.forEach(callback => {
+    triggerStateCheckCallbacks(newState) {
+        this.statesCheckCallbacks.forEach(callback => {
             try {
                 callback(newState);
             } catch (error) {

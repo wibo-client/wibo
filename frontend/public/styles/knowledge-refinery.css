@@ -1,5 +1,7 @@
 .refinery-container {
   padding: 20px;
+  overflow-x: auto;
+  margin-bottom: 20px;
 }
 
 .refinery-header {
@@ -28,9 +30,13 @@
 
 .refinery-table th,
 .refinery-table td {
-  padding: 12px;
+  padding: 8px;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  border: 1px solid #ddd;
+  max-width: 150px;
+  white-space: normal;
+  word-wrap: break-word;
+  vertical-align: top;
 }
 
 .refinery-table th {
@@ -113,4 +119,79 @@
 
 .task-info.error {
   color: #f44336;
+}
+
+/* 设置各列的宽度和换行行为 */
+.refinery-table th:nth-child(1), 
+.refinery-table td:nth-child(1) { 
+  width: 15%; 
+  min-width: 120px;
+} /* 作用目录 */
+
+.refinery-table th:nth-child(2),
+.refinery-table td:nth-child(2) { 
+  width: 15%;
+  min-width: 120px;
+} /* 关键问题 */
+
+.refinery-table th:nth-child(3),
+.refinery-table td:nth-child(3) { 
+  width: 8%;
+  min-width: 60px;
+  text-align: right;
+} /* 涵盖文件数 */
+
+.refinery-table th:nth-child(4),
+.refinery-table td:nth-child(4),
+.refinery-table th:nth-child(5),
+.refinery-table td:nth-child(5) { 
+  width: 8%;
+  min-width: 80px;
+  text-align: right;
+} /* Token消耗 */
+
+.refinery-table th:nth-child(6),
+.refinery-table td:nth-child(6) { 
+  width: 6%;
+  min-width: 60px;
+} /* 更新周期 */
+
+.refinery-table th:nth-child(7),
+.refinery-table td:nth-child(7) { 
+  width: 6%;
+  min-width: 60px;
+  text-align: right;
+} /* 命中次数 */
+
+.refinery-table th:nth-child(8),
+.refinery-table td:nth-child(8),
+.refinery-table th:nth-child(9),
+.refinery-table td:nth-child(9) { 
+  width: 8%;
+  min-width: 90px;
+} /* 时间 */
+
+.refinery-table th:nth-child(10),
+.refinery-table td:nth-child(10) { 
+  width: 6%;
+  min-width: 70px;
+} /* 当前状态 */
+
+.refinery-table th:nth-child(11),
+.refinery-table td:nth-child(11) { 
+  width: 12%;
+  min-width: 100px;
+} /* 任务处理信息 */
+
+.refinery-table th:nth-child(12),
+.refinery-table td:nth-child(12) { 
+  width: 120px;
+  min-width: 120px;
+  white-space: nowrap;
+} /* 操作按钮 */
+
+/* 数字类型的单元格样式 */
+.refinery-table td.numeric {
+  font-family: monospace;
+  text-align: right;
 }

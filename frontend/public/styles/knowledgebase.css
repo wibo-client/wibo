@@ -1,10 +1,16 @@
+/* 知识库标题样式 */
+.knowledge-title {
+  margin-bottom: 20px;
+}
+
 /* 知识库相关样式 */
 .knowledge-base-header {
   display: flex;
   align-items: center;
   gap: 20px;
-  margin-bottom: 20px;
 }
+
+/* ...existing code... */
 
 .directory-input-group {
   display: flex;
@@ -61,7 +67,108 @@
   background-color: #f0f0f0;
 }
 
+/* 精炼任务表格样式 */
+.refinery-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    table-layout: fixed;  /* 添加固定布局 */
+}
 
+.refinery-table th,
+.refinery-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    overflow: hidden;        /* 处理溢出 */
+    text-overflow: ellipsis; /* 显示省略号 */
+    white-space: nowrap;     /* 防止换行 */
+}
+
+/* 设置各列的宽度 */
+.refinery-table th:nth-child(1), 
+.refinery-table td:nth-child(1) { width: 15%; } /* 作用目录 */
+
+.refinery-table th:nth-child(2),
+.refinery-table td:nth-child(2) { width: 25%; } /* 关键问题 */
+
+.refinery-table th:nth-child(3),
+.refinery-table td:nth-child(3) { width: 4%; } /* 涵盖文件数 */
+
+.refinery-table th:nth-child(4),
+.refinery-table td:nth-child(4) { width: 4%; } /* 全量Token消耗 */
+
+.refinery-table th:nth-child(5),
+.refinery-table td:nth-child(5) { width: 4%; } /* 增量Token消耗 */
+
+.refinery-table th:nth-child(6),
+.refinery-table td:nth-child(6) { width: 6%; } /* 命中次数 */
+
+.refinery-table th:nth-child(7),
+.refinery-table td:nth-child(7) { width: 8%; } /* 创建日期 */
+
+.refinery-table th:nth-child(8),
+.refinery-table td:nth-child(8) { width: 6%; } /* 当前状态 */
+
+.refinery-table th:nth-child(9),
+.refinery-table td:nth-child(9) { width: 12%; } /* 任务处理信息 */
+
+.refinery-table th:nth-child(10),
+.refinery-table td:nth-child(10) { 
+    width: 80px; 
+    white-space: nowrap;
+} /* 操作按钮 */
+
+/* 精炼任务表格操作按钮样式 */
+.refinery-table .action-buttons {
+    display: flex;
+    flex-direction: column;  /* 改为纵向排列 */
+    gap: 4px;               /* 按钮之间的间距 */
+    width: 100%;            /* 占满单元格宽度 */
+}
+
+.refinery-table .action-buttons button {
+    width: 100%;           /* 按钮宽度占满容器 */
+    padding: 4px 8px;      /* 调整内边距 */
+    font-size: 12px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* 确保操作列有足够的宽度和合适的内边距 */
+.refinery-table th:last-child,
+.refinery-table td:last-child {
+    width: 100px;      /* 减小宽度 */
+    min-width: 100px;  /* 确保最小宽度 */
+    padding: 4px;      /* 减小内边距 */
+}
+
+.refinery-table .action-buttons {
+    display: flex;
+    gap: 4px;  /* 减小按钮间距 */
+    width: 100%;  /* 让容器占满单元格 */
+    height: auto;
+}
+
+.refinery-table .action-buttons button {
+    flex: 1;     /* 让按钮平均分配空间 */
+    padding: 4px 2px;  /* 减小内边距 */
+    font-size: 12px;
+    white-space: nowrap;
+    text-align: center;
+    min-width: 0;    /* 允许按钮宽度收缩 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 确保操作列不会被压缩 */
+.refinery-table th:last-child,
+.refinery-table td:last-child {
+    width: 200px;     /* 设置固定宽度 */
+    min-width: 200px; /* 确保不会被压缩 */
+    padding: 4px;     /* 减小单元格内边距 */
+}
 
 /* 服务状态样式 */
 .service-status {
@@ -100,7 +207,33 @@
   color: #666;
 }
 
+/* 添加状态徽章样式 */
+.status-badge {
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
 
+.status-badge.status-active {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status-badge.status-processing {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-badge.status-failed {
+    background-color: #ffebee;
+    color: #d32f2f;
+}
+
+.status-badge.status-pending {
+    background-color: #fff3e0;
+    color: #f57c00;
+}
 
 /* 索引设置样式 */
 .file-types-container {
@@ -149,4 +282,138 @@
 .enhancement-label {
   font-size: 12px;
   color: #495057;
+}
+
+/* 折叠面板样式 */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.collapsible-header:hover {
+  background-color: #e9ecef;
+}
+
+.collapsible-header h4 {
+  margin: 0;
+}
+
+.collapsible-header .toggle-icon {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.collapsible-header .toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.collapsible-content {
+  display: none;
+}
+
+.collapsible-content.expanded {
+  display: block;
+}
+
+/* 模态对话框样式 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 1050;
+}
+
+.modal.show {
+    display: flex;  /* 改为 flex */
+    align-items: center;  /* 垂直居中 */
+    justify-content: center;  /* 水平居中 */
+}
+
+.modal-dialog {
+    position: relative;
+    width: auto;
+    max-width: 500px;
+    margin: 300px auto;
+}
+
+.modal-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+    border-radius: 0.3rem;
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-title {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.modal-body {
+    position: relative;
+    flex: 1 1 auto;
+    padding: 1rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem;
+    border-top: 1px solid #dee2e6;
+    gap: 0.5rem;
+}
+
+/* 添加模态框输入控件样式 */
+.modal-input {
+    width: calc(100% - 2px) !important;  /* 确保输入框不会超出模态框 */
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+/* 提示消息样式 */
+.alert {
+    padding: 0.75rem 1.25rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
