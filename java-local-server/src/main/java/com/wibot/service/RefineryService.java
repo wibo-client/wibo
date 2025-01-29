@@ -315,7 +315,7 @@ public class RefineryService implements DocumentEventListener {
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
                     String response = singletonLLMChat.getChatClient()
-                            .prompt(prompt)
+                            .prompt(prompt) 总结一下主要新闻似乎无效，明天优化一下
                             .call()
                             .content();
 

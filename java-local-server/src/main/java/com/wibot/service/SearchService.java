@@ -263,7 +263,7 @@ public class SearchService {
 
         // 2. 确定策略并更新任务
         SimilarQuestionResult similarResult = null;
-        if (pathPrefix.endsWith("/")) {
+        if (pathPrefix.endsWith("/") || pathPrefix.endsWith("\\"))  {
             // 只有在目录模式下才检查相似问题
             similarResult = findSimilarQuestions(query);
             if (similarResult.hasSimilar) {
@@ -482,9 +482,22 @@ public class SearchService {
 
     private List<SearchResultVO> processNewQuestion(CollectFactsTask task) {
         task.addSystemLog("🔄 准备处理新问题查询...");
-        String pathWithWildcard = task.getPathPrefix().endsWith("/")
-                ? task.getPathPrefix() + "*"
-                : task.getPathPrefix() + "/*";
+        
+        String pathPrefix = task.getPathPrefix();
+        String pathWithWildcard = pathPrefix;
+        
+        // 检查系统类型并使用对应的分隔符
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        String separator = isWindows ? "\\" : "/";
+        
+        // 确保不以*结尾才添加通配符
+        if (!pathWithWildcard.endsWith("*")) {
+            // 根据是否以分隔符结尾决定如何添加通配符
+            pathWithWildcard = pathWithWildcard.endsWith(separator) ? 
+                pathWithWildcard + "*" : 
+                pathWithWildcard + separator + "*";
+        }
+        
         task.addSystemLog("🔍 使用通配路径进行查询: " + pathWithWildcard);
 
         List<SearchResultVO> results = fetchDocumentContent(task.getQuery(), pathWithWildcard);

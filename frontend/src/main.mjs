@@ -193,14 +193,7 @@ app.whenReady().then(async () => {
       } else if (type === 'highQuilityRAGChat') {
         requestContext.sendSystemLog('🔍 进入深问模式，大模型会遍历所有的文档片段，回答将更全面，但消耗的token相对较多，时间较慢');
 
-        await globalContext.referenceHandler.searchOrFullScan(message, path, requestContext);
-        requestContext.checkAborted();
-
-        await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
-        requestContext.checkAborted();
-
-        await globalContext.referenceHandler.extractKeyFacts(message, path, requestContext);
-        requestContext.checkAborted();
+        await globalContext.referenceHandler.collectFacts(message, path, requestContext);
 
         await globalContext.referenceHandler.refineParsedFacts(message, path, requestContext);
         requestContext.checkAborted();

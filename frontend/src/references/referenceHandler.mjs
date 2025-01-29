@@ -25,53 +25,30 @@ export default class ReferenceHandler {
       })),
       totalCount: aggregatedContent.length
     };
-    
+
     requestContext.results.referenceData = referenceData;
   }
 
-  async collectFacts(message, path, requestContext){
-    const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
-    const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
-    const seenUrls = new Set();
-    let searchResults = [];
+  async collectFacts(message, path, requestContext) {
+    try {
+      // 检查插件可用性并调用插件的 collectFacts 方法
+      const results = await requestContext.selectedPlugin.collectFacts(message, path, requestContext);
 
-
-    requestContext.sendSystemLog('🔄 开始重写查询...');
-    requestContext.checkAborted();  
-    const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
-    requestContext.checkAborted();  
-    requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
-
-    let discaredCount = 0;
-    for (const query of requeryResult) {
-      requestContext.checkAborted();  
-      // 添加更友好的查询日志输出
-      requestContext.sendSystemLog(query.queryLog);
-
-      const result = await requestContext.selectedPlugin.search(query.query, path);
-
-      // 去重并添加结果
-      for (const item of result) {
-        if (searchItemNumbers * 10 < searchResults.length) {
-          discaredCount++;
-          continue;
-        }
-        if (!seenUrls.has(item.id)) {
-          seenUrls.add(item.id);
-          searchResults.push(item);
-
-        }
+      // 更新搜索结果
+      if (results && Array.isArray(results)) {
+        requestContext.results.searchResults = results;
+        requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${results.length} 个唯一结果`);
+      } else {
+        requestContext.results.searchResults = [];
+        requestContext.sendSystemLog('ℹ️ 未找到相关内容');
       }
+    } catch (error) {
+      console.error('CollectFacts failed:', error);
+      requestContext.sendSystemLog(`❌ 收集内容失败: ${error.message}`);
+      throw error;
     }
-    requestContext.checkAborted();  
-    if (discaredCount > 0) {
-      requestContext.sendSystemLog(`片段多于 5倍的 searchItemNumbers 配置 ，参考了 ${searchResults.length}个片段， 有${discaredCount} 个片段会被忽略，你可以减少检索范围来规避此情况`);
-    } else {
-      requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
-    }
-    requestContext.results.searchResults = searchResults;
-    
   }
+
   async searchOrFullScan(message, path, requestContext) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
     const searchType = requestContext.type;
@@ -80,14 +57,14 @@ export default class ReferenceHandler {
     let searchResults = [];
 
     requestContext.sendSystemLog('🔄 开始重写查询...');
-    requestContext.checkAborted();  
+    requestContext.checkAborted();
     const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
-    requestContext.checkAborted();  
+    requestContext.checkAborted();
     requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
 
     let discaredCount = 0;
     for (const query of requeryResult) {
-      requestContext.checkAborted();  
+      requestContext.checkAborted();
       // 添加更友好的查询日志输出
       requestContext.sendSystemLog(query.queryLog);
 
@@ -106,7 +83,7 @@ export default class ReferenceHandler {
         }
       }
     }
-    requestContext.checkAborted();  
+    requestContext.checkAborted();
     if (discaredCount > 0) {
       requestContext.sendSystemLog(`片段多于 5倍的 searchItemNumbers 配置 ，参考了 ${searchResults.length}个片段， 有${discaredCount} 个片段会被忽略，你可以减少检索范围来规避此情况`);
     } else {
@@ -137,11 +114,11 @@ export default class ReferenceHandler {
 
       // 添加更友好的查询日志输出
       requestContext.sendSystemLog(query.queryLog);
-      requestContext.checkAborted();  
+      requestContext.checkAborted();
       const result = await requestContext.selectedPlugin.search(query.query, path);
-      requestContext.checkAborted(); 
+      requestContext.checkAborted();
       const rerankedResult = await this.globalContext.rerankImpl.rerank(result, query.query);
-      requestContext.checkAborted(); 
+      requestContext.checkAborted();
       // 去重并添加结果
       for (const item of rerankedResult) {
         if (!seenUrls.has(item.id)) {
@@ -161,7 +138,7 @@ export default class ReferenceHandler {
 
   async fetchDetails(message, path, requestContext) {
     const searchResults = requestContext.results.searchResults;
-    
+
     requestContext.sendSystemLog('📑 获取详细内容...');
     if (!searchResults || searchResults.length === 0) {
       requestContext.sendSystemLog('ℹ️ 未找到相关内容');
@@ -170,7 +147,7 @@ export default class ReferenceHandler {
     }
     const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(searchResults);
     requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
-    
+
     requestContext.results.detailsSearchResults = detailsSearchResults;
   }
 
@@ -290,13 +267,13 @@ export default class ReferenceHandler {
           // 创建最后一批的副本
           const finalBatchRefs = [...todoTasksRef];
           const jsonPrompt = createJsonPrompt(finalBatchRefs, message);
-          
+
           tasks.push(async () => {
             requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢）,批次 ${currentBatchIndex}，分析 ${finalBatchRefs.length} 条内容，剩余 0 条待分析`);
             let groupAnswer;
             for (let i = 0; i < 3; i++) {
               try {
-              requestContext.checkAborted();  // 添加检查
+                requestContext.checkAborted();  // 添加检查
                 groupAnswer = await this.globalContext.llmCaller.callSync([{
                   role: 'user',
                   content: JSON.stringify(jsonPrompt, null, 2)
@@ -420,6 +397,17 @@ export default class ReferenceHandler {
 
   async refineParsedFacts(message, path, requestContext) {
     const parsedFacts = requestContext.results.parsedFacts;
+
+    // 添加空结果检查
+    if (!parsedFacts || parsedFacts.length === 0) {
+      requestContext.sendSystemLog('ℹ️ 没有找到相关内容可供精炼');
+      requestContext.results.refinedFacts = {
+        fact: '',
+        urls: []
+      };
+      return;
+    }
+
     requestContext.sendSystemLog(' 🔄 开始精炼数据......');
     // 1. 提取所有 URL，并保持原始顺序
     const allUrls = Array.from(new Set(
@@ -527,130 +515,8 @@ export default class ReferenceHandler {
         sb += `${result.date}\n`;
       }
     });
-    
+
     requestContext.results.markdownResult = sb;
   }
-
-  // async callLLMRemoteAsync(messages, requestContext, sendLLMStream) {
-  //   try {
-  //     const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
-  //     if (!serverInfo.isHealthy || !serverInfo.port) {
-  //       throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
-  //     }
-
-  //     const formattedMessages = messages.map(msg => ({
-  //       role: msg.role || 'user',
-  //       content: msg.content
-  //     }));
-
-  //     const response = await fetch(`http://localhost:${serverInfo.port}/chat/streamCall`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         messages: formattedMessages
-  //       })
-  //     });
-
-  //     if (!response.ok) {
-  //       if (response.status === 401) {
-  //         requestContext.sendSystemLog('❌ 未授权：请在管理界面中输入API密钥');
-  //         throw new Error('Unauthorized: 请在管理界面中输入API密钥');
-  //       }
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-
-  //     const reader = response.body.getReader();
-  //     const decoder = new TextDecoder();
-  //     let receiveBuffer = [];
-  //     let lastAvailableChunk = [];
-
-  //     while (true) {
-  //       const { done, value } = await reader.read();
-
-  //       if (done) {
-  //         // 处理最后的缓冲区数据
-  //         if (receiveBuffer.length > 0) {
-  //           const finalData = this.processStreamBuffer(receiveBuffer);
-  //           if (finalData) {
-  //             sendLLMStream(finalData);
-  //           }
-  //         }
-  //         break;
-  //       }
-
-  //       const chunk = decoder.decode(value, { stream: false });
-  //       const lines = chunk.split('\n');
-
-  //       for (const line of lines) {
-  //         if (line.trim() === '') {
-  //           receiveBuffer = [];
-  //           continue;
-  //         } else {
-  //           lastAvailableChunk = receiveBuffer;
-  //         }
-
-  //         if (line.startsWith('data:')) {
-  //           receiveBuffer.push(line);
-  //         }
-  //       }
-
-  //       // 处理当前累积的缓冲区
-  //       const data = this.processStreamBuffer(lastAvailableChunk);
-  //       if (data) {
-  //         sendLLMStream(data);
-  //       }
-  //     }
-
-  //   } catch (error) {
-  //     console.error('Remote LLM call failed:', error);
-  //     requestContext.sendSystemLog(`❌ 错误: ${error.message}`);
-  //     throw error;
-  //   }
-  // }
-
-  // // 将 processStreamBuffer 改为类方法
-  // processStreamBuffer(buffer) {
-  //   if (!buffer || buffer.length === 0) return null;
-
-  //   return buffer
-  //     .map(line => line.replace('data:', '').trim())
-  //     .join('\n');
-  // }
-
-  // async callLLMRemoteSync(messages) {
-  //   try {
-  //     const serverInfo = await this.globalContext.localServerManager.getCurrentServerInfo();
-  //     if (!serverInfo.isHealthy || !serverInfo.port) {
-  //       throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
-  //     }
-
-  //     const formattedMessages = messages.map(msg => ({
-  //       role: msg.role || 'user',
-  //       content: msg.content
-  //     }));
-
-  //     const response = await fetch(`http://localhost:${serverInfo.port}/chat/syncCall`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         messages: formattedMessages
-  //       })
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-
-  //     const result = await response.text();
-  //     return [result]; // 保持与原有 callSync 返回格式一致
-  //   } catch (error) {
-  //     console.error('Remote LLM sync call failed:', error);
-  //     throw error;
-  //   }
-  // }
 
 }
