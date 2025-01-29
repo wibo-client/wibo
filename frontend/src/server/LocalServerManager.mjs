@@ -22,6 +22,7 @@ gpt 生成的这个表太漂亮了，我直接贴出来。
 
 export default class LocalServerManager {
     constructor() {
+        this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
         this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
@@ -50,6 +51,7 @@ export default class LocalServerManager {
 
     async init(globalContext) {
         this.globalContext = globalContext;
+        this.inited = true;
     }
 
     // 新增：获取 desiredState 方法
@@ -603,6 +605,9 @@ export default class LocalServerManager {
 
     // 新增：同步API密钥的方法
     async syncApiKey(port) {
+        if (this.inited === false) {
+            return;
+        }
         try {
             const apiKey = await this.globalContext.configHandler.getModelSK();
             if (!apiKey) {
