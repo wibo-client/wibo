@@ -31,6 +31,107 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         }
     }
 
+    async collectFacts(query, path, requestContext) {
+        if (!this.BASE_URL) {
+            throw new Error('Local server is not available');
+        }
+
+        try {
+            // 处理路径前缀
+            let processedPath = path;
+            if (path.startsWith('/local')) {
+                if (path.includes(':')) {
+                    processedPath = path.replace('/local/', '');
+                } else {
+                    processedPath = path.replace('/local', '');
+                }
+            }
+
+            if (path.includes(':')) {
+                processedPath = processedPath.replace(/\//g, '\\');
+            }
+
+            // 1. 提交任务
+            const submitResponse = await fetch(`${this.BASE_URL}/submitCollectFacts`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    pathPrefix: processedPath,
+                }),
+            });
+
+            if (!submitResponse.ok) {
+                throw new Error(`HTTP error! status: ${submitResponse.status}`);
+            }
+
+            // 2. 获取taskId
+            const { taskId } = await submitResponse.json();
+            let lastLogCount = 0;
+
+            // 3. 轮询任务状态
+            while (true) {
+                const statusResponse = await fetch(`${this.BASE_URL}/collectFacts/${taskId}/status`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!statusResponse.ok) {
+                    throw new Error(`Failed to get task status: ${statusResponse.status}`);
+                }
+
+                const statusData = await statusResponse.json();
+                if (!statusData) {
+                    throw new Error('Task not found');
+                }
+
+                // 4. 更新系统日志
+                if (statusData.systemLogs && statusData.systemLogs.length > lastLogCount) {
+                    const newLogs = statusData.systemLogs.slice(lastLogCount);
+                    for (const log of newLogs) {
+                        requestContext.sendSystemLog(log);
+                    }
+                    lastLogCount = statusData.systemLogs.length;
+                }
+
+                // 5. 检查任务状态并返回结果
+                switch (statusData.status) {
+                    case 'COMPLETED':
+                        return statusData.results || [];
+                    case 'FAILED':
+                        throw new Error(statusData.error || 'Task failed');
+                    case 'CANCELLED':
+                        throw new Error('Task was cancelled');
+                    case 'PROCESSING':
+                    case 'PENDING':
+                        // 继续等待
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        break;
+                    default:
+                        throw new Error(`Unknown task status: ${statusData.status}`);
+                }
+
+                // 检查是否被中止
+                if (requestContext.isAborted) {
+                    await fetch(`${this.BASE_URL}/collectFacts/${taskId}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    throw new Error('Task was aborted by user');
+                }
+            }
+        } catch (error) {
+            console.error('CollectFacts failed:', error);
+            throw error;
+        }
+    }
+
     async search(queryStr, pathPrefix = '') {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');

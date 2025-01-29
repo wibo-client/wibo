@@ -29,6 +29,49 @@ export default class ReferenceHandler {
     requestContext.results.referenceData = referenceData;
   }
 
+  async collectFacts(message, path, requestContext){
+    const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
+    const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
+    const seenUrls = new Set();
+    let searchResults = [];
+
+
+    requestContext.sendSystemLog('🔄 开始重写查询...');
+    requestContext.checkAborted();  
+    const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
+    requestContext.checkAborted();  
+    requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
+    let discaredCount = 0;
+    for (const query of requeryResult) {
+      requestContext.checkAborted();  
+      // 添加更友好的查询日志输出
+      requestContext.sendSystemLog(query.queryLog);
+
+      const result = await requestContext.selectedPlugin.search(query.query, path);
+
+      // 去重并添加结果
+      for (const item of result) {
+        if (searchItemNumbers * 10 < searchResults.length) {
+          discaredCount++;
+          continue;
+        }
+        if (!seenUrls.has(item.id)) {
+          seenUrls.add(item.id);
+          searchResults.push(item);
+
+        }
+      }
+    }
+    requestContext.checkAborted();  
+    if (discaredCount > 0) {
+      requestContext.sendSystemLog(`片段多于 5倍的 searchItemNumbers 配置 ，参考了 ${searchResults.length}个片段， 有${discaredCount} 个片段会被忽略，你可以减少检索范围来规避此情况`);
+    } else {
+      requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个唯一结果`);
+    }
+    requestContext.results.searchResults = searchResults;
+    
+  }
   async searchOrFullScan(message, path, requestContext) {
     const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
     const searchType = requestContext.type;
@@ -350,7 +393,7 @@ export default class ReferenceHandler {
 
   async refineBatch(currentBatch, message, requestContext) {
     const batchContent = currentBatch.join('\n\n--- 分割线 ---\n\n');
-    const prompt = `请基于以下内容进行精炼，保留所有重要信息，消除重复内容，保持逻辑连贯。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n${batchContent}\n\n请基于以上内容，回答问题：${message}`;
+    const prompt = `请基于以下内容进行精炼，保留所有重要信息，消除重复内容，保持逻辑连贯。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n 参考内容： \n ${batchContent}\n\n请基于以上内容，精炼出所有有助于回答问题的有效信息：${message}`;
 
     requestContext.sendSystemLog(`🔄 正在精炼内容...`);
     let refinedAnswer;

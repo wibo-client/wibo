@@ -22,6 +22,9 @@ import com.wibot.persistence.entity.RefineryTaskDO;
 import com.wibot.service.dto.ExtractFactResponse;
 import com.wibot.service.dto.ExtractedFact;
 import com.wibot.utils.JsonExtractor;
+
+import jakarta.annotation.PreDestroy;
+
 import com.wibot.controller.vo.RefineryTaskVO;
 import com.wibot.documentLoader.DocumentIndexService;
 import com.wibot.documentLoader.event.DocumentEventListener;
@@ -35,10 +38,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ArrayBlockingQueue;
 
 @Service
 public class RefineryService implements DocumentEventListener {
@@ -68,6 +79,16 @@ public class RefineryService implements DocumentEventListener {
 
     @Autowired
     private ObjectMapper objectMapper; // 替换原有的 private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // 替换原有的线程池定义
+    private final ExecutorService batchProcessor = new ThreadPoolExecutor(
+            2, // 核心线程数
+            2, // 最大线程数
+            60L, // 空闲线程存活时间
+            TimeUnit.SECONDS, // 时间单位
+            new ArrayBlockingQueue<>(5), // 固定大小为5的队列
+            new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时使用调用者线程执行任务
+    );
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
         // 转换VO到DO
@@ -158,23 +179,20 @@ public class RefineryService implements DocumentEventListener {
                         .toList();
             }
 
-            extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
-
-            // 不再需要这里的批量保存，因为已经在处理批次时保存了
-            // 只需要更新任务状态即可
+            // 获取token消耗并更新任务
+            int totalTokenCost = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+            task.setFullUpdateTokenCost(totalTokenCost);
+            refineryTaskRepository.save(task);
 
         } catch (Exception e) {
             throw new RuntimeException("Task processing failed: " + e.getMessage(), e);
         }
     }
 
-    private void extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question,
-            RefineryTaskDO task) {
-        int currentLength = 0;
-        int batchIndex = 1;
-        List<Map<String, Object>> currentBatch = new ArrayList<>();
-        Long lastProcessedId = null;
+    private int extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question, RefineryTaskDO task) {
         int totalTokenCost = 0;
+        List<Future<BatchProcessResult>> futures = new ArrayList<>();
+        int batchIndex = 1;
 
         for (MarkdownParagraphPO paragraph : paragraphs) {
             Map<String, Object> reference = new HashMap<>();
@@ -183,136 +201,203 @@ public class RefineryService implements DocumentEventListener {
             reference.put("content", paragraph.getContent());
             reference.put("paragraphOrder", paragraph.getParagraphOrder());
             reference.put("date", paragraph.getCreatedDateTime());
-            batchIndex++;
+
             try {
                 String jsonStr = objectMapper.writeValueAsString(reference);
                 totalTokenCost += jsonStr.length(); // 累加输入token成本
 
-                if (currentLength + jsonStr.length() < MAX_CONTENT_SIZE) {
-                    currentBatch.add(reference);
-                    currentLength += jsonStr.length();
-                    continue;
-                }
+                // 每个段落创建一个单独的batch并提交
+                List<Map<String, Object>> singleItemBatch = Collections.singletonList(reference);
+                futures.add(
+                        batchProcessor.submit(new BatchProcessTask(singleItemBatch, question, task, batchIndex, this)));
 
-                // Process current batch and add response token cost
-                totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, task, batchIndex);
-                lastProcessedId = updateCheckpoint(currentBatch, task);
-
-                // Reset batch
-                currentBatch = new ArrayList<>();
-                currentLength = 0;
-
+                batchIndex++;
             } catch (JsonProcessingException e) {
                 logger.error("Failed to serialize reference to JSON", e);
                 throw new RuntimeException(e);
             }
         }
 
-        // Process final batch
-        if (!currentBatch.isEmpty()) {
-            totalTokenCost += processBatchAndGetTokenCost(currentBatch, question, task, batchIndex);
-            lastProcessedId = updateCheckpoint(currentBatch, task);
+        // 等待所有任务完成
+        for (Future<BatchProcessResult> future : futures) {
+            try {
+                BatchProcessResult result = future.get();
+                // 每个batch处理成功后的tokenCost已经累加到task中
+                totalTokenCost += result.getTokenCost();
+            } catch (Exception e) {
+                logger.error("Failed to process batch", e);
+                throw new RuntimeException(e);
+            }
         }
 
-        // Update token cost
-        task.setFullUpdateTokenCost(totalTokenCost); 这里更新一下，fullUpdateTokenCost放 外面，这里只返回cost 。这样可以兼容两种情况
-        refineryTaskRepository.save(task);
-
+        return totalTokenCost;
     }
 
-    private Long updateCheckpoint(List<Map<String, Object>> batch, RefineryTaskDO task) {
-        // 获取当前批次中最大的ID
-        Long maxId = batch.stream()
-                .map(ref -> Long.valueOf(ref.get("id").toString()))
-                .max(Long::compareTo)
-                .orElse(null);
+    private void updateTaskWithRetry(Long taskId, int responseLength, Long paragraphId, String response) {
+        int maxRetries = 3;
+        int retryCount = 0;
+        boolean success = false;
 
-        if (maxId != null) {
-            task.setProcessingCheckpoint(maxId.toString());
-            refineryTaskRepository.save(task);
+        while (!success && retryCount < maxRetries) {
+            try {
+                RefineryTaskDO task = refineryTaskRepository.findById(taskId)
+                        .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+
+                // 更新task信息
+                task.setFullUpdateTokenCost(task.getFullUpdateTokenCost() + responseLength);
+                task.setProcessingCheckpoint(paragraphId.toString());
+
+                // 构建索引
+                documentIndexService.buildRefineryTaskIndex(taskId, response, paragraphId);
+
+                // 保存更新
+                refineryTaskRepository.save(task);
+                success = true;
+
+            } catch (Exception e) {
+                retryCount++;
+                if (retryCount == maxRetries) {
+                    logger.error("Failed to update task after {} retries for taskId: {}", maxRetries, taskId, e);
+                    throw new RuntimeException("Failed to update task after " + maxRetries + " retries", e);
+                }
+                logger.warn("Retry {} - Failed to update task: {}, will retry in 1 second", retryCount, taskId);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Task update interrupted", ie);
+                }
+            }
+        }
+    }
+
+    /**
+     * 用于封装LLM调用结果的类
+     */
+    public static class ExtractFactsResult {
+        private final List<ExtractedFact> facts;
+        private final String rawResponse;
+        private final int responseLength;
+
+        public ExtractFactsResult(List<ExtractedFact> facts, String rawResponse) {
+            this.facts = facts;
+            this.rawResponse = rawResponse;
+            this.responseLength = rawResponse != null ? rawResponse.length() : 0;
         }
 
-        return maxId;
+        public List<ExtractedFact> getFacts() {
+            return facts;
+        }
+
+        public String getRawResponse() {
+            return rawResponse;
+        }
+
+        public int getResponseLength() {
+            return responseLength;
+        }
     }
 
-    private int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question,
-            RefineryTaskDO task, int batchIndex) {
+    /**
+     * 公共方法：从内容中提取事实
+     */
+    public ExtractFactsResult extractFactsFromContent(List<Map<String, Object>> batch, String question) {
         Map<String, Object> params = new HashMap<>();
-
-        String jsonInput;
         try {
-            jsonInput = objectMapper.writeValueAsString(batch);
-        } catch (JsonProcessingException e) {
-            logger.error("Failed to serialize params to JSON", e);
-            throw new RuntimeException(e);
-        }
+            String jsonInput = objectMapper.writeValueAsString(batch);
+            params.put("references", jsonInput);
+            params.put("question", question);
 
-        params.put("references", jsonInput);
-        params.put("question", question);
+            PromptTemplate promptTemplate = new PromptTemplate(extractFactsPrompt);
+            Message userMessage = promptTemplate.createMessage(params);
+            Prompt prompt = new Prompt(Collections.singletonList(userMessage));
 
-        PromptTemplate promptTemplate = new PromptTemplate(extractFactsPrompt);
-        Message userMessage = promptTemplate.createMessage(params);
-        List<Message> messages = Collections.singletonList(userMessage);
-
-        try {
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
-                    Prompt prompt = new Prompt(messages);
                     String response = singletonLLMChat.getChatClient()
                             .prompt(prompt)
                             .call()
                             .content();
 
-                    // 先提取JSON字符串
                     String jsonStr = JsonExtractor.extractJsonFromResponse(response);
                     if (jsonStr == null) {
                         logger.error("Failed to extract JSON from response: {}", response);
                         continue;
                     }
 
-                    // 解析JSON并处理事实
                     ExtractFactResponse factResponse = objectMapper.readValue(jsonStr, ExtractFactResponse.class);
                     if (factResponse != null && factResponse.getFacts() != null) {
-                        // 立即处理每个事实
-                        for (ExtractedFact fact : factResponse.getFacts()) {
-                            Long paragraphId = Long.parseLong(fact.getId());
-
-                            // 查找现有的事实
-                            Optional<RefineryFactDO> existingFact = refineryFactRepository
-                                    .findByRefineryTaskIdAndParagraphId(task.getId(), paragraphId)
-                                    .stream()
-                                    .findFirst();
-
-                            if (existingFact.isPresent()) {
-                                // 更新现有事实
-                                RefineryFactDO factDO = existingFact.get();
-                                factDO.setFact(fact.getFact());
-                                refineryFactRepository.save(factDO);
-                            } else {
-                                // 创建新事实
-                                RefineryFactDO factDO = new RefineryFactDO(task.getId(), paragraphId, fact.getFact());
-                                refineryFactRepository.save(factDO);
-                            }
-                        }
-                        logger.info("Successfully processed and saved batch {}, extracted {} facts",
-                                batchIndex, factResponse.getFacts().size());
-
-                        return response.length();
+                        return new ExtractFactsResult(factResponse.getFacts(), response);
                     }
                 } catch (Exception e) {
                     if (attempt == 2) {
-                        logger.error("Failed to process batch {} after 3 attempts", batchIndex, e);
                         throw e;
                     }
-                    logger.warn("Attempt {} failed for batch {}, retrying...", attempt + 1, batchIndex);
+                    logger.warn("Attempt {} failed, retrying in {} seconds", attempt + 1, attempt + 1);
                     Thread.sleep(1000 * (attempt + 1));
                 }
             }
         } catch (Exception e) {
+            logger.error("Error extracting facts: {}", e.getMessage());
+            throw new RuntimeException("Failed to extract facts", e);
+        }
+        return new ExtractFactsResult(Collections.emptyList(), null);
+    }
+
+    /**
+     * 修改后的处理方法，使用新的公共方法
+     */
+    public synchronized int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question,
+            Long taskId, int batchIndex) {
+        try {
+            ExtractFactsResult result = extractFactsFromContent(batch, question);
+            if (result.getFacts().isEmpty()) {
+                return 0;
+            }
+
+            boolean isFirst = true;
+            for (ExtractedFact fact : result.getFacts()) {
+                Long paragraphId = Long.parseLong(fact.getId());
+                if (isFirst) {
+                    logger.info("Extracted facts: {}", result.getFacts());
+                    isFirst = false;
+                    refineryFactRepository.deleteByRefineryTaskIdAndParagraphId(taskId, paragraphId);
+                }
+
+                saveFact(taskId, paragraphId, fact.getFact());
+            }
+
+            logger.info("Successfully processed and saved batch {}, extracted {} facts",
+                    batchIndex, result.getFacts().size());
+
+            // 获取当前批次的段落ID
+            Long paragraphId = Long.parseLong(batch.get(0).get("id").toString());
+
+            // 更新任务状态
+            updateTaskWithRetry(taskId, result.getResponseLength(), paragraphId, result.getRawResponse());
+
+            return result.getResponseLength();
+
+        } catch (Exception e) {
             logger.error("Error processing batch {}", batchIndex, e);
             throw new RuntimeException("Failed to process batch " + batchIndex, e);
         }
-        return 0;
+    }
+
+    private void saveFact(Long taskId, Long paragraphId, String factContent) {
+        Optional<RefineryFactDO> existingFact = refineryFactRepository
+                .findByRefineryTaskIdAndParagraphId(taskId, paragraphId)
+                .stream()
+                .findFirst();
+
+        if (existingFact.isPresent()) {
+            RefineryFactDO factDO = existingFact.get();
+            factDO.setFact(factDO.getFact() + "\n" + factContent);
+            refineryFactRepository.save(factDO);
+        } else {
+            RefineryFactDO factDO = new RefineryFactDO(taskId, paragraphId, factContent);
+            refineryFactRepository.save(factDO);
+        }
     }
 
     /**
@@ -412,11 +497,9 @@ public class RefineryService implements DocumentEventListener {
                     refineryFactRepository.deleteByRefineryTaskIdAndParagraphIdIn(task.getId(), paragraphIds);
                 }
 
-                extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
-
-                // 更新任务统计信息
-                int incrementalTokenCost = task.getIncrementalTokenCost() + facts.size() * 100; // 估算token消耗
-                task.setIncrementalTokenCost(incrementalTokenCost);
+                // 获取token消耗并累加到增量消耗中
+                int tokenCost = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+                task.setIncrementalTokenCost(task.getIncrementalTokenCost() + tokenCost);
                 task.setLastUpdateTime(LocalDateTime.now());
                 refineryTaskRepository.save(task);
 
@@ -493,5 +576,64 @@ public class RefineryService implements DocumentEventListener {
         // 删除数据库中的数据
         refineryFactRepository.deleteByRefineryTaskId(taskId);
         refineryTaskRepository.deleteById(taskId);
+    }
+
+    // 添加静态内部类 BatchProcessResult
+    private static class BatchProcessResult {
+        private final int tokenCost;
+        private final Long minId;
+
+        public BatchProcessResult(int tokenCost, Long minId) {
+            this.tokenCost = tokenCost;
+            this.minId = minId;
+        }
+
+        public int getTokenCost() {
+            return tokenCost;
+        }
+
+        public Long getMinId() {
+            return minId;
+        }
+    }
+
+    // 添加静态内部类 BatchProcessTask
+    private static class BatchProcessTask implements Callable<BatchProcessResult> {
+        private final List<Map<String, Object>> batch;
+        private final String question;
+        private final RefineryTaskDO task;
+        private final int batchIndex;
+        private final RefineryService service;
+
+        public BatchProcessTask(List<Map<String, Object>> batch, String question, RefineryTaskDO task, int batchIndex,
+                RefineryService service) {
+            this.batch = batch;
+            this.question = question;
+            this.task = task;
+            this.batchIndex = batchIndex;
+            this.service = service;
+        }
+
+        @Override
+        public BatchProcessResult call() {
+            int tokenCost = service.processBatchAndGetTokenCost(batch, question, task.getId(), batchIndex);
+            // 由于每个batch只有一个段落，直接返回其ID
+            Long paragraphId = Long.valueOf(batch.get(0).get("id").toString());
+            return new BatchProcessResult(tokenCost, paragraphId);
+        }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        // 优雅关闭线程池
+        batchProcessor.shutdown();
+        try {
+            if (!batchProcessor.awaitTermination(60, TimeUnit.SECONDS)) {
+                batchProcessor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            batchProcessor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }

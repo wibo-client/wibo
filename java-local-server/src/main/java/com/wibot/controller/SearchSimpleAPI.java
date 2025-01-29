@@ -4,24 +4,20 @@ import com.wibot.controller.vo.SearchResultVO;
 import com.wibot.controller.vo.AggregatedContentVO;
 import com.wibot.index.DocumentIndexInterface;
 import com.wibot.index.SearchDocumentResult;
-import com.wibot.index.SimpleLocalLucenceIndex;
 import com.wibot.index.search.SearchQuery;
-import com.wibot.pathHandler.PathBasedIndexHandlerSelector;
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
 import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
+import com.wibot.service.SearchService;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,13 +36,16 @@ public class SearchSimpleAPI {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SearchSimpleAPI.class);
 
     @Autowired
-    private PathBasedIndexHandlerSelector pathBasedIndexHandlerSelector;
-
-    @Autowired
     private DocumentDataRepository documentDataRepository;
 
     @Autowired
     private MarkdownParagraphRepository markdownParagraphRepository;
+
+    @Autowired
+    private DocumentIndexInterface documentIndexInterface;
+
+    @Autowired
+    private SearchService searchService; // 添加SearchService注入
 
     /**
      * 完整的搜索方法，支持所有搜索参数
@@ -60,7 +59,6 @@ public class SearchSimpleAPI {
         String pathPrefix = (String) searchParams.get("pathPrefix");
         int TopN = (int) searchParams.get("TopN");
 
-        DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector.selectIndexHandler(pathPrefix);
         SearchQuery searchQuery = new SearchQuery();
         searchQuery.setOriginalQuery(queryStr);
         searchQuery.setPathPrefix(pathPrefix);
@@ -127,9 +125,6 @@ public class SearchSimpleAPI {
             // 构建 SearchQuery 对象
             SearchQuery searchQuery = buildSearchQuery(searchParams);
 
-            // 获取索引处理器
-            DocumentIndexInterface documentIndexInterface = pathBasedIndexHandlerSelector
-                    .selectIndexHandler(searchQuery.getPathPrefix());
             List<SearchDocumentResult> results = documentIndexInterface
                     .searchWithStrategy(searchQuery);
 
@@ -228,46 +223,6 @@ public class SearchSimpleAPI {
                 .collect(Collectors.toList());
     }
 
-    @PostMapping("/fetchDocumentContent")
-    public List<SearchResultVO> fetchDocumentContent(@RequestBody Map<String, Object> requestParams) {
-        String pathPrefix = String.valueOf(requestParams.get("pathPrefix"));
-
-        // 处理带有通配符的路径
-        List<DocumentDataPO> documentDataList;
-        if (pathPrefix.contains("*")) {
-            documentDataList = findDocumentsWithWildcard(pathPrefix);
-        } else {
-            Optional<DocumentDataPO> documentDataOpt = documentDataRepository.findByFilePath(pathPrefix);
-            if (documentDataOpt.isEmpty()) {
-                logger.error("Document not found for pathPrefix: " + pathPrefix);
-                return new ArrayList<>();
-            }
-            documentDataList = List.of(documentDataOpt.get());
-        }
-
-        List<SearchResultVO> searchResults = new ArrayList<>();
-        for (DocumentDataPO documentData : documentDataList) {
-            Long documentDataId = documentData.getId();
-            String title = documentData.getFileName();
-
-            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
-
-            searchResults.addAll(paragraphs.stream().map(paragraph -> {
-                return new SearchResultVO(paragraph.getId(), title, "",
-                        paragraph.getCreatedDateTime(), documentData.getFilePath());
-            }).collect(Collectors.toList()));
-        }
-
-        return searchResults;
-    }
-
-    private List<DocumentDataPO> findDocumentsWithWildcard(String pathPrefix) {
-        // for h2 only
-        String sqlPattern = pathPrefix.replace("\\", "\\\\").replace("*", "%");
-
-        return documentDataRepository.findByFilePathLike(sqlPattern);
-    }
-
     private MarkdownParagraphPO getParagraphById(Long id) {
         Optional<MarkdownParagraphPO> paragraph = markdownParagraphRepository.findById(id);
         if (paragraph.isPresent()) {
@@ -277,5 +232,24 @@ public class SearchSimpleAPI {
             return new MarkdownParagraphPO();
         }
 
+    }
+
+    @PostMapping("/submitCollectFacts")
+    public Map<String, Object> submitCollectFacts(@RequestBody Map<String, Object> requestParams) {
+        return searchService.handleCollectFactsRequest(requestParams);
+    }
+
+    @GetMapping("/collectFacts/{taskId}/status")
+    public Map<String, Object> getCollectFactsStatus(@PathVariable Long taskId) {
+        return searchService.getCollectFactsStatus(taskId);
+    }
+
+    @PostMapping("/collectFacts/{taskId}/cancel")
+    public Map<String, Object> cancelCollectFactsTask(@PathVariable Long taskId) {
+        searchService.cancelTask(taskId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("taskId", taskId);
+        response.put("status", "CANCELLED");
+        return response;
     }
 }
