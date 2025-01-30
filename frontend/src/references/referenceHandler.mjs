@@ -10,14 +10,14 @@ export default class ReferenceHandler {
   }
 
   buildReferenceData(message, path, requestContext) {
-    const aggregatedContent = requestContext.results.searchResults;
+    const aggregatedContent = requestContext.results.searchResults || [];
     const referenceData = {
       fullContent: aggregatedContent.map((doc, index) => ({
         index: index + 1,
-        title: doc.title,
-        url: doc.realUrl,
-        date: doc.date,
-        description: doc.description
+        title: doc.title || '',
+        url: doc.realUrl || '',
+        date: doc.date || '',
+        description: (doc.description || '')
           .replace(/<\/?h[1-6][^>]*>/gi, "") // 去掉所有的 <h1> 到 <h6> 标签
           .replace(/\n/g, " ") // 去掉所有的换行符
           .replace(/<br\s*\/?>/gi, " ") // 去掉所有的 <br> 标签
@@ -396,10 +396,10 @@ export default class ReferenceHandler {
   }
 
   async refineParsedFacts(message, path, requestContext) {
-    const parsedFacts = requestContext.results.parsedFacts;
+    const searchResults = requestContext.results.searchResults;
 
     // 添加空结果检查
-    if (!parsedFacts || parsedFacts.length === 0) {
+    if (!searchResults || searchResults.length === 0) {
       requestContext.sendSystemLog('ℹ️ 没有找到相关内容可供精炼');
       requestContext.results.refinedFacts = {
         fact: '',
@@ -409,13 +409,14 @@ export default class ReferenceHandler {
     }
 
     requestContext.sendSystemLog(' 🔄 开始精炼数据......');
-    // 1. 提取所有 URL，并保持原始顺序
+
+    // 1. 提取所有 URL
     const allUrls = Array.from(new Set(
-      parsedFacts.flatMap(fact => fact.urls)
+      searchResults.map(result => result.url)
     ));
 
     // 2. 检查是否需要精炼
-    const factsContent = parsedFacts.map(fact => fact.fact);
+    const factsContent = searchResults.map(result => result.fact || result.summary || '');
     const totalLength = factsContent.join('').length;
 
     if (totalLength <= this.MAX_CONTENT_SIZE) {

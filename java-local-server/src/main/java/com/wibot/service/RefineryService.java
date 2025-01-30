@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -50,6 +52,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class RefineryService implements DocumentEventListener {
@@ -82,12 +86,23 @@ public class RefineryService implements DocumentEventListener {
 
     // 替换原有的线程池定义
     private final ExecutorService batchProcessor = new ThreadPoolExecutor(
-            2, // 核心线程数
-            2, // 最大线程数
+            3, // 核心线程数
+            3, // 最大线程数
             60L, // 空闲线程存活时间
             TimeUnit.SECONDS, // 时间单位
-            new ArrayBlockingQueue<>(5), // 固定大小为5的队列
-            new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时使用调用者线程执行任务
+            new ArrayBlockingQueue<>(200), // 队列大小为200
+            new ThreadFactory() {
+                private final AtomicInteger threadNumber = new AtomicInteger(1);
+                
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r);
+                    thread.setName("RefineryService-Worker-" + threadNumber.getAndIncrement());
+                    thread.setDaemon(false);
+                    return thread;
+                }
+            },
+            new ThreadPoolExecutor.AbortPolicy()
     );
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
@@ -179,8 +194,16 @@ public class RefineryService implements DocumentEventListener {
                         .toList();
             }
 
-            // 获取token消耗并更新任务
-            int totalTokenCost = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+            // 获取所有任务的Future
+            List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+            
+            // 等待所有任务完成并计算总消耗
+            int totalTokenCost = 0;
+            for (Future<BatchProcessResult> future : futures) {
+                BatchProcessResult result = future.get();
+                totalTokenCost += result.getTokenCost();
+            }
+            
             task.setFullUpdateTokenCost(totalTokenCost);
             refineryTaskRepository.save(task);
 
@@ -189,11 +212,11 @@ public class RefineryService implements DocumentEventListener {
         }
     }
 
-    private int extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question, RefineryTaskDO task) {
-        int totalTokenCost = 0;
+    private List<Future<BatchProcessResult>> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question, RefineryTaskDO task) {
         List<Future<BatchProcessResult>> futures = new ArrayList<>();
         int batchIndex = 1;
-
+        
+        // 只创建和提交任务,不等待结果
         for (MarkdownParagraphPO paragraph : paragraphs) {
             Map<String, Object> reference = new HashMap<>();
             reference.put("part", "第" + batchIndex + "篇参考内容");
@@ -204,12 +227,11 @@ public class RefineryService implements DocumentEventListener {
 
             try {
                 String jsonStr = objectMapper.writeValueAsString(reference);
-                totalTokenCost += jsonStr.length(); // 累加输入token成本
-
-                // 每个段落创建一个单独的batch并提交
                 List<Map<String, Object>> singleItemBatch = Collections.singletonList(reference);
-                futures.add(
-                        batchProcessor.submit(new BatchProcessTask(singleItemBatch, question, task, batchIndex, this)));
+                
+                Future<BatchProcessResult> future = batchProcessor.submit(
+                    new BatchProcessTask(singleItemBatch, question, task, batchIndex, this));
+                futures.add(future);
 
                 batchIndex++;
             } catch (JsonProcessingException e) {
@@ -218,19 +240,7 @@ public class RefineryService implements DocumentEventListener {
             }
         }
 
-        // 等待所有任务完成
-        for (Future<BatchProcessResult> future : futures) {
-            try {
-                BatchProcessResult result = future.get();
-                // 每个batch处理成功后的tokenCost已经累加到task中
-                totalTokenCost += result.getTokenCost();
-            } catch (Exception e) {
-                logger.error("Failed to process batch", e);
-                throw new RuntimeException(e);
-            }
-        }
-
-        return totalTokenCost;
+        return futures;
     }
 
     private void updateTaskWithRetry(Long taskId, int responseLength, Long paragraphId, String response) {
@@ -315,7 +325,7 @@ public class RefineryService implements DocumentEventListener {
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
                     String response = singletonLLMChat.getChatClient()
-                            .prompt(prompt) 总结一下主要新闻似乎无效，明天优化一下
+                            .prompt(prompt) 
                             .call()
                             .content();
 
@@ -339,7 +349,7 @@ public class RefineryService implements DocumentEventListener {
             }
         } catch (Exception e) {
             logger.error("Error extracting facts: {}", e.getMessage());
-            throw new RuntimeException("Failed to extract facts", e);
+            throw new RuntimeException("Failed to extract facts ， already retry 3 times  ", e);
         }
         return new ExtractFactsResult(Collections.emptyList(), null);
     }
@@ -476,8 +486,6 @@ public class RefineryService implements DocumentEventListener {
 
     private void handleAfterDocumentModify(DocumentDataPO document) {
         logger.info("Handling document modification: {}", document.getFilePath());
-
-        // 修改这行代码，使用 findByDirectoryPathLikeAndStatus 方法
         String directoryPathPattern = getParentPath(document.getFilePath()) + "%";
         List<RefineryTaskDO> relatedTasks = refineryTaskRepository.findByDirectoryPathLikeAndStatus(
                 directoryPathPattern,
@@ -485,7 +493,6 @@ public class RefineryService implements DocumentEventListener {
 
         for (RefineryTaskDO task : relatedTasks) {
             try {
-                // 获取文档的所有段落
                 List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository
                         .findByDocumentDataId(document.getId());
 
@@ -497,8 +504,14 @@ public class RefineryService implements DocumentEventListener {
                     refineryFactRepository.deleteByRefineryTaskIdAndParagraphIdIn(task.getId(), paragraphIds);
                 }
 
-                // 获取token消耗并累加到增量消耗中
-                int tokenCost = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+                // 获取所有future并等待完成
+                List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+                int tokenCost = 0;
+                for (Future<BatchProcessResult> future : futures) {
+                    BatchProcessResult result = future.get();
+                    tokenCost += result.getTokenCost();
+                }
+                
                 task.setIncrementalTokenCost(task.getIncrementalTokenCost() + tokenCost);
                 task.setLastUpdateTime(LocalDateTime.now());
                 refineryTaskRepository.save(task);
