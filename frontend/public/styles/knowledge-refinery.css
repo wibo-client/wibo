@@ -70,7 +70,8 @@
 }
 
 .action-buttons {
-  display: flex;
+  display: flex; 
+  flex-direction: column;  /* 改为纵向排列 */
   gap: 8px;
 }
 
@@ -122,76 +123,178 @@
 }
 
 /* 设置各列的宽度和换行行为 */
-.refinery-table th:nth-child(1), 
-.refinery-table td:nth-child(1) { 
-  width: 15%; 
-  min-width: 120px;
-} /* 作用目录 */
-
-.refinery-table th:nth-child(2),
-.refinery-table td:nth-child(2) { 
+.refinery-table th:nth-child(1),
+.refinery-table td:nth-child(1) {
   width: 15%;
   min-width: 120px;
-} /* 关键问题 */
+}
+
+/* 作用目录 */
+
+.refinery-table th:nth-child(2),
+.refinery-table td:nth-child(2) {
+  width: 15%;
+  min-width: 120px;
+}
+
+/* 关键问题 */
 
 .refinery-table th:nth-child(3),
-.refinery-table td:nth-child(3) { 
+.refinery-table td:nth-child(3) {
   width: 8%;
   min-width: 60px;
   text-align: right;
-} /* 涵盖文件数 */
+}
+
+/* 涵盖文件数 */
 
 .refinery-table th:nth-child(4),
 .refinery-table td:nth-child(4),
 .refinery-table th:nth-child(5),
-.refinery-table td:nth-child(5) { 
+.refinery-table td:nth-child(5) {
   width: 8%;
   min-width: 80px;
   text-align: right;
-} /* Token消耗 */
+}
+
+/* Token消耗 */
 
 .refinery-table th:nth-child(6),
-.refinery-table td:nth-child(6) { 
+.refinery-table td:nth-child(6) {
   width: 6%;
   min-width: 60px;
-} /* 更新周期 */
+}
+
+/* 更新周期 */
 
 .refinery-table th:nth-child(7),
-.refinery-table td:nth-child(7) { 
+.refinery-table td:nth-child(7) {
   width: 6%;
   min-width: 60px;
   text-align: right;
-} /* 命中次数 */
+}
+
+/* 命中次数 */
 
 .refinery-table th:nth-child(8),
 .refinery-table td:nth-child(8),
 .refinery-table th:nth-child(9),
-.refinery-table td:nth-child(9) { 
+.refinery-table td:nth-child(9) {
   width: 8%;
   min-width: 90px;
-} /* 时间 */
+}
+
+/* 时间 */
 
 .refinery-table th:nth-child(10),
-.refinery-table td:nth-child(10) { 
+.refinery-table td:nth-child(10) {
   width: 6%;
   min-width: 70px;
-} /* 当前状态 */
+}
+
+/* 当前状态 */
 
 .refinery-table th:nth-child(11),
-.refinery-table td:nth-child(11) { 
+.refinery-table td:nth-child(11) {
   width: 12%;
   min-width: 100px;
-} /* 任务处理信息 */
+}
+
+/* 任务处理信息 */
 
 .refinery-table th:nth-child(12),
-.refinery-table td:nth-child(12) { 
+.refinery-table td:nth-child(12) {
   width: 120px;
   min-width: 120px;
   white-space: nowrap;
-} /* 操作按钮 */
+}
+
+/* 操作按钮 */
 
 /* 数字类型的单元格样式 */
 .refinery-table td.numeric {
   font-family: monospace;
   text-align: right;
+}
+
+/* 系统消息区域样式 */
+.system-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 0;
+  border-top: 1px solid #eee;
+}
+
+.system-toggle,
+.system-stop,
+.system-faq {
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.system-toggle {
+  color: #666;
+}
+
+.system-stop {
+  color: #f44336;
+}
+
+.system-faq {
+  color: #4a90e2;
+}
+
+.system-toggle:hover {
+  background-color: #f5f5f5;
+}
+
+.system-stop:hover {
+  color: #d32f2f;
+  background-color: rgba(244, 67, 54, 0.1);
+}
+
+.system-faq:hover {
+  color: #357abd;
+  background-color: rgba(74, 144, 226, 0.1);
+}
+
+/* Toast消息样式 */
+.alert {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+.alert-success {
+  background-color: #e8f5e9;
+  color: #388e3c;
+  border: 1px solid #c8e6c9;
+}
+
+.alert-danger {
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }

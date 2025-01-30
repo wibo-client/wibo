@@ -9,7 +9,6 @@ public class RefineryTaskVO {
     private int coveredFileCount;          // 涵盖文件数
     private int fullUpdateTokenCost;       // 上次全量更新所消耗token估算
     private int incrementalTokenCost;      // 上次增量更新所消耗token估算
-    private String updateCycle;            // 更新周期（每日/每周/每月）
     private int hitCount;                  // 命中次数
     private LocalDateTime lastUpdateTime;   // 最后更新日期
     private LocalDateTime createTime;       // 创建日期
@@ -35,9 +34,6 @@ public class RefineryTaskVO {
 
     public int getIncrementalTokenCost() { return incrementalTokenCost; }
     public void setIncrementalTokenCost(int incrementalTokenCost) { this.incrementalTokenCost = incrementalTokenCost; }
-
-    public String getUpdateCycle() { return updateCycle; }
-    public void setUpdateCycle(String updateCycle) { this.updateCycle = updateCycle; }
 
     public int getHitCount() { return hitCount; }
     public void setHitCount(int hitCount) { this.hitCount = hitCount; }

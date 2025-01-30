@@ -190,7 +190,7 @@ public class SearchService {
             };
             task.setResults(convertToMapList(results));
             setTaskStatus(task, CollectFactsTask.STATUS_COMPLETED);
-            task.addSystemLog("🎉 任务处理完成！");
+        
 
         } catch (Exception e) {
             logger.error("Error processing collect facts task: {}", task.getTaskId(), e);
@@ -607,7 +607,6 @@ public class SearchService {
                             return content;
                         })
                         .collect(Collectors.toList());
-
                 try {
                     ExtractFactsResult result = refineryService.extractFactsFromContent(batchInput, task.getQuery());
                     

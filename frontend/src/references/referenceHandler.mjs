@@ -370,7 +370,7 @@ export default class ReferenceHandler {
 
   async refineBatch(currentBatch, message, requestContext) {
     const batchContent = currentBatch.join('\n\n--- 分割线 ---\n\n');
-    const prompt = `请基于以下内容进行精炼，保留所有重要信息，消除重复内容，保持逻辑连贯。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n 参考内容： \n ${batchContent}\n\n请基于以上内容，精炼出所有有助于回答问题的有效信息：${message}`;
+    const prompt = `请基于以下内容进行精炼，保留所有重要信息，包含事实，代码，链接，观点等关键信息，消除重复内容，保持逻辑连贯。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n 参考内容： \n ${batchContent}\n\n请基于以上内容，精炼出所有有助于回答问题的有效信息：${message}`;
 
     requestContext.sendSystemLog(`🔄 正在精炼内容...`);
     let refinedAnswer;
@@ -421,11 +421,13 @@ export default class ReferenceHandler {
 
     if (totalLength <= this.MAX_CONTENT_SIZE) {
       // 如果内容长度已经符合要求，直接返回
-      requestContext.sendSystemLog('✅ 精炼完毕 ');
+      requestContext.sendSystemLog('✅ 精炼完毕，开始基于精炼后内容回答问题 ');
       requestContext.results.refinedFacts = {
         fact: factsContent.join('\n\n'),
         urls: allUrls
       };
+      requestContext.sendSystemLog('如果您需要，可以点我，将本问题设为常问问题，可以加快类似问题的回答速度。 ');
+
       return;
     }
 

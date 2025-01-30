@@ -469,6 +469,7 @@ export default class ChatHandler {
         <div class="system-actions">
           <span class="system-toggle">展开详情</span>
           <span class="system-stop">终止任务</span>
+          <span class="system-faq">设为常问</span>
         </div>
       `;
       messageGroup.appendChild(systemMessageElement);
@@ -490,6 +491,24 @@ export default class ChatHandler {
           console.error('终止任务请求失败:', error);
           // 可以选择向用户显示错误信息
           const errorMessage = error.message || '终止任务失败';
+          systemContent.querySelector('.execution-log:last-child').textContent = `❌ ${errorMessage}`;
+        }
+      });
+
+      // 添加设为常问的点击处理
+      const systemFaq = systemMessageElement.querySelector('.system-faq');
+      systemFaq.addEventListener('click', async () => {
+        try {
+          const taskData = {
+            directoryPath: path,
+            keyQuestion: message
+          };
+
+          await window.refineryHandler.addRefineryTask(taskData);
+          systemContent.querySelector('.execution-log:last-child').textContent = '✅ 已成功设置为常问问题';
+        } catch (error) {
+          console.error('设置常问问题失败:', error);
+          const errorMessage = error.message || '设置常问问题失败';
           systemContent.querySelector('.execution-log:last-child').textContent = `❌ ${errorMessage}`;
         }
       });

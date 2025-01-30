@@ -7,7 +7,7 @@ export default class RefineryHandler {
     this.knowledgeLocalServerStatusHandler.addStateCheckListener(state => {
       this.BASE_URL = state.baseUrl;
       this.lastKnownState = state;
-      if(state.isHealthy) {
+      if (state.isHealthy) {
         this.updateRefineryTasks();
       }
     });
@@ -88,42 +88,41 @@ export default class RefineryHandler {
     // 关闭按钮事件
     const closeButtons = dialog.querySelectorAll('[data-dismiss="modal"]');
     closeButtons.forEach(button => {
-        button.onclick = () => {
-            dialog.remove();
-        };
+      button.onclick = () => {
+        dialog.remove();
+      };
     });
 
     // 提交按钮事件
     const submitButton = dialog.querySelector('#submitTask');
     submitButton.onclick = async () => {
-        try {
-            const taskData = {
-                directoryPath: dialog.querySelector('#directoryPath').value,
-                keyQuestion: dialog.querySelector('#keyQuestion').value,
-                updateCycle: dialog.querySelector('#updateCycle').value
-            };
+      try {
+        const taskData = {
+          directoryPath: dialog.querySelector('#directoryPath').value,
+          keyQuestion: dialog.querySelector('#keyQuestion').value
+        };
 
-            // 校验必填字段
-            if (!taskData.directoryPath || !taskData.keyQuestion) {
-                this.showErrorMessage('请填写所有必填字段');
-                return;
-            }
-
-            // 创建任务
-            await this.addRefineryTask(taskData);
-            
-            // 关闭对话框
-            dialog.remove();
-            
-            // 显示成功消息
-            this.showSuccessMessage('任务创建成功');
-            
-            // 刷新任务列表
-            await this.updateRefineryTasks();
-
-        } catch (error) {
-            this.showErrorMessage(error.message);
+        // 校验必填字段
+        if (!taskData.directoryPath || !taskData.keyQuestion) {
+          this.showErrorMessage('请填写所有必填字段');
+          return;
         }
+
+        // 创建任务
+        await this.addRefineryTask(taskData);
+
+        // 关闭对话框
+        dialog.remove();
+
+        // 显示成功消息
+        this.showSuccessMessage('任务创建成功');
+
+        // 刷新任务列表
+        await this.updateRefineryTasks();
+
+      } catch (error) {
+        this.showErrorMessage(error.message);
+      }
     };
   }
 
@@ -146,26 +145,39 @@ export default class RefineryHandler {
   }
 
   // 添加新的精炼任务
-  async addRefineryTask(task) {
+  async addRefineryTask(taskData) {
     if (!this.BASE_URL) {
       throw new Error('Local server is not available');
     }
 
-    const response = await fetch(`${this.BASE_URL}/api/refinery/task`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(task)
-    });
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.error || '添加任务失败');
+    // 输入验证
+    if (!taskData.directoryPath || !taskData.keyQuestion) {
+      throw new Error('目录路径和关键问题为必填项');
     }
 
-    await this.updateRefineryTasks();
-    return data.data;
+    try {
+      const response = await fetch(`${this.BASE_URL}/api/refinery/task`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskData)
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || '添加任务失败');
+      }
+
+      this.showSuccessMessage('常问问题设置成功');
+      await this.updateRefineryTasks();
+      return data.data;
+
+    } catch (error) {
+      this.showErrorMessage(error.message);
+      throw error;
+    }
   }
 
   // 更新精炼任务
@@ -192,7 +204,7 @@ export default class RefineryHandler {
     if (!this.BASE_URL) {
       throw new Error('Local server is not available');
     }
-    
+
     const response = await fetch(`${this.BASE_URL}/api/refinery/task/${taskId}/delete`, {
       method: 'POST'
     });
@@ -215,7 +227,7 @@ export default class RefineryHandler {
     try {
       const response = await fetch(`${this.BASE_URL}/api/refinery/tasks`);
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.error || '获取任务列表失败');
       }
@@ -226,7 +238,7 @@ export default class RefineryHandler {
       tbody.innerHTML = '';
       data.data.forEach(task => {
         const row = tbody.insertRow();
-        
+
         // 修改列的顺序和内容
         row.insertCell(0).textContent = task.directoryPath;
         row.insertCell(1).textContent = task.keyQuestion;
@@ -237,30 +249,38 @@ export default class RefineryHandler {
         row.insertCell(6).textContent = this.formatDateTime(task.createTime);
         row.insertCell(7).innerHTML = this.formatStatus(task.status);
         row.insertCell(8).textContent = task.errorMessage || '';
-        
+
         // 添加操作按钮列
         const actionsCell = row.insertCell(9);
-        
+
+        // 创建按钮容器
+        const actionButtons = document.createElement('div');
+        actionButtons.className = 'action-buttons';
+
         // 创建操作按钮
         const updateFullBtn = document.createElement('button');
         const updateIncrBtn = document.createElement('button');
         const deleteBtn = document.createElement('button');
-        
+
         updateFullBtn.textContent = '全量更新';
         updateIncrBtn.textContent = '增量更新';
         deleteBtn.textContent = '删除';
-        
+
         updateFullBtn.className = 'btn btn-sm btn-primary action-btn update-full';
         updateIncrBtn.className = 'btn btn-sm btn-info action-btn update-incremental';
         deleteBtn.className = 'btn btn-sm btn-danger action-btn delete-btn';
-        
+
         updateFullBtn.onclick = () => this.updateRefineryTask(task.id, 'full');
         updateIncrBtn.onclick = () => this.updateRefineryTask(task.id, 'incremental');
         deleteBtn.onclick = () => this.confirmAndDeleteTask(task.id);
-        
-        actionsCell.appendChild(updateFullBtn);
-        actionsCell.appendChild(updateIncrBtn);
-        actionsCell.appendChild(deleteBtn);
+
+        // 将按钮添加到容器中
+        actionButtons.appendChild(updateFullBtn);
+        actionButtons.appendChild(updateIncrBtn);
+        actionButtons.appendChild(deleteBtn);
+
+        // 将容器添加到单元格中
+        actionsCell.appendChild(actionButtons);
       });
     } catch (error) {
       console.warn('[精炼服务] 更新任务列表失败:', error.message);
@@ -271,16 +291,7 @@ export default class RefineryHandler {
   // 新增格式化方法
   formatTokenCount(count) {
     if (!count) return '0';
-    return count > 1000 ? (count/1000).toFixed(1) + 'k' : count;
-  }
-
-  formatUpdateCycle(cycle) {
-    const cycleMap = {
-      'DAILY': '每日',
-      'WEEKLY': '每周',
-      'MONTHLY': '每月'
-    };
-    return cycleMap[cycle] || cycle;
+    return count > 1000 ? (count / 1000).toFixed(1) + 'k' : count;
   }
 
   formatStatus(status) {
@@ -307,16 +318,16 @@ export default class RefineryHandler {
   formatDateTime(dateTimeStr) {
     if (!dateTimeStr) return '';
     try {
-        const date = new Date(dateTimeStr);
-        return date.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+      const date = new Date(dateTimeStr);
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch (error) {
-        return dateTimeStr;
+      return dateTimeStr;
     }
   }
 }

@@ -14,14 +14,24 @@ public class JsonExtractor {
         }
         
         try {
-            // 1. 检查是否包含 Markdown JSON 代码块
-            Pattern markdownPattern = Pattern.compile("```json\\s*([\\s\\S]*?)\\s*```");
-            Matcher markdownMatcher = markdownPattern.matcher(response);
-            if (markdownMatcher.find()) {
-                String json = markdownMatcher.group(1).trim();
-                logger.debug("Found JSON in markdown block: {}", json);
-                return json;
+            // 1. 查找 "```json" 标记的位置
+            String jsonMarker = "```json";
+            int startIndex = response.indexOf(jsonMarker);
+            if (startIndex != -1) {
+                // 移动到 json 标记后面
+                startIndex += jsonMarker.length();
+                
+                // 2. 查找最后一个 "```" 的位置
+                int endIndex = response.lastIndexOf("```");
+                if (endIndex > startIndex) {
+                    // 提取内容并清理
+                    String json = response.substring(startIndex, endIndex).trim();
+                    logger.debug("Found JSON in markdown block: {}", json);
+                    return json;
+                }
             }
+            
+            // 如果没有找到合适的markdown代码块，继续尝试其他模式
             
             // 2. 检查是否整个响应就是一个JSON (对象或数组)
             String trimmedResponse = response.trim();

@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const logViewerHandler = new LogViewerHandler(); // 添加日志查看器模块
   const refineryHandler = new RefineryHandler(); // 新增知识精炼处理器
 
+  // 将 refineryHandler 添加到 window 对象中，使其他模块可以访问
+  window.refineryHandler = refineryHandler;
 
   const knowledgeBaseHandler = new KnowledgeBaseHandler();
   const knowledgeLocalServerStatusHandler = new KnowledgeLocalServerStatusHandler();
