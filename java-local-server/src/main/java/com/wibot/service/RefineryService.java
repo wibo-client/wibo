@@ -59,6 +59,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class RefineryService implements DocumentEventListener {
     private static final Logger logger = LoggerFactory.getLogger(RefineryService.class);
     private static final int MAX_CONTENT_SIZE = 28720;
+    private static final String UPDATE_TYPE_INCREMENTAL = "INCREMENTAL";
+    private static final String UPDATE_TYPE_FULL = "FULL";
 
     @Value("classpath:/prompts/extractFacts.st")
     private Resource extractFactsPrompt;
@@ -211,15 +213,20 @@ public class RefineryService implements DocumentEventListener {
             List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(),
                     task);
 
-            // 等待所有任务完成并计算总消耗
-            int totalTokenCost = 0;
+            // 逐个处理future结果
             for (Future<BatchProcessResult> future : futures) {
-                BatchProcessResult result = future.get();
-                totalTokenCost += result.getTokenCost();
+                try {
+                    BatchProcessResult result = future.get();
+                    updateTaskStats(task.getId(), result.getTokenCost(),
+                            result.getMinId(), UPDATE_TYPE_FULL);
+                } catch (Exception e) {
+                    logger.error("Error processing future result: {}", e.getMessage());
+                    throw new RuntimeException("Failed to process task future", e);
+                }
             }
 
-            task.setFullUpdateTokenCost(totalTokenCost);
-            refineryTaskRepository.save(task);
+            // 任务完成后清除checkpoint
+            clearTaskCheckpoint(task.getId());
 
         } catch (Exception e) {
             throw new RuntimeException("Task processing failed: " + e.getMessage(), e);
@@ -275,8 +282,6 @@ public class RefineryService implements DocumentEventListener {
                 // 构建索引
                 documentIndexService.buildRefineryTaskIndex(taskId, response, paragraphId);
 
-                // 保存更新
-                refineryTaskRepository.save(task);
                 success = true;
 
             } catch (Exception e) {
@@ -525,7 +530,7 @@ public class RefineryService implements DocumentEventListener {
                 int tokenCost = 0;
                 for (Future<BatchProcessResult> future : futures) {
                     BatchProcessResult result = future.get();
-                    tokenCost += result.getTokenCost();
+                    updateTaskStats(task.getId(), result.getTokenCost(), null, UPDATE_TYPE_INCREMENTAL);
                 }
 
                 task.setIncrementalTokenCost(task.getIncrementalTokenCost() + tokenCost);
@@ -669,5 +674,38 @@ public class RefineryService implements DocumentEventListener {
     // 添加任务提交方法
     public <T> Future<T> submitTask(Callable<T> task) {
         return batchProcessor.submit(task);
+    }
+
+    /**
+     * 同步更新任务状态
+     */
+    private synchronized void updateTaskStats(Long taskId, int tokenCost, Long paragraphId, String updateType) {
+        RefineryTaskDO task = refineryTaskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+
+        if (UPDATE_TYPE_INCREMENTAL.equals(updateType)) {
+            // 增量更新只更新token消耗
+            task.setIncrementalTokenCost(task.getIncrementalTokenCost() + tokenCost);
+        } else {
+            // 全量更新需要更新checkpoint和token消耗
+            task.setFullUpdateTokenCost(task.getFullUpdateTokenCost() + tokenCost);
+            if (paragraphId != null) {
+                task.setProcessingCheckpoint(paragraphId.toString());
+            }
+        }
+
+        task.setLastUpdateTime(LocalDateTime.now());
+        refineryTaskRepository.save(task);
+    }
+
+    /**
+     * 清除任务的checkpoint
+     */
+    private synchronized void clearTaskCheckpoint(Long taskId) {
+        RefineryTaskDO task = refineryTaskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+        task.setProcessingCheckpoint(null);
+        task.setLastUpdateTime(LocalDateTime.now());
+        refineryTaskRepository.save(task);
     }
 }
