@@ -368,11 +368,11 @@ export default class ReferenceHandler {
     }
   }
 
-  async refineBatch(currentBatch, message, requestContext) {
+  async refineBatch(currentBatch, message, requestContext, roundIndex, batchIndex) {
     const batchContent = currentBatch.join('\n\n--- 分割线 ---\n\n');
     const prompt = `请基于以下内容进行精炼，保留所有重要信息，包含事实，代码，链接，观点等关键信息，消除重复内容，保持逻辑连贯。要求：1. 保留所有重要信息 2. 消除重复内容 3. 保持逻辑连贯\n\n 参考内容： \n ${batchContent}\n\n请基于以上内容，精炼出所有有助于回答问题的有效信息：${message}`;
 
-    requestContext.sendSystemLog(`🔄 正在精炼内容...`);
+    requestContext.sendSystemLog(`🔄 第 ${roundIndex} 轮精炼，第 ${batchIndex} 个批次开始处理...`);
     let refinedAnswer;
     for (let j = 0; j < 3; j++) {
       try {
@@ -385,7 +385,7 @@ export default class ReferenceHandler {
     }
 
     if (refinedAnswer) {
-      requestContext.sendSystemLog('✅ 内容精炼完成');
+      requestContext.sendSystemLog(`✅ 第 ${roundIndex} 轮精炼，第 ${batchIndex} 个批次处理完成`);
       // 确保返回数组形式
       const result = refinedAnswer.join('').split('\n\n--- 分割线 ---\n\n');
       return Array.isArray(result) ? result : [result];
@@ -443,11 +443,12 @@ export default class ReferenceHandler {
       let currentBatch = [];
 
       // 按批次处理内容
+      let batchIndex = 1;
       for (const content of refinedContent) {
         if (currentBatch.join(' ').length + content.length <= this.MAX_CONTENT_SIZE) {
           currentBatch.push(content);
         } else {
-          const refinedBatch = await this.refineBatch(currentBatch, message, requestContext);
+          const refinedBatch = await this.refineBatch(currentBatch, message, requestContext, i + 1, batchIndex++);
           if (refinedBatch === null) {
             break;
           }
@@ -458,7 +459,7 @@ export default class ReferenceHandler {
 
       // 处理剩余的批次
       if (currentBatch.length > 0) {
-        const refinedBatch = await this.refineBatch(currentBatch, message, requestContext);
+        const refinedBatch = await this.refineBatch(currentBatch, message, requestContext, i + 1, batchIndex++);
         if (refinedBatch !== null) {
           newRefinedContent = newRefinedContent.concat(refinedBatch);
         }

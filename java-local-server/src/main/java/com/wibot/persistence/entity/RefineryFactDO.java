@@ -19,7 +19,7 @@ public class RefineryFactDO {
     @Column(nullable = false)
     private Long paragraphId; // 关联的段落ID
 
-    @Column(nullable = false, length = 4000)
+    @Column(nullable = false, length = 10000)
     private String fact; // 提取的事实内容
 
     @Column(nullable = false)

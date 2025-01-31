@@ -155,6 +155,20 @@ export default class RefineryHandler {
       throw new Error('目录路径和关键问题为必填项');
     }
 
+    // 处理目录路径中的/local前缀
+    if (taskData.directoryPath.startsWith('/local')) {
+      if (taskData.directoryPath.includes(':/')) {
+        // Windows 路径格式
+        taskData.directoryPath = taskData.directoryPath.substring(7); // 移除'/local/'
+        //还需要将路径中的'/'替换为'\\'
+        taskData.directoryPath = taskData.directoryPath.replace(/\//g, '\\');
+        
+      } else {
+        // Linux/Mac 路径格式
+        taskData.directoryPath = taskData.directoryPath.substring(6); // 移除'/local'
+      }
+    }
+
     try {
       const response = await fetch(`${this.BASE_URL}/api/refinery/task`, {
         method: 'POST',

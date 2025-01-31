@@ -50,11 +50,50 @@ public class DirectorySyncService {
         }
     }
 
-    private void syncDirectory(UserDirectoryIndexPO task) throws IOException {
+    public synchronized Map<String, Object> manualSync() {
+        logger.info("开始手动同步任务");
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            List<UserDirectoryIndexPO> completedTasks = indexRepository
+                    .findByIndexStatus(UserDirectoryIndexPO.STATUS_COMPLETED);
+
+            int totalDirs = completedTasks.size();
+            int successCount = 0;
+            List<String> failedDirs = new ArrayList<>();
+
+            for (UserDirectoryIndexPO task : completedTasks) {
+                try {
+                    syncDirectory(task);
+                    successCount++;
+                } catch (Exception e) {
+                    String errorMsg = "同步目录失败: " + task.getDirectoryPath();
+                    logger.error(errorMsg, e);
+                    failedDirs.add(task.getDirectoryPath());
+                }
+            }
+
+            result.put("success", true);
+            result.put("message", String.format("同步完成. 总目录数: %d, 成功: %d, 失败: %d",
+                    totalDirs, successCount, failedDirs.size()));
+            result.put("totalDirs", totalDirs);
+            result.put("successCount", successCount);
+            result.put("failedDirs", failedDirs);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "同步过程发生错误: " + e.getMessage());
+            logger.error("手动同步过程发生错误", e);
+        }
+
+        return result;
+    }
+
+    private synchronized void syncDirectory(UserDirectoryIndexPO task) throws IOException {
         String directoryPath = task.getDirectoryPath();
         Path dirPath = Paths.get(directoryPath);
 
-        // Modify the logic to get existing file records, separating normal files and ignored files
+        // Modify the logic to get existing file records, separating normal files and
+        // ignored files
         List<DocumentDataPO> existingDocs = documentDataRepository.findByFilePathStartingWith(directoryPath);
 
         // Process normal files and ignored files separately

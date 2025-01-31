@@ -363,10 +363,25 @@ export default class KnowledgeBaseHandler {
         row.insertCell(2).textContent = dir.ignoredCount;
         row.insertCell(3).textContent = dir.indexedCount;
         row.insertCell(4).textContent = dir.completionRate;
+        
+        // 操作列添加两个按钮
+        const actionsCell = row.insertCell(5);
         const deleteButton = document.createElement('button');
+        const syncNowButton = document.createElement('button');
+        
         deleteButton.textContent = '删除';
+        syncNowButton.textContent = '立即更新';
+        
         deleteButton.onclick = () => this.deleteMonitoredDir(dir.path);
-        row.insertCell(5).appendChild(deleteButton);
+        syncNowButton.onclick = () => this.syncNowMonitoredDir();
+        
+        // 设置按钮样式
+        deleteButton.className = 'btn btn-danger btn-sm';
+        syncNowButton.className = 'btn btn-primary btn-sm';
+        syncNowButton.style.marginLeft = '8px';
+        
+        actionsCell.appendChild(deleteButton);
+        actionsCell.appendChild(syncNowButton);
       });
     } catch (error) {
       console.warn('[本地索引服务] 更新监控目录失败:', error.message);
@@ -388,6 +403,26 @@ export default class KnowledgeBaseHandler {
           icon.classList.toggle('expanded');
         }
       });
+    }
+  }
+
+  // 新增立即更新方法
+  async syncNowMonitoredDir() {
+    try {
+      const response = await fetch(`${this.BASE_URL}/admin/sync-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await this.updateMonitoredDirs();
+        alert('手动同步已触发');
+      } else {
+        alert(data.message || '同步失败');
+      }
+    } catch (error) {
+      alert('同步失败: ' + error.message);
     }
   }
 }

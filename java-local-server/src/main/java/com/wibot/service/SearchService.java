@@ -89,35 +89,36 @@ public class SearchService {
     private MarkdownParagraphRepository markdownParagraphRepository;
 
     private final AtomicLong taskIdGenerator = new AtomicLong(0);
-    private final ExecutorService executorService = Executors.newFixedThreadPool(3, 
-        new ThreadFactory() {
-            private final AtomicInteger threadNumber = new AtomicInteger(1);
-            
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r);
-                thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
-                thread.setDaemon(false);
-                return thread;
-            }
-        });
+    private final ExecutorService executorService = Executors.newFixedThreadPool(3,
+            new ThreadFactory() {
+                private final AtomicInteger threadNumber = new AtomicInteger(1);
+
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r);
+                    thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
+                    thread.setDaemon(false);
+                    return thread;
+                }
+            });
 
     private final ExecutorService aiAnalysisExecutor = new ThreadPoolExecutor(
-        4, // 核心线程数为2
-        4, // 最大线程数为2
-        60L, // 空闲线程存活时间
-        TimeUnit.SECONDS,
-        new ArrayBlockingQueue<>(10), // 队列长度为10
-        new ThreadFactory() {
-            private final AtomicInteger threadNumber = new AtomicInteger(1);
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r);
-                thread.setName("AIAnalysis-Worker-" + threadNumber.getAndIncrement());
-                return thread;
-            }
-        },
-        new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时使用调用者线程执行
+            4, // 核心线程数为2
+            4, // 最大线程数为2
+            60L, // 空闲线程存活时间
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(10), // 队列长度为10
+            new ThreadFactory() {
+                private final AtomicInteger threadNumber = new AtomicInteger(1);
+
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r);
+                    thread.setName("AIAnalysis-Worker-" + threadNumber.getAndIncrement());
+                    return thread;
+                }
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时使用调用者线程执行
     );
 
     private static class TaskContext {
@@ -190,7 +191,6 @@ public class SearchService {
             };
             task.setResults(convertToMapList(results));
             setTaskStatus(task, CollectFactsTask.STATUS_COMPLETED);
-        
 
         } catch (Exception e) {
             logger.error("Error processing collect facts task: {}", task.getTaskId(), e);
@@ -302,7 +302,7 @@ public class SearchService {
 
         // 2. 确定策略并更新任务
         SimilarQuestionResult similarResult = null;
-        if (pathPrefix.endsWith("/") || pathPrefix.endsWith("\\"))  {
+        if (pathPrefix.endsWith("/") || pathPrefix.endsWith("\\")) {
             // 只有在目录模式下才检查相似问题
             similarResult = findSimilarQuestions(query);
             if (similarResult.hasSimilar) {
@@ -521,22 +521,21 @@ public class SearchService {
 
     private List<SearchResultVO> processNewQuestion(CollectFactsTask task) {
         task.addSystemLog("🔄 准备处理新问题查询...");
-        
+
         String pathPrefix = task.getPathPrefix();
         String pathWithWildcard = pathPrefix;
-        
+
         // 检查系统类型并使用对应的分隔符
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         String separator = isWindows ? "\\" : "/";
-        
+
         // 确保不以*结尾才添加通配符
         if (!pathWithWildcard.endsWith("*")) {
             // 根据是否以分隔符结尾决定如何添加通配符
-            pathWithWildcard = pathWithWildcard.endsWith(separator) ? 
-                pathWithWildcard + "*" : 
-                pathWithWildcard + separator + "*";
+            pathWithWildcard = pathWithWildcard.endsWith(separator) ? pathWithWildcard + "*"
+                    : pathWithWildcard + separator + "*";
         }
-        
+
         task.addSystemLog("🔍 使用通配路径进行查询: " + pathWithWildcard);
 
         List<SearchResultVO> results = fetchDocumentContent(task, pathWithWildcard);
@@ -561,7 +560,7 @@ public class SearchService {
 
     private List<SearchResultVO> fetchDocumentContent(CollectFactsTask task, String pathPrefix) {
         task.addSystemLog("📂 正在查找匹配的文档...");
-        
+
         // 处理带有通配符的路径
         List<DocumentDataPO> documentDataList;
         if (pathPrefix.contains("*")) {
@@ -586,72 +585,13 @@ public class SearchService {
         for (DocumentDataPO documentData : documentDataList) {
             processedDocs++;
             final int currentDoc = processedDocs;
-            
-            task.addSystemLog(String.format("📄 提交文档处理任务 (%d/%d): %s", 
-                currentDoc, documentDataList.size(), documentData.getFileName()));
+
+            task.addSystemLog(String.format("📄 提交文档处理任务 (%d/%d): %s",
+                    currentDoc, documentDataList.size(), documentData.getFileName()));
 
             // 为每个文档创建一个处理任务
-            Future<List<SearchResultVO>> docFuture = aiAnalysisExecutor.submit(() -> {
-                List<SearchResultVO> docResults = new ArrayList<>();
-                Long documentDataId = documentData.getId();
-                String title = documentData.getFileName();
-                
-                List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
-                task.addSystemLog(String.format("📝 文档 %s: 找到 %d 个段落需要分析，本步骤较慢，多等等哦", documentData.getFileName(), paragraphs.size()));
-
-                List<Map<String, Object>> batchInput = paragraphs.stream()
-                        .map(paragraph -> {
-                            Map<String, Object> content = new HashMap<>();
-                            content.put("id", paragraph.getId().toString());
-                            content.put("content", paragraph.getContent());
-                            return content;
-                        })
-                        .collect(Collectors.toList());
-                try {
-                    ExtractFactsResult result = refineryService.extractFactsFromContent(batchInput, task.getQuery());
-                    
-                    int relevantFacts = (int) result.getFacts().stream()
-                        .filter(fact -> !fact.getFact().isEmpty())
-                        .count();
-                    task.addSystemLog(String.format("✨ 文档 %s: AI分析完成，找到 %d 个相关内容", documentData.getFileName(), relevantFacts));
-
-                    Map<Long, String> summaryMap = result.getFacts().stream()
-                            .collect(Collectors.toMap(
-                                    fact -> Long.parseLong(fact.getId()),
-                                    ExtractedFact::getFact,
-                                    (existing, replacement) -> existing
-                            ));
-
-                    docResults.addAll(paragraphs.stream()
-                            .map(paragraph -> new SearchResultVO(
-                                    paragraph.getId(),
-                                    title,
-                                    summaryMap.getOrDefault(paragraph.getId(), ""),
-                                    paragraph.getCreatedDateTime(),
-                                    documentData.getFilePath()))
-                            .filter(searchResult -> {
-                                String description = searchResult.getDescription();
-                                return description != null && !description.isEmpty();
-                            })
-                            .collect(Collectors.toList()));
-
-                } catch (Exception e) {
-                    task.addSystemLog(String.format("⚠️ 文档 %s: 处理出错: %s", documentData.getFileName(), e.getMessage()));
-                    logger.error("Error processing document {}: {}", documentData.getFilePath(), e.getMessage());
-                    
-                    // 发生错误时返回空描述的结果
-                    docResults.addAll(paragraphs.stream()
-                            .map(paragraph -> new SearchResultVO(
-                                    paragraph.getId(),
-                                    title,
-                                    "",
-                                    paragraph.getCreatedDateTime(),
-                                    documentData.getFilePath()))
-                            .collect(Collectors.toList()));
-                }
-                
-                return docResults;
-            });
+            Future<List<SearchResultVO>> docFuture = aiAnalysisExecutor
+                    .submit(() -> processDocument(documentData, task, 0));
 
             documentFutures.add(docFuture);
         }
@@ -674,5 +614,86 @@ public class SearchService {
     private List<DocumentDataPO> findDocumentsWithWildcard(String pathPrefix) {
         String sqlPattern = pathPrefix.replace("\\", "\\\\").replace("*", "%");
         return documentDataRepository.findByFilePathLike(sqlPattern);
+    }
+
+    // 添加重试相关的常量
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 1000; // 1秒延迟
+
+    // 添加处理单个文档的方法
+    private List<SearchResultVO> processDocument(DocumentDataPO documentData, CollectFactsTask task, int retryCount) {
+        List<SearchResultVO> docResults = new ArrayList<>();
+        Long documentDataId = documentData.getId();
+        String title = documentData.getFileName();
+
+        try {
+            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
+            task.addSystemLog(
+                    String.format("📝 文档 %s: 找到 %d 个段落需要分析，本步骤较慢，多等等哦", documentData.getFileName(), paragraphs.size()));
+
+            List<Map<String, Object>> batchInput = paragraphs.stream()
+                    .map(paragraph -> {
+                        Map<String, Object> content = new HashMap<>();
+                        content.put("id", paragraph.getId().toString());
+                        content.put("content", paragraph.getContent());
+                        return content;
+                    })
+                    .collect(Collectors.toList());
+
+            ExtractFactsResult result = refineryService.extractFactsFromContent(batchInput, task.getQuery());
+
+            int relevantFacts = (int) result.getFacts().stream()
+                    .filter(fact -> !fact.getFact().isEmpty())
+                    .count();
+            task.addSystemLog(String.format("✨ 文档 %s: AI分析完成，找到 %d 个相关内容", documentData.getFileName(), relevantFacts));
+
+            Map<Long, String> summaryMap = result.getFacts().stream()
+                    .collect(Collectors.toMap(
+                            fact -> Long.parseLong(fact.getId()),
+                            ExtractedFact::getFact,
+                            (existing, replacement) -> existing));
+
+            return paragraphs.stream()
+                    .map(paragraph -> new SearchResultVO(
+                            paragraph.getId(),
+                            title,
+                            summaryMap.getOrDefault(paragraph.getId(), ""),
+                            paragraph.getCreatedDateTime(),
+                            documentData.getFilePath()))
+                    .filter(searchResult -> {
+                        String description = searchResult.getDescription();
+                        return description != null && !description.isEmpty();
+                    })
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            if (retryCount < MAX_RETRIES) {
+                task.addSystemLog(String.format("⚠️ 文档 %s: 处理出错 (第%d次重试): %s",
+                        documentData.getFileName(), retryCount + 1, e.getMessage()));
+                try {
+                    Thread.sleep(RETRY_DELAY_MS * (retryCount + 1)); // 递增延迟
+                    return processDocument(documentData, task, retryCount + 1);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("处理被中断", ie);
+                }
+            }
+
+            task.addSystemLog(String.format("❌ 文档 %s: 处理失败 (已重试%d次): %s",
+                    documentData.getFileName(), retryCount, e.getMessage()));
+            logger.error("Error processing document {} after {} retries: {}",
+                    documentData.getFilePath(), retryCount, e.getMessage());
+
+            // 所有重试都失败后，返回空描述的结果
+            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
+            return paragraphs.stream()
+                    .map(paragraph -> new SearchResultVO(
+                            paragraph.getId(),
+                            title,
+                            "",
+                            paragraph.getCreatedDateTime(),
+                            documentData.getFilePath()))
+                    .collect(Collectors.toList());
+        }
     }
 }

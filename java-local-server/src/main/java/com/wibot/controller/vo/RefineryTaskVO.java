@@ -3,56 +3,123 @@ package com.wibot.controller.vo;
 import java.time.LocalDateTime;
 
 public class RefineryTaskVO {
-    private Long id;                     // 任务ID
-    private String directoryPath;          // 作用目录（递归）
-    private String keyQuestion;            // 关键问题
-    private int coveredFileCount;          // 涵盖文件数
-    private int fullUpdateTokenCost;       // 上次全量更新所消耗token估算
-    private int incrementalTokenCost;      // 上次增量更新所消耗token估算
-    private int hitCount;                  // 命中次数
-    private LocalDateTime lastUpdateTime;   // 最后更新日期
-    private LocalDateTime createTime;       // 创建日期
-    private String status;                 // 当前状态（活跃/处理中/失败）
+    private Long id; // 任务ID
+    private String directoryPath; // 作用目录（递归）
+    private String keyQuestion; // 关键问题
+    private int coveredFileCount; // 涵盖文件数
+    private int fullUpdateTokenCost; // 上次全量更新所消耗token估算
+    private int incrementalTokenCost; // 上次增量更新所消耗token估算
+    private int hitCount; // 命中次数
+    private LocalDateTime lastUpdateTime; // 最后更新日期
+    private LocalDateTime createTime; // 创建日期
+    private String status; // 当前状态（活跃/处理中/失败）
     private String errorMessage;
     private String processingCheckpoint;
+    private String message; // 添加消息字段
 
     // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getDirectoryPath() { return directoryPath; }
-    public void setDirectoryPath(String directoryPath) { this.directoryPath = directoryPath; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getKeyQuestion() { return keyQuestion; }
-    public void setKeyQuestion(String keyQuestion) { this.keyQuestion = keyQuestion; }
+    public String getDirectoryPath() {
+        return directoryPath;
+    }
 
-    public int getCoveredFileCount() { return coveredFileCount; }
-    public void setCoveredFileCount(int coveredFileCount) { this.coveredFileCount = coveredFileCount; }
+    public void setDirectoryPath(String directoryPath) {
+        this.directoryPath = directoryPath;
+    }
 
-    public int getFullUpdateTokenCost() { return fullUpdateTokenCost; }
-    public void setFullUpdateTokenCost(int fullUpdateTokenCost) { this.fullUpdateTokenCost = fullUpdateTokenCost; }
+    public String getKeyQuestion() {
+        return keyQuestion;
+    }
 
-    public int getIncrementalTokenCost() { return incrementalTokenCost; }
-    public void setIncrementalTokenCost(int incrementalTokenCost) { this.incrementalTokenCost = incrementalTokenCost; }
+    public void setKeyQuestion(String keyQuestion) {
+        this.keyQuestion = keyQuestion;
+    }
 
-    public int getHitCount() { return hitCount; }
-    public void setHitCount(int hitCount) { this.hitCount = hitCount; }
+    public int getCoveredFileCount() {
+        return coveredFileCount;
+    }
 
-    public LocalDateTime getLastUpdateTime() { return lastUpdateTime; }
-    public void setLastUpdateTime(LocalDateTime lastUpdateTime) { this.lastUpdateTime = lastUpdateTime; }
+    public void setCoveredFileCount(int coveredFileCount) {
+        this.coveredFileCount = coveredFileCount;
+    }
 
-    public LocalDateTime getCreateTime() { return createTime; }
-    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
+    public int getFullUpdateTokenCost() {
+        return fullUpdateTokenCost;
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public void setFullUpdateTokenCost(int fullUpdateTokenCost) {
+        this.fullUpdateTokenCost = fullUpdateTokenCost;
+    }
 
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    
-    public String getProcessingCheckpoint() { return processingCheckpoint; }
-    public void setProcessingCheckpoint(String processingCheckpoint) { 
-        this.processingCheckpoint = processingCheckpoint; 
+    public int getIncrementalTokenCost() {
+        return incrementalTokenCost;
+    }
+
+    public void setIncrementalTokenCost(int incrementalTokenCost) {
+        this.incrementalTokenCost = incrementalTokenCost;
+    }
+
+    public int getHitCount() {
+        return hitCount;
+    }
+
+    public void setHitCount(int hitCount) {
+        this.hitCount = hitCount;
+    }
+
+    public LocalDateTime getLastUpdateTime() {
+        return lastUpdateTime;
+    }
+
+    public void setLastUpdateTime(LocalDateTime lastUpdateTime) {
+        this.lastUpdateTime = lastUpdateTime;
+    }
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public String getProcessingCheckpoint() {
+        return processingCheckpoint;
+    }
+
+    public void setProcessingCheckpoint(String processingCheckpoint) {
+        this.processingCheckpoint = processingCheckpoint;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 
 }

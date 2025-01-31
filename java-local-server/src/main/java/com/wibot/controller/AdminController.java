@@ -10,6 +10,7 @@ import com.wibot.service.DirectoryManagementService;
 import com.wibot.service.FileTypeConfigurationService;
 import com.wibot.service.RemoteUploadService;
 import com.wibot.service.SystemConfigService;
+import com.wibot.service.DirectorySyncService;
 import java.util.Map;
 import java.util.List;
 import org.slf4j.Logger;
@@ -31,30 +32,32 @@ public class AdminController {
 
     @Autowired
     private FileTypeConfigurationService modelEnhancementService;
-    
+
     @Autowired
     private RemoteUploadService remoteUploadService;
 
-    @GetMapping("/chatClient")
-    public String chatPage() {
-        return "chat";
-    }
+    @Autowired
+    private DirectorySyncService directorySyncService;
 
-    @GetMapping("/")
-    public String home() {
-        return "chat";
-    }
+    // @GetMapping("/chatClient")
+    // public String chatPage() {
+    // return "chat";
+    // }
+
+    // @GetMapping("/")
+    // public String home() {
+    // return "chat";
+    // }
 
     // @GetMapping("/admin")
     // public String adminPage() {
-    //     return "admin";
+    // return "admin";
     // }
-
 
     // @GetMapping("/index/status")
     // @ResponseBody
     // public Map<String, Object> getIndexStatus(@RequestParam String path) {
-    //     return directoryManagementService.getIndexStatus(path);
+    // return directoryManagementService.getIndexStatus(path);
     // }
 
     // 获取监控目录列表
@@ -79,11 +82,13 @@ public class AdminController {
 
     // @GetMapping("/upload")
     // public String uploadPage() {
-    //     boolean enabled = systemConfigService.getBooleanValue(SystemConfigService.CONFIG_REMOTE_UPLOAD_ENABLED, false);
-    //     if (!enabled) {
-    //         return "redirect:/admin"; // 如果功能未启用，重定向到管理页面
-    //     }
-    //     return "upload";
+    // boolean enabled =
+    // systemConfigService.getBooleanValue(SystemConfigService.CONFIG_REMOTE_UPLOAD_ENABLED,
+    // false);
+    // if (!enabled) {
+    // return "redirect:/admin"; // 如果功能未启用，重定向到管理页面
+    // }
+    // return "upload";
     // }
 
     @PostMapping("/admin/uploadFile")
@@ -105,7 +110,7 @@ public class AdminController {
     public Map<String, Object> getAK() {
         return apiKeyService.getAK();
     }
-    
+
     @PostMapping("/admin/submit/path")
     @ResponseBody
     public Map<String, Object> handlePathSubmission(@RequestBody Map<String, String> request) {
@@ -136,5 +141,11 @@ public class AdminController {
     @ResponseBody
     public Map<String, Object> getCurrentIndexSettings() {
         return modelEnhancementService.getCurrentIndexSettings();
+    }
+
+    @PostMapping("/admin/sync-now")
+    @ResponseBody
+    public Map<String, Object> syncNow() {
+        return directorySyncService.manualSync();
     }
 }

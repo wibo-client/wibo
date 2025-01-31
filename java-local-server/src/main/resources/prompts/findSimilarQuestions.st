@@ -6,15 +6,15 @@
 {historyQuestions}
 
 请按照以下JSON格式返回结果：
-{
+\{
     "similarQuestions": [
-        {
+        \{
             "taskId": "历史问题ID",
             "similarity": "相似度(0-100)",
             "reason": "简要说明相似原因"
-        }
+        \}
     ]
-}
+\}
 
 注意：
 1. 只返回相似度大于70的问题

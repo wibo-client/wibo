@@ -93,7 +93,7 @@ public class RefineryService implements DocumentEventListener {
             new ArrayBlockingQueue<>(200), // 队列大小为200
             new ThreadFactory() {
                 private final AtomicInteger threadNumber = new AtomicInteger(1);
-                
+
                 @Override
                 public Thread newThread(Runnable r) {
                     Thread thread = new Thread(r);
@@ -102,10 +102,23 @@ public class RefineryService implements DocumentEventListener {
                     return thread;
                 }
             },
-            new ThreadPoolExecutor.AbortPolicy()
-    );
+            new ThreadPoolExecutor.AbortPolicy());
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
+        // 检查是否已存在相同的任务
+        Optional<RefineryTaskDO> existingTask = refineryTaskRepository
+                .findAll()
+                .stream()
+                .filter(task -> task.getDirectoryPath().equals(taskVO.getDirectoryPath())
+                        && task.getKeyQuestion().equals(taskVO.getKeyQuestion()))
+                .findFirst();
+
+        if (existingTask.isPresent()) {
+            RefineryTaskVO existingVO = convertToVO(existingTask.get());
+            existingVO.setMessage("任务已存在，请勿重复创建");
+            return existingVO;
+        }
+
         // 转换VO到DO
         RefineryTaskDO taskDO = new RefineryTaskDO();
         taskDO.setDirectoryPath(taskVO.getDirectoryPath());
@@ -195,15 +208,16 @@ public class RefineryService implements DocumentEventListener {
             }
 
             // 获取所有任务的Future
-            List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
-            
+            List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(),
+                    task);
+
             // 等待所有任务完成并计算总消耗
             int totalTokenCost = 0;
             for (Future<BatchProcessResult> future : futures) {
                 BatchProcessResult result = future.get();
                 totalTokenCost += result.getTokenCost();
             }
-            
+
             task.setFullUpdateTokenCost(totalTokenCost);
             refineryTaskRepository.save(task);
 
@@ -212,10 +226,11 @@ public class RefineryService implements DocumentEventListener {
         }
     }
 
-    private List<Future<BatchProcessResult>> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs, String question, RefineryTaskDO task) {
+    private List<Future<BatchProcessResult>> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs,
+            String question, RefineryTaskDO task) {
         List<Future<BatchProcessResult>> futures = new ArrayList<>();
         int batchIndex = 1;
-        
+
         // 只创建和提交任务,不等待结果
         for (MarkdownParagraphPO paragraph : paragraphs) {
             Map<String, Object> reference = new HashMap<>();
@@ -228,9 +243,9 @@ public class RefineryService implements DocumentEventListener {
             try {
                 String jsonStr = objectMapper.writeValueAsString(reference);
                 List<Map<String, Object>> singleItemBatch = Collections.singletonList(reference);
-                
+
                 Future<BatchProcessResult> future = batchProcessor.submit(
-                    new BatchProcessTask(singleItemBatch, question, task, batchIndex, this));
+                        new BatchProcessTask(singleItemBatch, question, task, batchIndex, this));
                 futures.add(future);
 
                 batchIndex++;
@@ -325,7 +340,7 @@ public class RefineryService implements DocumentEventListener {
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
                     String response = singletonLLMChat.getChatClient()
-                            .prompt(prompt) 
+                            .prompt(prompt)
                             .call()
                             .content();
 
@@ -357,7 +372,7 @@ public class RefineryService implements DocumentEventListener {
     /**
      * 修改后的处理方法，使用新的公共方法
      */
-    public synchronized int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question,
+    public int processBatchAndGetTokenCost(List<Map<String, Object>> batch, String question,
             Long taskId, int batchIndex) {
         try {
             ExtractFactsResult result = extractFactsFromContent(batch, question);
@@ -505,13 +520,14 @@ public class RefineryService implements DocumentEventListener {
                 }
 
                 // 获取所有future并等待完成
-                List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(), task);
+                List<Future<BatchProcessResult>> futures = extractFactsFromParagraph(paragraphs, task.getKeyQuestion(),
+                        task);
                 int tokenCost = 0;
                 for (Future<BatchProcessResult> future : futures) {
                     BatchProcessResult result = future.get();
                     tokenCost += result.getTokenCost();
                 }
-                
+
                 task.setIncrementalTokenCost(task.getIncrementalTokenCost() + tokenCost);
                 task.setLastUpdateTime(LocalDateTime.now());
                 refineryTaskRepository.save(task);
