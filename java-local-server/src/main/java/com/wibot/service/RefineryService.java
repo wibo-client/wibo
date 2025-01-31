@@ -102,7 +102,7 @@ public class RefineryService implements DocumentEventListener {
                     return thread;
                 }
             },
-            new ThreadPoolExecutor.AbortPolicy());
+            new ThreadPoolExecutor.CallerRunsPolicy());
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
         // 检查是否已存在相同的任务
@@ -244,7 +244,7 @@ public class RefineryService implements DocumentEventListener {
                 String jsonStr = objectMapper.writeValueAsString(reference);
                 List<Map<String, Object>> singleItemBatch = Collections.singletonList(reference);
 
-                Future<BatchProcessResult> future = batchProcessor.submit(
+                Future<BatchProcessResult> future = submitTask(
                         new BatchProcessTask(singleItemBatch, question, task, batchIndex, this));
                 futures.add(future);
 
@@ -664,5 +664,10 @@ public class RefineryService implements DocumentEventListener {
             batchProcessor.shutdownNow();
             Thread.currentThread().interrupt();
         }
+    }
+
+    // 添加任务提交方法
+    public <T> Future<T> submitTask(Callable<T> task) {
+        return batchProcessor.submit(task);
     }
 }

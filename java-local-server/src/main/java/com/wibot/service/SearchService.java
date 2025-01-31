@@ -102,25 +102,6 @@ public class SearchService {
                 }
             });
 
-    private final ExecutorService aiAnalysisExecutor = new ThreadPoolExecutor(
-            4, // 核心线程数为2
-            4, // 最大线程数为2
-            60L, // 空闲线程存活时间
-            TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(10), // 队列长度为10
-            new ThreadFactory() {
-                private final AtomicInteger threadNumber = new AtomicInteger(1);
-
-                @Override
-                public Thread newThread(Runnable r) {
-                    Thread thread = new Thread(r);
-                    thread.setName("AIAnalysis-Worker-" + threadNumber.getAndIncrement());
-                    return thread;
-                }
-            },
-            new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时使用调用者线程执行
-    );
-
     private static class TaskContext {
         final CollectFactsTask task;
         final Future<?> future;
@@ -142,15 +123,6 @@ public class SearchService {
             }
         } catch (InterruptedException e) {
             executorService.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-        aiAnalysisExecutor.shutdown();
-        try {
-            if (!aiAnalysisExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
-                aiAnalysisExecutor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            aiAnalysisExecutor.shutdownNow();
             Thread.currentThread().interrupt();
         }
     }
@@ -590,8 +562,8 @@ public class SearchService {
                     currentDoc, documentDataList.size(), documentData.getFileName()));
 
             // 为每个文档创建一个处理任务
-            Future<List<SearchResultVO>> docFuture = aiAnalysisExecutor
-                    .submit(() -> processDocument(documentData, task, 0));
+            Future<List<SearchResultVO>> docFuture = refineryService.submitTask(
+                    () -> processDocument(documentData, task, 0));
 
             documentFutures.add(docFuture);
         }
