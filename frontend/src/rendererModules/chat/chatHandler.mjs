@@ -56,7 +56,7 @@ export default class ChatHandler {
       const currentScrollTop = feedbackBox.scrollTop;
 
       // 检测是否向上滚动到接近顶部
-      if (currentScrollTop < lastScrollTop && currentScrollTop < 0 && !this.loadingHistory) {
+      if (currentScrollTop < lastScrollTop && currentScrollTop <= 0 && !this.loadingHistory) {
         await this.loadMoreHistory(feedbackBox);
       }
 
@@ -159,6 +159,8 @@ export default class ChatHandler {
     const messageGroup = document.createElement('div');
     messageGroup.className = 'message-group';
     messageGroup.setAttribute('data-message-id', messageData.id); // 改用 id 而不是 timestamp
+    // 添加path信息到data属性
+    messageGroup.setAttribute('data-path', messageData.path || '');
     messageGroup.innerHTML = messageData.html;
     return messageGroup;
   }
@@ -453,6 +455,8 @@ export default class ChatHandler {
       messageGroup.className = 'message-group';
       const messageId = uuidv4(); // 使用UUID替代timestamp
       messageGroup.setAttribute('data-message-id', messageId);  // 使用data-message-id属性
+      // 添加path到data属性
+      messageGroup.setAttribute('data-path', path);
 
       // 用户输入信息
       const userMessageElement = document.createElement('div');
@@ -667,7 +671,7 @@ export default class ChatHandler {
         id: messageId,  // 添加UUID作为消息ID
         timestamp: Date.now(),  // 保留timestamp用于显示时间
         type: type,
-        path: path,
+        path: path,  // 确保path被包含在messageData中
         html: messageGroup.innerHTML
       };
 
@@ -805,8 +809,18 @@ export default class ChatHandler {
         if (!userMessage) return;
 
         const message = userMessage.textContent.replace(/^### 你 : /, '').trim();
-        const pathInput = document.getElementById('pathInput');
-        const path = pathInput ? pathInput.value : '';
+        // 从data属性获取path
+        const path = messageGroup.getAttribute('data-path');
+        
+        if (!path) {
+          console.error('未找到目录路径信息');
+          const systemContent = e.target.closest('.message.system').querySelector('.system-content');
+          const logElement = document.createElement('div');
+          logElement.className = 'execution-log';
+          logElement.textContent = '❌ 未找到目录路径信息，无法设置常问问题';
+          systemContent.appendChild(logElement);
+          return;
+        }
         
         const systemContent = e.target.closest('.message.system').querySelector('.system-content');
 
@@ -818,7 +832,6 @@ export default class ChatHandler {
 
           await window.refineryHandler.addRefineryTask(taskData);
           
-          // 添加或更新执行日志
           const logElement = document.createElement('div');
           logElement.className = 'execution-log';
           logElement.textContent = '✅ 已成功设置为常问问题';
@@ -827,7 +840,6 @@ export default class ChatHandler {
           console.error('设置常问问题失败:', error);
           const errorMessage = error.message || '设置常问问题失败';
           
-          // 添加或更新执行日志
           const logElement = document.createElement('div');
           logElement.className = 'execution-log';
           logElement.textContent = `❌ ${errorMessage}`;

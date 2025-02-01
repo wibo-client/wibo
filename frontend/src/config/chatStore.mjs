@@ -8,7 +8,7 @@ class ChatStore {
     });
   }
 
-  addMessage(message) {
+addMessage(message) {
     let messages = this.store.get('messages', []);
     const MAX_MESSAGES = 200;
     
