@@ -14,6 +14,7 @@ export default class ChatHandler {
     this.historyIndex = -1;          // 添加历史索引
     this.currentInput = '';          // 添加当前输入缓存
     this.setupContextMenuHandler();
+    this.setupGlobalFaqListener();
   }
 
   async loadInitialHistory() {
@@ -495,24 +496,6 @@ export default class ChatHandler {
         }
       });
 
-      // 添加设为常问的点击处理
-      const systemFaq = systemMessageElement.querySelector('.system-faq');
-      systemFaq.addEventListener('click', async () => {
-        try {
-          const taskData = {
-            directoryPath: path,
-            keyQuestion: message
-          };
-
-          await window.refineryHandler.addRefineryTask(taskData);
-          systemContent.querySelector('.execution-log:last-child').textContent = '✅ 已成功设置为常问问题';
-        } catch (error) {
-          console.error('设置常问问题失败:', error);
-          const errorMessage = error.message || '设置常问问题失败';
-          systemContent.querySelector('.execution-log:last-child').textContent = `❌ ${errorMessage}`;
-        }
-      });
-
       // 修改展开/折叠功能的绑定方式
       const toggleSystemContent = () => {
         systemContent.classList.toggle('expanded');
@@ -809,5 +792,48 @@ export default class ChatHandler {
     } catch (error) {
       console.error('清空消息失败:', error);
     }
+  }
+
+  // 添加新方法处理全局FAQ点击
+  setupGlobalFaqListener() {
+    document.getElementById('messages').addEventListener('click', async (e) => {
+      if (e.target.classList.contains('system-faq')) {
+        const messageGroup = e.target.closest('.message-group');
+        if (!messageGroup) return;
+
+        const userMessage = messageGroup.querySelector('.message.user');
+        if (!userMessage) return;
+
+        const message = userMessage.textContent.replace(/^### 你 : /, '').trim();
+        const pathInput = document.getElementById('pathInput');
+        const path = pathInput ? pathInput.value : '';
+        
+        const systemContent = e.target.closest('.message.system').querySelector('.system-content');
+
+        try {
+          const taskData = {
+            directoryPath: path,
+            keyQuestion: message
+          };
+
+          await window.refineryHandler.addRefineryTask(taskData);
+          
+          // 添加或更新执行日志
+          const logElement = document.createElement('div');
+          logElement.className = 'execution-log';
+          logElement.textContent = '✅ 已成功设置为常问问题';
+          systemContent.appendChild(logElement);
+        } catch (error) {
+          console.error('设置常问问题失败:', error);
+          const errorMessage = error.message || '设置常问问题失败';
+          
+          // 添加或更新执行日志
+          const logElement = document.createElement('div');
+          logElement.className = 'execution-log';
+          logElement.textContent = `❌ ${errorMessage}`;
+          systemContent.appendChild(logElement);
+        }
+      }
+    });
   }
 }

@@ -9,21 +9,30 @@ class ChatStore {
   }
 
   addMessage(message) {
-    const messages = this.store.get('messages', []);
+    let messages = this.store.get('messages', []);
+    const MAX_MESSAGES = 200;
+    
+    // 如果消息数量超过限制，删除最早的消息
+    if (messages.length >= MAX_MESSAGES) {
+        messages = messages.slice(messages.length - MAX_MESSAGES + 1);
+    }
+    
     const messageWithId = {
-      ...message,
-      // 如果消息已经有id就用现有的,否则生成新的UUID
-      id: message.id || uuidv4()
+        ...message,
+        id: message.id || uuidv4()
     };
-    messages.unshift(messageWithId);
+    
+    messages.push(messageWithId);
     this.store.set('messages', messages);
-    return messageWithId;  // 返回带ID的消息
-  }
+    return messageWithId;
+}
 
   getMessages(offset = 0, limit = 5) {
     const messages = this.store.get('messages', []);
-    return messages.slice(offset, offset + limit);
-  }
+    const reversedMessages = messages.slice().reverse();  // 先反转一次
+    const slicedMessages = reversedMessages.slice(offset, offset + limit); // 截取需要的部分
+    return slicedMessages.slice().reverse(); // 再反转回来
+}
 
   deleteMessage(messageId) {
     const messages = this.store.get('messages', []);
