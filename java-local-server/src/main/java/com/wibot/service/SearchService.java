@@ -15,7 +15,6 @@ import com.wibot.utils.JsonExtractor;
 
 import jakarta.annotation.PreDestroy;
 
-import com.wibot.index.DocumentIndexInterface;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
@@ -30,7 +29,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.time.LocalDateTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,9 +39,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.ArrayBlockingQueue;
-
 import java.util.stream.Collectors;
 
 import com.wibot.persistence.DocumentDataRepository;
@@ -51,8 +46,6 @@ import com.wibot.persistence.MarkdownParagraphRepository;
 import com.wibot.controller.vo.SearchResultVO;
 import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
-
-import org.springframework.scheduling.annotation.Scheduled;
 
 @Service
 public class SearchService {
@@ -67,8 +60,8 @@ public class SearchService {
     @Autowired
     private RefineryFactRepository refineryFactRepository;
 
-    @Autowired
-    private DocumentIndexInterface documentIndexInterface;
+    // @Autowired
+    // private DocumentIndexInterface documentIndexInterface;
 
     @Autowired
     private RefineryService refineryService;
@@ -477,6 +470,10 @@ public class SearchService {
                     results.add(searchResult);
                     processedParagraphIds.add(fact.getParagraphId());
                 }
+                RefineryTaskDO similarTask = refineryTaskRepository.findById(taskId)
+                        .orElseThrow(() -> new RuntimeException("Similar task not found: " + taskId));
+                similarTask.setHitCount(similarTask.getHitCount() + 1);
+                refineryTaskRepository.save(similarTask);
             }
 
             // 修改排序规则：按照ID正序排序

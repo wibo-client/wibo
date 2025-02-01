@@ -80,34 +80,37 @@ public class DocumentIndexService {
         return success;
     }
 
-    /**
-     * 为提炼任务构建索引文档
-     * 
-     * @param taskId      任务ID
-     * @param fact        提取的事实
-     * @param content     原始内容
-     * @param filePath    文件路径
-     * @param paragraphId 段落ID
-     */
-    public void buildRefineryTaskIndex(Long taskId, String fact, Long paragraphId) {
-        String threadName = Thread.currentThread().getName();
-        try {
-            logger.debug("Thread {} building refinery task index for task: {}, paragraph: {}",
-                    threadName, taskId, paragraphId);
+    // /**
+    // * 为提炼任务构建索引文档
+    // *
+    // * @param taskId 任务ID
+    // * @param fact 提取的事实
+    // * @param content 原始内容
+    // * @param filePath 文件路径
+    // * @param paragraphId 段落ID
+    // */
+    // public void buildRefineryTaskIndex(Long taskId, String fact, Long
+    // paragraphId) {
+    // String threadName = Thread.currentThread().getName();
+    // try {
+    // logger.debug("Thread {} building refinery task index for task: {}, paragraph:
+    // {}",
+    // threadName, taskId, paragraphId);
 
-            // 只保留必要的字段：文档ID、任务ID和事实内容
-            DocumentBuilder builder = new DocumentBuilder(String.valueOf(paragraphId))
-                    .withRefineryTask(taskId)
-                    .withFact(fact);
+    // // 只保留必要的字段：文档ID、任务ID和事实内容
+    // DocumentBuilder builder = new DocumentBuilder(String.valueOf(paragraphId))
+    // .withRefineryTask(taskId)
+    // .withFact(fact);
 
-            index.insertOrUpdateByParagraphId(builder);
+    // index.insertOrUpdateByParagraphId(builder);
 
-        } catch (Exception e) {
-            logger.error("Thread {} failed to build refinery task index for task: {}, paragraph: {}",
-                    threadName, taskId, paragraphId, e);
-            throw new RuntimeException("Failed to build refinery task index", e);
-        }
-    }
+    // } catch (Exception e) {
+    // logger.error("Thread {} failed to build refinery task index for task: {},
+    // paragraph: {}",
+    // threadName, taskId, paragraphId, e);
+    // throw new RuntimeException("Failed to build refinery task index", e);
+    // }
+    // }
 
     /**
      * 删除提炼任务相关的索引

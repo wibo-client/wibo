@@ -60,4 +60,7 @@ public interface RefineryTaskRepository extends JpaRepository<RefineryTaskDO, Lo
 
     // 添加新方法：根据目录路径和状态查找任务
     List<RefineryTaskDO> findByDirectoryPathLikeAndStatus(String directoryPath, String status);
+
+    // 添加新方法：根据目录路径和状态查找任务
+    List<RefineryTaskDO> findByDirectoryPathLike(String directoryPath);
 }

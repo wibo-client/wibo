@@ -273,24 +273,19 @@ export default class RefineryHandler {
 
         // 创建操作按钮
         const updateFullBtn = document.createElement('button');
-        const updateIncrBtn = document.createElement('button');
         const deleteBtn = document.createElement('button');
 
         updateFullBtn.textContent = '全量更新';
-        updateIncrBtn.textContent = '增量更新';
         deleteBtn.textContent = '删除';
 
         updateFullBtn.className = 'btn btn-sm btn-primary action-btn update-full';
-        updateIncrBtn.className = 'btn btn-sm btn-info action-btn update-incremental';
         deleteBtn.className = 'btn btn-sm btn-danger action-btn delete-btn';
 
         updateFullBtn.onclick = () => this.updateRefineryTask(task.id, 'full');
-        updateIncrBtn.onclick = () => this.updateRefineryTask(task.id, 'incremental');
         deleteBtn.onclick = () => this.confirmAndDeleteTask(task.id);
 
         // 将按钮添加到容器中
         actionButtons.appendChild(updateFullBtn);
-        actionButtons.appendChild(updateIncrBtn);
         actionButtons.appendChild(deleteBtn);
 
         // 将容器添加到单元格中
