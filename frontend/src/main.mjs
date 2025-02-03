@@ -136,16 +136,6 @@ app.whenReady().then(async () => {
       true,
       (chunk) => sendLLMStream(chunk)
     );
-    // try {
-    //   const serverInfo = await globalContext.localServerManager.getCurrentServerInfo();
-    //   if (!serverInfo.isHealthy || !serverInfo.port) {
-    //     throw new Error('本地服务器未启动,请在管理界面中启动本地知识库服务');
-    //   }
-    //   await globalContext.referenceHandler.callLLMRemoteAsync(messages, sendSystemLog, sendLLMStream);
-    // } catch (error) {
-    //   console.error('LLM call failed:', error);
-    //   throw error;
-    // }
   }
 
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
@@ -185,17 +175,17 @@ app.whenReady().then(async () => {
 
       if (type === 'search') {
         requestContext.sendSystemLog('🔍 进入直接搜索...');
-        await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
-        await globalContext.referenceHandler.buildSearchResultsString(message, path, requestContext);
+        await selectedPlugin.searchAndRerank(message, path, requestContext);
+        await selectedPlugin.buildSearchResultsString(message, path, requestContext);
         requestContext.sendLLMStream(requestContext.results.markdownResult);
         requestContext.sendSystemLog('✅ 搜索完成');
 
       } else if (type === 'highQuilityRAGChat') {
         requestContext.sendSystemLog('🔍 进入深问模式，大模型会遍历所有的文档片段，回答将更全面，但消耗的token相对较多，时间较慢');
-
-        await globalContext.referenceHandler.collectFacts(message, path, requestContext);
-
-        await globalContext.referenceHandler.refineParsedFacts(message, path, requestContext);
+        requestContext.checkAborted();
+        await selectedPlugin.collectFacts(message, path, requestContext);
+        requestContext.checkAborted();
+        await selectedPlugin.refineParsedFacts(message, path, requestContext);
         requestContext.checkAborted();
 
         const finalPrompt = `请基于以下参考内容回答问题：
@@ -210,20 +200,20 @@ app.whenReady().then(async () => {
           requestContext.sendLLMStream
         );
 
-        await globalContext.referenceHandler.buildReferenceData(message, path, requestContext);
+        await selectedPlugin.buildReferenceData(message, path, requestContext);
         requestContext.sendReference(requestContext.results.referenceData);
         requestContext.sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
       } else if (type === 'searchAndChat') {
         requestContext.sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
 
-        await globalContext.referenceHandler.searchAndRerank(message, path, requestContext);
+        await selectedPlugin.searchAndRerank(message, path, requestContext);
+        requestContext.checkAborted();
+        
+        await selectedPlugin.fetchDetailsWithLimit(message, path, requestContext);
         requestContext.checkAborted();
 
-        await globalContext.referenceHandler.fetchDetails(message, path, requestContext);
-        requestContext.checkAborted();
-
-        await globalContext.referenceHandler.buildPromptFromContent(message, path, requestContext);
+        await selectedPlugin.buildPromptFromContent(message, path, requestContext);
 
         await callLLMAsync(
           [{ role: 'user', content: requestContext.results.finalPrompt }],
@@ -231,7 +221,7 @@ app.whenReady().then(async () => {
           requestContext.sendLLMStream
         );
 
-        await globalContext.referenceHandler.buildReferenceData(message, path, requestContext);
+        await selectedPlugin.buildReferenceData(message, path, requestContext);
         requestContext.sendReference(requestContext.results.referenceData);
         requestContext.sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 

@@ -101,7 +101,9 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
                 // 5. 检查任务状态并返回结果
                 switch (statusData.status) {
                     case 'COMPLETED':
-                        return statusData.results || [];
+                        requestContext.results.parsedFacts = statusData.results || [];
+                        requestContext.results.searchResults = statusData.results || [];
+                        return;
                     case 'FAILED':
                         throw new Error(statusData.error || 'Task failed');
                     case 'CANCELLED':

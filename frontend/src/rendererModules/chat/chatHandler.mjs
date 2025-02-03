@@ -584,17 +584,6 @@ export default class ChatHandler {
           const referenceMessageElement = document.createElement('div');
           referenceMessageElement.className = 'message reference';
 
-          // 构建初始显示内容（只显示第一条）
-          let initialContent = '### 参考文档\n\n';
-          if (referenceData.fullContent.length > 0) {
-            const doc = referenceData.fullContent[0];
-            initialContent += `1. [${doc.title}](${doc.url})\n`;
-            if (doc.date) {
-              initialContent += `   日期: ${doc.date}\n`;
-            }
-            initialContent += `   描述: ${doc.description}\n\n`;
-          }
-
           // 构建完整内容
           let fullContent = '### 参考文档\n\n';
           referenceData.fullContent.forEach(doc => {
@@ -602,18 +591,15 @@ export default class ChatHandler {
             if (doc.date) {
               fullContent += `   日期: ${doc.date}\n`;
             }
-            fullContent += `   描述: ${doc.description}\n\n`;
+            fullContent += `   描述: ${doc.description || doc.summary || '暂无描述'}\n\n`;
           });
 
           referenceMessageElement.innerHTML = `
-            <div class="reference-content">
-                ${marked(initialContent)}
+            <div class="reference-full-content">
+              ${marked(fullContent)}
             </div>
             <div class="reference-actions">
-                <a href="#" class="reference-toggle">展开更多参考(${referenceData.fullContent.length})</a>
-            </div>
-            <div class="reference-full-content" style="display:none">
-                ${marked(fullContent)}
+              <a href="#" class="reference-toggle">展开更多参考(${referenceData.fullContent.length})</a>
             </div>
           `;
 
@@ -630,15 +616,12 @@ export default class ChatHandler {
 
             // 检查是否是展开/折叠按钮
             if (link.classList.contains('reference-toggle')) {
-              const content = referenceMessageElement.querySelector('.reference-content');
               const fullContentElement = referenceMessageElement.querySelector('.reference-full-content');
-
-              content.classList.toggle('expanded');
-              if (content.classList.contains('expanded')) {
-                content.innerHTML = fullContentElement.innerHTML;
+              fullContentElement.classList.toggle('expanded');
+              
+              if (fullContentElement.classList.contains('expanded')) {
                 link.textContent = '收起参考';
               } else {
-                content.innerHTML = marked(initialContent);
                 link.textContent = `展开更多参考(${referenceData.fullContent.length})`;
               }
               return;

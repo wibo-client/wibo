@@ -133,35 +133,6 @@
     /* 移除引用消息的顶部边距 */
 }
 
-.reference-content {
-    background-color: #fff;
-    border-radius: 4px;
-    padding: 8px;
-    max-height: 100px;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out;
-}
-
-.reference-content.expanded {
-    max-height: 1000px;
-    overflow-y: auto;
-}
-
-.reference-content a {
-    color: #2196F3;
-    text-decoration: none;
-    position: relative;
-}
-
-.reference-content a:hover {
-    text-decoration: underline;
-    cursor: pointer;
-}
-
-.reference-content a:active {
-    color: #1976D2;
-}
-
 .reference-actions {
     display: flex;
     gap: 12px;
@@ -180,6 +151,32 @@
 .reference-toggle:hover,
 .reference-follow-up:hover {
     text-decoration: underline;
+}
+
+.reference-full-content {
+    background-color: #fff;
+    border-radius: 4px;
+    padding: 8px;
+    max-height: 60px; /* 初始显示约3行的高度 */
+    overflow: hidden;
+    transition: all 0.3s ease-out;
+}
+
+.reference-full-content.expanded {
+    max-height: 1000px;
+    overflow-y: auto;
+}
+
+/* 当未展开时，添加渐变遮罩效果 */
+.reference-full-content:not(.expanded)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(transparent, #fff);
+    pointer-events: none;
 }
 
 /* 输入区域样式 */

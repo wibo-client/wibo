@@ -80,6 +80,8 @@ export class BaiduPuppeteerIndexHandlerImpl extends PuppeteerIndexHandler {
         return await this.globalContext.rerankImpl.rerank(documentPartList, queryString);
     }
 
+    
+
     async processSearchResults(page) {
         return await page.$$eval('#content_left > div', blocks => {
             return blocks.map(block => {
