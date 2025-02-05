@@ -156,6 +156,58 @@ export default class KnowledgeBaseHandler {
     }
   }
 
+  // 添加新的验证方法
+  validateIgnoredDirectories(dirList) {
+    try {
+      // 基本清理：移除空行和前后空格
+      let cleanedDirs = dirList
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+      
+      // 去重
+      cleanedDirs = [...new Set(cleanedDirs)];
+      
+      // 验证每个路径格式
+      const invalidPaths = cleanedDirs.filter(dir => {
+        // 不允许以引号开头或结尾
+        if (dir.startsWith('"') || dir.endsWith('"')) {
+          return true;
+        }
+        
+        const endsWithSpace = /\s$/;
+        const validStart = /^[a-zA-Z0-9\/\\.~_*]/;  // 允许 * 用于通配符模式
+        
+        return endsWithSpace.test(dir) || 
+               !validStart.test(dir);
+      });
+
+      // 尝试解析每一行，确保格式正确
+      const parseErrors = cleanedDirs.filter(dir => {
+        try {
+          // 检查是否能作为有效的 glob 模式解析
+          return !/^[a-zA-Z0-9\/\\.~_*{}[\]!@#$%^&()+-]+$/.test(dir);
+        } catch (e) {
+          return true;
+        }
+      });
+
+      const allInvalidPaths = [...new Set([...invalidPaths, ...parseErrors])];
+      
+      return {
+        isValid: allInvalidPaths.length === 0,
+        cleanedDirs,
+        invalidPaths: allInvalidPaths
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        cleanedDirs: [],
+        invalidPaths: ['解析错误：请确保输入格式正确'],
+        error: error.message
+      };
+    }
+  }
 
   // 修改 syncIndexSettings 方法
   async syncIndexSettings() {
@@ -165,6 +217,20 @@ export default class KnowledgeBaseHandler {
     }
 
     try {
+      // 验证忽略目录
+      const ignoredDirsInput = document.getElementById('ignoredDirectories')?.value || '';
+      const validationResult = this.validateIgnoredDirectories(ignoredDirsInput);
+      
+      if (!validationResult.isValid) {
+        alert('以下路径格式无效：\n' + validationResult.invalidPaths.join('\n') +
+              '\n\n路径规则：\n' +
+              '1. 不能以引号开头或结尾\n' +
+              '2. 不能包含特殊字符 <>:|?*\n' +
+              '3. 必须以字母、数字、/、.、~、* 或_开头\n' +
+              '4. 支持glob模式，如 **/*.txt');
+        return;
+      }
+
       const config = {
         fileTypes: {
           text: document.getElementById('textFilesToggle')?.checked || false,
@@ -186,11 +252,11 @@ export default class KnowledgeBaseHandler {
           },
           archive: document.getElementById('archiveFilesToggle')?.checked || false
         },
-        ignoredDirectories: document.getElementById('ignoredDirectories')?.value
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0)
+        ignoredDirectories: validationResult.cleanedDirs
       };
+
+      // 更新文本框显示去重后的内容
+      document.getElementById('ignoredDirectories').value = validationResult.cleanedDirs.join('\n');
 
       const response = await fetch(`${this.BASE_URL}/admin/update-index-settings`, {
         method: 'POST',

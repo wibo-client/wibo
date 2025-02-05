@@ -40,8 +40,8 @@
 ## 正常百度 searchengine要重构 ok
 ## 进一步要增强验证一下java的自动关闭，生命周期管理。 mac验证了 ， windows todo .
 ## 404 local quick search 调对  ok 
-## ignore 部分的问题排查。 
-
+## ignoreDirs 问题排查。-- 没复现。 但 增强了检查，理论应该是修复了ok
+ 
 # 暂时不做了
 ## 知乎搜索能力增强
 ## 参考资料部分感觉要再想想。 
