@@ -1,7 +1,7 @@
 /**
  * 索引处理接口，提供索引构建和搜索功能
  */
-export class IndexHandlerInterface {
+export class AbstractIndexHandler {
     constructor() {
         this.MAX_CONTENT_SIZE = 28720;
     }
@@ -72,7 +72,7 @@ export class IndexHandlerInterface {
         let searchResults = [];
 
         // 根据请求类型设置限制值
-        const limitThisTurn = requestType === 'searchAndChat' ? pageFetchLimit : searchItemNumbers;
+        const limitThisTurn = requestType === 'quickSearch' ? pageFetchLimit : searchItemNumbers;
 
         requestContext.sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
@@ -97,8 +97,8 @@ export class IndexHandlerInterface {
             }
         }
 
-        // rerank 移到循环外部，只在 searchAndChat 模式下执行
-        if (requestType === 'searchAndChat') {
+        // rerank 移到循环外部，只在 quickSearch 模式下执行
+        if (requestType === 'quickSearch') {
             requestContext.checkAborted();
             searchResults = await this.globalContext.rerankImpl.rerank(searchResults, message);
         }
@@ -125,7 +125,7 @@ export class IndexHandlerInterface {
     }
 
 
-    async buildPromptFromContent(message, path, requestContext) {
+    async quickSearch_buildPromptFromContent(message, path, requestContext) {
         const aggregatedContent = requestContext.results.detailsSearchResults;
         const contextBuilder = [];
         let currentLength = 0;
@@ -179,7 +179,7 @@ export class IndexHandlerInterface {
     }
 
 
-    async fetchDetailsWithLimit(message, path, requestContext) {
+    async quickSearch_fetchDetailsWithLimit(message, path, requestContext) {
         const searchResults = requestContext.results.searchResults;
 
         requestContext.sendSystemLog('📑 获取详细内容...');
@@ -231,7 +231,7 @@ export class IndexHandlerInterface {
     }
 
     // 输入： requestContext.results.parsedFacts;
-    async refineParsedFacts(message, path, requestContext) {
+    async deepSearch_refineParsedFacts(message, path, requestContext) {
         const searchResults = requestContext.results.parsedFacts;
 
         // 添加空结果检查
@@ -313,7 +313,7 @@ export class IndexHandlerInterface {
 
 
     // 输出： requestContext.results.refinedFacts;  和 requestContext.results.searchResults ，都要有。后面都有用
-    async collectFacts(message, path, requestContext) {
+    async deepSearch_collectFacts(message, path, requestContext) {
         throw new Error('Method not implemented.');
     }
 

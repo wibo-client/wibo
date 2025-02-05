@@ -25,7 +25,9 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+
+        this.MAX_PROCESS_HISTORY = 5;
 
         // 启动状态同步任务
         this.startStateSyncTask();
@@ -64,8 +66,31 @@ export default class LocalServerManager {
         return this.store.get('javaProcess');
     }
 
+    // 获取进程历史记录
+    getProcessHistory() {
+        return this.store.get('javaProcessHistory', []);
+    }
+
+    // 设置进程信息，保留历史记录
     setJavaProcess(processInfo) {
-        this.store.set('javaProcess', processInfo);
+        const history = this.getProcessHistory();
+        const timestamp = Date.now();
+        
+        // 添加时间戳到进程信息
+        const enhancedProcessInfo = {
+            ...processInfo,
+            timestamp,
+            status: 'running'
+        };
+
+        // 添加新进程信息到历史记录
+        history.unshift(enhancedProcessInfo);
+        
+        // 保持历史记录在限定大小内
+        const trimmedHistory = history.slice(0, this.MAX_PROCESS_HISTORY);
+        
+        this.store.set('javaProcessHistory', trimmedHistory);
+        this.store.set('javaProcess', enhancedProcessInfo);
     }
 
     deleteJavaProcess() {

@@ -1,6 +1,6 @@
-import { IndexHandlerInterface } from './indexHandlerInter.mjs';
+import { AbstractIndexHandler } from './abstractIndexHandler.mjs';
 
-export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
+export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
     constructor() {
         super();
         this.BASE_URL = null;
@@ -31,7 +31,7 @@ export class LocalServerIndexHandlerImpl extends IndexHandlerInterface {
         }
     }
 
-    async collectFacts(query, path, requestContext) {
+    async deepSearch_collectFacts(query, path, requestContext) {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');
         }

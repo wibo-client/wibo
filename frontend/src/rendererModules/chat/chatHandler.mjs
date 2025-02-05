@@ -245,12 +245,12 @@ export default class ChatHandler {
         if (event.shiftKey) {
           // Shift + Enter: 捡问
           event.preventDefault();
-          typeSelect.value = 'searchAndChat';
+          typeSelect.value = 'quickSearch';
           this.sendMessage();
         } else if (event.altKey) {
           // Alt + Enter: 深问
           event.preventDefault();
-          typeSelect.value = 'highQuilityRAGChat';
+          typeSelect.value = 'deepSearch';
           this.sendMessage();
         } else if (event.ctrlKey || event.metaKey) {
           // Ctrl + Enter 或 Cmd + Enter: 模型直答

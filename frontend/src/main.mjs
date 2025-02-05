@@ -180,12 +180,12 @@ app.whenReady().then(async () => {
         requestContext.sendLLMStream(requestContext.results.markdownResult);
         requestContext.sendSystemLog('✅ 搜索完成');
 
-      } else if (type === 'highQuilityRAGChat') {
+      } else if (type === 'deepSearch') {
         requestContext.sendSystemLog('🔍 进入深问模式，大模型会遍历所有的文档片段，回答将更全面，但消耗的token相对较多，时间较慢');
         requestContext.checkAborted();
-        await selectedPlugin.collectFacts(message, path, requestContext);
+        await selectedPlugin.deepSearch_collectFacts(message, path, requestContext);
         requestContext.checkAborted();
-        await selectedPlugin.refineParsedFacts(message, path, requestContext);
+        await selectedPlugin.deepSearch_refineParsedFacts(message, path, requestContext);
         requestContext.checkAborted();
 
         const finalPrompt = `请基于以下参考内容回答问题：
@@ -204,16 +204,16 @@ app.whenReady().then(async () => {
         requestContext.sendReference(requestContext.results.referenceData);
         requestContext.sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
-      } else if (type === 'searchAndChat') {
+      } else if (type === 'quickSearch') {
         requestContext.sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
 
         await selectedPlugin.searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();
         
-        await selectedPlugin.fetchDetailsWithLimit(message, path, requestContext);
+        await selectedPlugin.quickSearch_fetchDetailsWithLimit(message, path, requestContext);
         requestContext.checkAborted();
 
-        await selectedPlugin.buildPromptFromContent(message, path, requestContext);
+        await selectedPlugin.quickSearch_buildPromptFromContent(message, path, requestContext);
 
         await callLLMAsync(
           [{ role: 'user', content: requestContext.results.finalPrompt }],

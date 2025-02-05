@@ -1,7 +1,7 @@
-import { IndexHandlerInterface } from './indexHandlerInter.mjs';
+import { AbstractIndexHandler } from './abstractIndexHandler.mjs';
 import { JsonUtils } from '../utils/jsonUtils.mjs';
 
-export class PuppeteerIndexHandler extends IndexHandlerInterface {
+export class PuppeteerIndexHandler extends AbstractIndexHandler {
     constructor() {
         super();
     }
@@ -38,7 +38,7 @@ export class PuppeteerIndexHandler extends IndexHandlerInterface {
     }
 
 
-    async collectFacts(message, path, requestContext) {
+    async deepSearch_collectFacts(message, path, requestContext) {
         requestContext.checkAborted();
         await requestContext.selectedPlugin.searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();

@@ -1,4 +1,4 @@
-import { IndexHandlerInterface } from './indexHandlerInter.mjs';
+import { AbstractIndexHandler } from './abstractIndexHandler.mjs';
 import BaiduPuppeteerIndexHandlerImpl from './baiduPuppeteerIndexHandlerImpl.mjs';
 import fs from 'fs';
 import vm from 'vm';
@@ -158,7 +158,7 @@ export class PluginHandlerImpl {
 
     validatePlugin(plugin) {
         console.debug(`Validating plugin.`);
-        const interfaceMethods = Object.getOwnPropertyNames(IndexHandlerInterface.prototype).filter(method => method !== 'constructor');
+        const interfaceMethods = Object.getOwnPropertyNames(AbstractIndexHandler.prototype).filter(method => method !== 'constructor');
         const pluginMethods = Object.getOwnPropertyNames(plugin.prototype);
 
         const missingMethods = interfaceMethods.filter(method => !pluginMethods.includes(method));
