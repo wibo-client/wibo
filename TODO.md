@@ -37,15 +37,16 @@
 ## 添加新精炼任务 ok
 ## 对话历史日志是反的。 ok
 ## 历史信息里的设为常问 不能用, 修复  ok
-## 参考资料部分感觉要再想想。 
 ## 正常百度 searchengine要重构 ok
-## 进一步要增强验证一下java的自动关闭，生命周期管理。
-## 404 local quick search 调对 
+## 进一步要增强验证一下java的自动关闭，生命周期管理。 mac验证了 ， windows todo .
+## 404 local quick search 调对  ok 
+## ignore 部分的问题排查。 
 
 # 暂时不做了
 ## 知乎搜索能力增强
+## 参考资料部分感觉要再想想。 
 ## 本地优先作为 default 
 ## 增加对日期的识别考虑日期问题 ，尤其是在local
 ## TODO 把extractKeyFacts 和 refineContent 移动到java端。提高性能
 
-# V2.1.0
+# V2.1.0 

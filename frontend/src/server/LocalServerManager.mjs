@@ -25,7 +25,7 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
 
         this.MAX_PROCESS_HISTORY = 5;
 
@@ -49,6 +49,7 @@ export default class LocalServerManager {
         }
 
         this.initializePaths(); // 在构造函数中调用合并后的初始化方法
+        this.cleanupHandlersRegistered = false; // 添加标记
     }
 
     async init(globalContext) {
@@ -99,7 +100,10 @@ export default class LocalServerManager {
 
     // 启动状态同步任务
     startStateSyncTask() {
-        setInterval(async () => {
+        if (this.syncStateInterval) {
+            clearInterval(this.syncStateInterval);
+        }
+        this.syncStateInterval = setInterval(async () => {
             await this.syncState();
         }, 10000); // 每5秒同步一次状态
     }
@@ -284,24 +288,35 @@ export default class LocalServerManager {
 
     // 修改检查进程状态方法
     async checkProcessStatus() {
-
         const savedProcess = this.getJavaProcess();
-        if (!savedProcess) return false;
+        if (!savedProcess || !savedProcess.pid || !savedProcess.port) return false;
 
         try {
-            // 首先检查进程是否存在
+            // 检查进程是否存在
             process.kill(savedProcess.pid, 0);
-
-            // 进程存在，继续检查健康状态
+            
+            // 检查端口是否还在监听
             const isHealthy = await this.checkHealth(savedProcess.port);
-
+            
             if (!isHealthy) {
                 logger.warn('[ProcessCheck] Process exists but health check failed');
                 return false;
             }
-            // 进程正常且健康
+            
+            // 检查进程是否是我们启动的Java进程（仅限非Windows平台）
+            if (process.platform !== 'win32') {
+                try {
+                    const psOutput = await this.executeCommand('ps', ['-p', savedProcess.pid, '-o', 'command=']);
+                    if (!psOutput.toLowerCase().includes('java')) {
+                        logger.warn('[ProcessCheck] PID exists but is not a Java process');
+                        return false;
+                    }
+                } catch (e) {
+                    // 忽略ps命令执行错误
+                }
+            }
+            
             return true;
-
         } catch (e) {
             logger.warn('[ProcessCheck] Process check failed:', e.message);
             this.deleteJavaProcess();
@@ -498,8 +513,25 @@ export default class LocalServerManager {
 
             // 使用 custom-jre 的 java 可执行文件启动进程
             javaProcess = spawn(this.javaBinPath, args, {
-                stdio: ['pipe', 'pipe', 'pipe']
+                // 不分离进程,这样父进程结束时子进程也会结束
+                detached: false,
+                // 继承父进程的标准输入输出
+                stdio: 'pipe',
+                // Windows下隐藏命令窗口
+                windowsHide: true
             });
+
+            // 移除错误的 process.setpgid 调用
+            // 改用进程组管理
+            if (process.platform !== 'win32') {
+                try {
+                    // 在Unix系统上使用kill命令确保进程组存在
+                    await this.executeCommand('kill', ['-0', `-${javaProcess.pid}`]);
+                } catch (e) {
+                    // 忽略错误，因为第一次检查进程组可能不存在
+                    logger.debug('[LocalServer] Process group check:', e.message);
+                }
+            }
 
             // 等待进程启动
             await new Promise((resolve, reject) => {
@@ -556,6 +588,31 @@ export default class LocalServerManager {
 
             });
 
+            // 确保清理处理器只注册一次
+            if (!this.cleanupHandlersRegistered) {
+                const cleanup = () => {
+                    try {
+                        if (javaProcess) {
+                            if (process.platform === 'win32') {
+                                spawn('taskkill', ['/F', '/T', '/PID', javaProcess.pid.toString()]);
+                            } else {
+                                process.kill(-javaProcess.pid, 'SIGTERM');
+                            }
+                        }
+                    } catch (err) {
+                        logger.error('Error cleaning up java process:', err);
+                    }
+                };
+
+                // 监听父进程的退出事件
+                process.on('exit', cleanup);
+                process.on('SIGTERM', cleanup);
+                process.on('SIGINT', cleanup);
+                process.on('SIGQUIT', cleanup);
+                
+                this.cleanupHandlersRegistered = true;
+            }
+
         } catch (error) {
             logger.error(`[LocalServer] Start error: ${error}`);
             throw error; // 向上传递错误
@@ -576,16 +633,24 @@ export default class LocalServerManager {
 
         try {
             if (process.platform === 'win32') {
+                // Windows上使用taskkill终止整个进程树
                 await new Promise(resolve => {
-                    spawn('taskkill', ['/F', '/PID', savedProcess.pid]).on('exit', resolve);
+                    spawn('taskkill', ['/F', '/T', '/PID', savedProcess.pid.toString()]).on('exit', resolve);
                 });
             } else {
+                // Unix系统上先尝试温和终止进程组
                 try {
                     process.kill(savedProcess.pid, 'SIGTERM');
-                    await this.waitForProcessStop(savedProcess.pid);
+                    // 给进程一些时间来优雅退出
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    // 如果进程还在，强制终止
+                    try {
+                        process.kill(savedProcess.pid, 'SIGKILL');
+                    } catch (e) {
+                        // 进程可能已经退出，忽略错误
+                    }
                 } catch (e) {
-                    // 如果进程已经不存在，忽略错误
-                    logger.info('[LocalServer] Process already terminated:', e.message);
+                    logger.debug('[LocalServer] Process already terminated:', e.message);
                 }
             }
 
@@ -657,5 +722,41 @@ export default class LocalServerManager {
             console.error('Failed to sync API key:', error);
             // 不抛出错误，因为这是辅助功能
         }
+    }
+
+    // 添加资源释放方法
+    async destroy() {
+        // 清理所有进程
+        await this.cleanupExistingProcesses();
+        
+        // 清理状态同步定时器
+        if (this.syncStateInterval) {
+            clearInterval(this.syncStateInterval);
+        }
+        
+        // 重置状态
+        this.inited = false;
+        this.store.set('serverDesiredState', false);
+    }
+
+    // 添加辅助方法执行系统命令
+    async executeCommand(command, args) {
+        return new Promise((resolve, reject) => {
+            const proc = spawn(command, args);
+            let output = '';
+            
+            proc.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+            
+            proc.on('error', reject);
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    resolve(output.trim());
+                } else {
+                    reject(new Error(`Command failed with code ${code}`));
+                }
+            });
+        });
     }
 }

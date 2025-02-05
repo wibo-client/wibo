@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Optional;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 public class SearchSimpleAPI {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SearchSimpleAPI.class);
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Autowired
     private DocumentDataRepository documentDataRepository;
@@ -162,7 +164,7 @@ public class SearchSimpleAPI {
             Long id = Long.valueOf(idObj.toString()); // 修复类型转换问题
             String title = (String) item.get("title");
             String description = (String) item.get("description");
-            LocalDateTime date = LocalDateTime.parse((String) item.get("date"));
+            LocalDateTime date = LocalDateTime.parse((String) item.get("date"), DATE_FORMATTER);
             String url = (String) item.get("url");
 
             MarkdownParagraphPO paragraph = getParagraphById(id);

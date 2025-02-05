@@ -34,7 +34,7 @@
         <div class="input-group">
           <select id="request-type">
             <option value="quickSearch">快速检问 shift+enter</option>
-            <option value="deepSearch">深度检问 alt+enter</option>
+            <option value="deepSearch">全面检问 alt+enter</option>
             <option value="chat">模型直答 ctrl+enter</option>
             <option value="search">搜索直出 ctrl+\</option>
           </select>
@@ -325,12 +325,12 @@
         <input type="number" id="browserTimeout" class="form-control" placeholder="请输入浏览器超时时间" />
       </div>
       <div class="form-group">
-        <label for="searchItemNumbers">单次查询摘要条目数：</label>
-        <input type="number" id="searchItemNumbers" class="form-control" placeholder="请输入单次查询摘要条目数" />
+        <label for="searchItemNumbers">网页全面检问参考条目数：</label>
+        <input type="number" id="searchItemNumbers" class="form-control" placeholder="默认50条，也就是会看50个网页综合结果" />
       </div>
       <div class="form-group">
-        <label for="pageFetchLimit">单次查询详情页抓取数量：</label>
-        <input type="number" id="pageFetchLimit" class="form-control" placeholder="请输入单次查询页面抓取数量" />
+        <label for="pageFetchLimit">网页快速检问参考条目数：</label>
+        <input type="number" id="pageFetchLimit" class="form-control" placeholder="最多5条，也会收到llm的上下文窗口的限制" />
       </div>
       <button id="saveBrowserConfigButton" class="btn">保存</button>
     </div>

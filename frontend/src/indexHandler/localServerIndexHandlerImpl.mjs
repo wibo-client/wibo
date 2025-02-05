@@ -155,29 +155,6 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                 }
             }
 
-            // 如果不是目录（不以/结尾），则调用 fetchDocumentContent 接口
-            if (!processedPath.endsWith('/')) {
-                if (pathPrefix.includes(':')) {
-                    // Windows 路径
-                    processedPath = processedPath.replace(/\//g, '\\');
-                }
-                const response = await fetch(`${this.BASE_URL}/fetchDocumentContent`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        pathPrefix: processedPath,
-                        query: queryStr,
-                    }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                return await response.json();
-            }
 
             if (pathPrefix.includes(':')) {
                 // Windows 路径
