@@ -45,6 +45,8 @@ export default class KnowledgeBaseHandler {
         const result = await window.electron.showDirectoryPicker();
         if (result && result.filePath) {
           document.getElementById('localDirectory').value = result.filePath;
+          // 自动提交选择的目录
+          await this.submitLocalDirectory();
         }
       });
     }
