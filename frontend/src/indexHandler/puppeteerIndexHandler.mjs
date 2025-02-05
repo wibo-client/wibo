@@ -1,5 +1,6 @@
 import { AbstractIndexHandler } from './abstractIndexHandler.mjs';
 import { JsonUtils } from '../utils/jsonUtils.mjs';
+import logger from '../utils/loggerUtils.mjs';
 
 export class PuppeteerIndexHandler extends AbstractIndexHandler {
     constructor() {
@@ -60,8 +61,9 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
 
 
     async extractKeyFacts(message, path, requestContext) {
+        logger.debug('开始提取关键事实');
         const detailsSearchResults = requestContext.results.detailsSearchResults;
-
+        logger.debug(`detailsSearchResults: ${detailsSearchResults[0].content}`);
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
                 requestContext.checkAborted();  // 添加检查
@@ -145,6 +147,8 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                             let groupAnswer;
                             for (let i = 0; i < 3; i++) {
                                 try {
+                                    logger.info(`json prompt: ${JSON.stringify(jsonPrompt, null, 2)}`);
+                                    requestContext.checkAborted();  // 添加检查
                                     groupAnswer = await this.globalContext.llmCaller.callSync([{
                                         role: 'user',
                                         content: JSON.stringify(jsonPrompt, null, 2)
@@ -181,6 +185,8 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                         let groupAnswer;
                         for (let i = 0; i < 3; i++) {
                             try {
+                                logger.info(`json prompt: ${JSON.stringify(jsonPrompt, null, 2)}`);
+                                  
                                 requestContext.checkAborted();  // 添加检查
                                 groupAnswer = await this.globalContext.llmCaller.callSync([{
                                     role: 'user',

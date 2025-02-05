@@ -1,6 +1,6 @@
 import ChromeService from '../server/chromeService.mjs';
 import CookieUtils from '../utils/cookieUtils.mjs';
-import path from 'path';
+import logger from '../utils/loggerUtils.mjs';
 
 // 添加 Semaphore 类实现
 class Semaphore {
@@ -89,9 +89,7 @@ export class ContentCrawler {
 
     async fetchPageContent(url) {
         const configHandler = this.globalContext.configHandler;
-        const userDataDirString = await configHandler.getUserDataDir();
-        const userDataDir = path.resolve(userDataDirString || './user_data');
-        const cookieUtils = new CookieUtils(userDataDir);
+        const cookieUtils = new CookieUtils();  // 移除 userDataDir 参数
 
         // 检查并更新并发数
         const currentBrowserConcurrency = await configHandler.getBrowserConcurrency();
@@ -110,19 +108,50 @@ export class ContentCrawler {
             await cookieUtils.loadCookies(page, new URL(url).hostname);
 
             const content = await this.retryOperation(async () => {
+                logger.info(`开始加载页面: ${url}`);
                 await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+                
+                logger.info('页面加载完成，等待 body 元素');
                 await page.waitForSelector('body', { timeout: 30000 });
-                const pageContent = await page.evaluate(() => document.body.innerText);
-                await cookieUtils.saveCookies(page, new URL(url).hostname);
-                return this.convertToMarkdown(pageContent);
+                
+                // 在浏览器端执行，获取页面信息并返回到 Node.js 端
+                const pageInfo = await page.evaluate(() => {
+                    return {
+                        content: document.body.innerText,
+                        title: document.title,
+                        bodyLength: document.body.innerText.length,
+                        hasBody: !!document.body,
+                        bodyChildrenCount: document.body.children.length
+                    };
+                });
+                if (pageInfo.bodyLength === 0) {
+                    logger.warn('警告：页面内容为空，可能需要额外等待或检查页面加载状态');
+                }
+
+                try {
+                    await cookieUtils.saveCookies(page, new URL(url).hostname);
+                } catch (error) {
+                    logger.error(`保存 cookies 时出错: ${error.message}`);
+                    logger.error(`错误堆栈: ${error.stack}`);
+                    // 继续执行，不影响内容获取
+                }
+
+                logger.debug(`页面标题: ${pageInfo.title}`);
+                logger.debug(`页面内容长度: ${pageInfo.bodyLength} 字符`);
+                logger.debug(`Body 元素存在: ${pageInfo.hasBody}`);
+                logger.debug(`Body 子元素数量: ${pageInfo.bodyChildrenCount}`);
+                logger.debug(`HTML 预览: ${pageInfo.content.slice(0, 100)}...`);
+
+                return pageInfo.content;
             });
 
             // 获取当前网页的真实链接
             const realUrl = page.url();
 
+            logger.info(`获取到页面内容: ${content.length} 字符, 真实链接: ${realUrl}`);
             return { content, realUrl };
         } catch (error) {
-            console.error("处理任务时出错:", error);
+            logger.error(`抓取页面失败: ${error.message}`);
             return { content: '', realUrl: '' };
         } finally {
             if (page && !page.isClosed()) {
@@ -133,17 +162,6 @@ export class ContentCrawler {
         }
     }
 
-    convertToMarkdown(innerText) {
-        // 示例转换逻辑，可以根据需要进行调整
-        let markdownText = innerText
-            .replace(/^(#+)\s+/gm, '$1 ') // 标题
-            .replace(/\*\*(.*?)\*\*/g, '**$1**') // 粗体
-            .replace(/\*(.*?)\*/g, '*$1*') // 斜体
-            .replace(/`([^`]+)`/g, '`$1`') // 代码
-            .replace(/\n/g, '\n\n'); // 换行
-
-        return markdownText;
-    }
 }
 
 export default ContentCrawler;
