@@ -205,7 +205,7 @@ app.whenReady().then(async () => {
         requestContext.sendSystemLog('✅ 数据准备完成，开始依托数据回答问题');
 
       } else if (type === 'quickSearch') {
-        requestContext.sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
+        requestContext.sendSystemLog('🔍 快速检问模式，大模型会根据关键词查索引找相关文档并取靠前的内容，速度较快，但可能因为索引没命中而漏掉信息');
 
         await selectedPlugin.quickSearch_searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();
