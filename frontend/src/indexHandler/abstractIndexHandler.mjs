@@ -35,7 +35,7 @@ export class AbstractIndexHandler {
         throw new Error('Method not implemented.');
     }
 
-    async fetchAggregatedContent(summaryList) {
+    async fetchAggregatedContent(summaryList,requestContext) {
         throw new Error('Method not implemented.');
     }
 
@@ -65,14 +65,14 @@ export class AbstractIndexHandler {
     }
 
 
-    async searchAndRerank(message, path, requestContext) {
+    async quickSearch_searchAndRerank(message, path, requestContext) {
         const requestType = requestContext.type;
         const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
         const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
         let searchResults = [];
 
         // 根据请求类型设置限制值
-        const limitThisTurn = requestType === 'quickSearch' ? pageFetchLimit : searchItemNumbers;
+        const limitThisTurn = pageFetchLimit;
 
         requestContext.sendSystemLog('🔄 开始重写查询...');
         const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
@@ -97,13 +97,55 @@ export class AbstractIndexHandler {
             }
         }
 
-        // rerank 移到循环外部，只在 quickSearch 模式下执行
-        if (requestType === 'quickSearch') {
-            requestContext.checkAborted();
-            searchResults = await this.globalContext.rerankImpl.rerank(searchResults, message);
-        }
+        requestContext.checkAborted();
+        searchResults = await this.globalContext.rerankImpl.rerank(searchResults, message);
 
         requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个结果`);
+        requestContext.results.searchResults = searchResults;
+    }
+
+    async deepSearch_searchAndRerank(message, path, requestContext) {
+        const requestType = requestContext.type;
+        const searchItemNumbers = await this.globalContext.configHandler.getSearchItemNumbers();
+        const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
+        let searchResults = [];
+        const seenTitles = new Set();
+
+        requestContext.sendSystemLog('🔄 开始重写查询...');
+        const requeryResult = await requestContext.selectedPlugin.rewriteQuery(message);
+        requestContext.sendSystemLog(`✅ 查询重写完成，生成 ${requeryResult.length} 个查询`);
+
+        // 计算每个查询应获取的结果数量
+        const resultsPerQuery = Math.ceil(searchItemNumbers / requeryResult.length);
+        requestContext.sendSystemLog(`ℹ️ 每个查询将获取 ${resultsPerQuery} 个结果`);
+
+        for (const query of requeryResult) {
+            requestContext.sendSystemLog(query.queryLog);
+            requestContext.checkAborted();
+            const result = await requestContext.selectedPlugin.search(query.query, path);
+            requestContext.checkAborted();
+
+            // 为当前查询添加未重复的结果
+            let addedCount = 0;
+            for (const item of result) {
+                if (addedCount >= resultsPerQuery) break;
+                
+                // 检查标题是否已存在
+                if (!seenTitles.has(item.title)) {
+                    searchResults.push(item);
+                    seenTitles.add(item.title);
+                    addedCount++;
+                }
+            }
+
+            // 如果总结果数已达到限制，停止继续查询
+            if (searchResults.length >= searchItemNumbers) {
+                searchResults = searchResults.slice(0, searchItemNumbers);
+                break;
+            }
+        }
+
+        requestContext.sendSystemLog(`✅ 搜索完成，获取到 ${searchResults.length} 个标题去重后的结果`);
         requestContext.results.searchResults = searchResults;
     }
 
@@ -196,7 +238,7 @@ export class AbstractIndexHandler {
         const limitedResults = searchResults.slice(0, pageFetchLimit);
         requestContext.sendSystemLog(`🔍 将处理前 ${pageFetchLimit} 条搜索结果`);
 
-        const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(limitedResults);
+        const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(limitedResults,requestContext);
         requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
 
         requestContext.results.detailsSearchResults = detailsSearchResults;

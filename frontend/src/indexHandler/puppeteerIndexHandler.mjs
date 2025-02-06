@@ -41,11 +41,11 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
 
     async deepSearch_collectFacts(message, path, requestContext) {
         requestContext.checkAborted();
-        await requestContext.selectedPlugin.searchAndRerank(message, path, requestContext);
+        await requestContext.selectedPlugin.deepSearch_searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();
         const searchResults = requestContext.results.searchResults;
         requestContext.sendSystemLog(`🔍 开始获取详细的网页内容以供分析`);
-        const detailsSearchResults = await this.fetchAggregatedContent(searchResults);
+        const detailsSearchResults = await this.fetchAggregatedContent(searchResults,requestContext);
         requestContext.results.detailsSearchResults = detailsSearchResults;
         requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 条详细内容`);
         requestContext.checkAborted();
@@ -54,8 +54,32 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
     }
 
 
-    async fetchAggregatedContent(summaryList) {
-        return await this.contentAggregator.aggregateContent(summaryList);
+    async fetchAggregatedContent(summaryList, requestContext) {
+        let successCount = 0;
+        const results = await Promise.all(
+            summaryList.map(async (summary, index) => {
+                try {
+                    const result = await this.contentAggregator.aggregateContent([summary]);
+                    if (result && result.length > 0) {
+                        successCount++;
+                        // 每5个成功输出一次反馈
+                        if (successCount % 5 === 0) {
+                            requestContext.sendSystemLog(`✅ 已成功获取 ${successCount} 个网页内容`);
+                        }
+                        return result[0];
+                    } else {
+                        return null;
+                    }
+                } catch (error) {
+                    return null;
+                }
+            })
+        );
+
+        const validResults = results.filter(Boolean);
+        requestContext.sendSystemLog(`📊 总计: 成功获取 ${validResults.length} 个网页内容，失败 ${summaryList.length - validResults.length} 个`);
+        
+        return validResults;
     }
 
 

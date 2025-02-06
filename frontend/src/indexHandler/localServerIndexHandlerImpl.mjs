@@ -184,7 +184,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
         }
     }
 
-    async fetchAggregatedContent(summaryList) {
+    async fetchAggregatedContent(summaryList,requestContext) {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');
         }

@@ -175,7 +175,7 @@ app.whenReady().then(async () => {
 
       if (type === 'search') {
         requestContext.sendSystemLog('🔍 进入直接搜索...');
-        await selectedPlugin.searchAndRerank(message, path, requestContext);
+        await selectedPlugin.quickSearch_searchAndRerank(message, path, requestContext);
         await selectedPlugin.buildSearchResultsString(message, path, requestContext);
         requestContext.sendLLMStream(requestContext.results.markdownResult);
         requestContext.sendSystemLog('✅ 搜索完成');
@@ -207,7 +207,7 @@ app.whenReady().then(async () => {
       } else if (type === 'quickSearch') {
         requestContext.sendSystemLog('🔍 进入检问模式，大模型会根据关键词查索引找相关文档，速度较快，但可能因为索引没命中而漏掉信息');
 
-        await selectedPlugin.searchAndRerank(message, path, requestContext);
+        await selectedPlugin.quickSearch_searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();
 
         await selectedPlugin.quickSearch_fetchDetailsWithLimit(message, path, requestContext);
