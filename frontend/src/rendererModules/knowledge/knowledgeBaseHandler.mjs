@@ -224,12 +224,12 @@ export default class KnowledgeBaseHandler {
       const validationResult = this.validateIgnoredDirectories(ignoredDirsInput);
       
       if (!validationResult.isValid) {
-        alert('以下路径格式无效：\n' + validationResult.invalidPaths.join('\n') +
-              '\n\n路径规则：\n' +
-              '1. 不能以引号开头或结尾\n' +
-              '2. 不能包含特殊字符 <>:|?*\n' +
-              '3. 必须以字母、数字、/、.、~、* 或_开头\n' +
-              '4. 支持glob模式，如 **/*.txt');
+        await window.electron.showMessageBox({
+          type: 'warning',
+          title: '无效的路径格式',
+          message: '以下路径格式无效：\n' + validationResult.invalidPaths.join('\n'),
+          detail: '路径规则：\n1. 不能以引号开头或结尾\n2. 不能包含特殊字符 <>:|?*\n3. 必须以字母、数字、/、.、~、* 或_开头\n4. 支持glob模式，如 **/*.txt'
+        });
         return;
       }
 
@@ -268,9 +268,13 @@ export default class KnowledgeBaseHandler {
 
       const result = await response.json();
       if (!result.success) {
-        alert(result.message || '更新配置失败');
+        await window.electron.showErrorBox('配置更新失败', result.message || '更新配置失败');
       } else {
-        alert('索引设置已保存');
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '成功',
+          message: '索引设置已保存'
+        });
         // 保存成功后解除UI锁定，允许新的操作
         this.isUpdatingUI = false;
         if (this.uiLockTimeout) {
@@ -280,7 +284,7 @@ export default class KnowledgeBaseHandler {
       }
     } catch (error) {
       console.error('Failed to sync index settings:', error);
-      alert('同步配置失败: ' + error.message);
+      await window.electron.showErrorBox('同步失败', error.message);
       this.isUpdatingUI = false;
     }
   }
@@ -304,17 +308,22 @@ export default class KnowledgeBaseHandler {
       if (result.success) {
         // 在非调试模式下才显示提示
         if (!this.lastKnownState.debugMode) {
-          alert(enable ? '本地知识库服务启动，启动需要时间，等到服务状态为在线时就可用了' : '本地知识库服务已关闭');
+          await window.electron.showMessageBox({
+            type: 'info',
+            title: '服务状态',
+            message: enable ? '本地知识库服务启动' : '本地知识库服务已关闭',
+            detail: enable ? '启动需要时间，等到服务状态为在线时就可用了' : undefined
+          });
         }
       } else {
         toggle.checked = !enable;
         configSection.style.display = !enable ? 'block' : 'none';
-        alert(result.message || '操作失败');
+        await window.electron.showErrorBox('操作失败', result.message || '操作失败');
       }
     } catch (error) {
       toggle.checked = !toggle.checked;
       configSection.style.display = !toggle.checked ? 'block' : 'none';
-      alert('操作失败: ' + error.message);
+      await window.electron.showErrorBox('操作失败', error.message);
     } finally {
       toggle.disabled = false;
     }
@@ -344,12 +353,12 @@ export default class KnowledgeBaseHandler {
       } else {
         remoteUploadToggle.checked = !enable;
         configSection.style.display = !enable ? 'block' : 'none';
-        alert(data.message);
+        await window.electron.showErrorBox('操作失败', data.message);
       }
     } catch (error) {
       remoteUploadToggle.checked = !enable;
       configSection.style.display = !enable ? 'block' : 'none';
-      alert('操作失败: ' + error.message);
+      await window.electron.showErrorBox('操作失败', error.message);
     }
   }
 
@@ -366,10 +375,15 @@ export default class KnowledgeBaseHandler {
     }
   }
 
+  // 修改 submitLocalDirectory 方法
   async submitLocalDirectory() {
     const directory = document.getElementById('localDirectory').value;
     if (!directory) {
-      alert('请输入文件路径');
+      await window.electron.showMessageBox({
+        type: 'warning',
+        title: '输入验证',
+        message: '请输入文件路径'
+      });
       return;
     }
 
@@ -385,14 +399,27 @@ export default class KnowledgeBaseHandler {
         document.getElementById('localDirectory').value = '';
         await this.updateMonitoredDirs();
       }
-      alert(data.message);
+      await window.electron.showMessageBox({
+        type: 'info',
+        title: '提交结果',
+        message: data.message
+      });
     } catch (error) {
-      alert('提交失败: ' + error.message);
+      await window.electron.showErrorBox('提交失败', error.message);
     }
   }
 
+  // 修改 deleteMonitoredDir 方法
   async deleteMonitoredDir(path) {
-    if (confirm('确定要删除该监控目录吗？')) {
+    const { response } = await window.electron.showMessageBox({
+      type: 'question',
+      title: '确认删除',
+      message: '确定要删除该监控目录吗？',
+      buttons: ['取消', '确定'],
+      cancelId: 0
+    });
+
+    if (response === 1) {
       try {
         const response = await fetch(`${this.BASE_URL}/admin/delete/monitored-dir`, {
           method: 'POST',
@@ -404,9 +431,13 @@ export default class KnowledgeBaseHandler {
         if (data.success) {
           await this.updateMonitoredDirs();
         }
-        alert(data.message);
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '删除结果',
+          message: data.message
+        });
       } catch (error) {
-        alert('删除失败: ' + error.message);
+        await window.electron.showErrorBox('删除失败', error.message);
       }
     }
   }
@@ -485,12 +516,16 @@ export default class KnowledgeBaseHandler {
       const data = await response.json();
       if (data.success) {
         await this.updateMonitoredDirs();
-        alert('手动同步已触发');
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '同步状态',
+          message: '手动同步已触发'
+        });
       } else {
-        alert(data.message || '同步失败');
+        await window.electron.showErrorBox('同步失败', data.message || '同步失败');
       }
     } catch (error) {
-      alert('同步失败: ' + error.message);
+      await window.electron.showErrorBox('同步失败', error.message);
     }
   }
 }

@@ -59,7 +59,7 @@ export default class LocalServerManager {
 
     // 新增：获取 desiredState 方法
     getDesiredState() {
-        return this.store.get('serverDesiredState', false);
+        return this.store.get('serverDesiredState', true);
     }
 
     // 新增：获取和设置 javaProcess 方法
@@ -596,7 +596,8 @@ export default class LocalServerManager {
                             if (process.platform === 'win32') {
                                 spawn('taskkill', ['/F', '/T', '/PID', javaProcess.pid.toString()]);
                             } else {
-                                process.kill(-javaProcess.pid, 'SIGTERM');
+                                // 改为使用 SIGKILL 信号强制终止
+                                process.kill(-javaProcess.pid, 'SIGKILL');
                             }
                         }
                     } catch (err) {
@@ -676,15 +677,18 @@ export default class LocalServerManager {
 
         try {
             const pid = savedProcess.pid;
-            logger.info('[LocalServer] Stopping server... PID:  ' + pid);
+            logger.info('[LocalServer] Stopping server... PID: ' + pid);
+            
             if (process.platform === 'win32') {
                 spawn('taskkill', ['/pid', pid, '/f', '/t']);
             } else {
-                process.kill(pid, 'SIGTERM');
-            }
+                // 首先发送 SIGTERM 信号
 
-            // 等待进程完全停止
-            await this.waitForProcessStop(pid);
+                process.kill(pid, 'SIGTERM');
+                process.kill(pid, 'SIGKILL');
+                logger.info('[LocalServer] Sent SIGKILL signal');
+                
+            }
 
             this.deleteJavaProcess();
             logger.info('[LocalServer] Server stopped');

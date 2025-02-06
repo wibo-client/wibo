@@ -20,16 +20,20 @@ class AuthClass {
 
       const data = await response.json();
       if (data.success) {
-        alert('登录成功');
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '登录成功',
+          message: '登录成功'
+        });
         await this.setToken(data.token);
         return true;
       } else {
-        alert('登录失败: ' + data.message);
+        await window.electron.showErrorBox('登录失败', data.message);
         return false;
       }
     } catch (error) {
       console.error('登录错误:', error);
-      alert('登录失败');
+      await window.electron.showErrorBox('登录失败', error.message);
       return false;
     }
   }
@@ -46,15 +50,19 @@ class AuthClass {
 
       const data = await response.json();
       if (data.success) {
-        alert('注册成功，请登录');
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '注册成功',
+          message: '注册成功，请登录'
+        });
         return true;
       } else {
-        alert('注册失败: ' + data.message);
+        await window.electron.showErrorBox('注册失败', data.message);
         return false;
       }
     } catch (error) {
       console.error('注册错误:', error);
-      alert('注册失败');
+      await window.electron.showErrorBox('注册失败', error.message);
       return false;
     }
   }

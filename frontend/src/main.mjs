@@ -209,7 +209,7 @@ app.whenReady().then(async () => {
 
         await selectedPlugin.searchAndRerank(message, path, requestContext);
         requestContext.checkAborted();
-        
+
         await selectedPlugin.quickSearch_fetchDetailsWithLimit(message, path, requestContext);
         requestContext.checkAborted();
 
@@ -390,8 +390,29 @@ app.whenReady().then(async () => {
     }
   });
 
+  // 添加对话框相关的 IPC 处理器
+  ipcMain.handle('show-message-box', async (event, options) => {
+    // 确保在主窗口中显示对话框
+    const mainWindow = BrowserWindow.getFocusedWindow();
+    return await dialog.showMessageBox(mainWindow, {
+      ...options,
+      defaultId: 0,
+      cancelId: 1,
+      // 设置默认按钮，如果没有提供
+      buttons: options.buttons || ['确定'],
+      // 设置默认类型，如果没有提供
+      type: options.type || 'info'
+    });
+  });
+
+  ipcMain.handle('show-error-box', async (event, title, message) => {
+    return dialog.showErrorBox(title, message);
+  });
+
   // 确保在应用退出时清理 Java 进程
   app.on('before-quit', async () => {
+
+
     try {
       console.log('Stopping Java process...');
       // 直接调用内部停止方法，强制关闭进程

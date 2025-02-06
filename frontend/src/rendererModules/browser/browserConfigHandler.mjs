@@ -55,23 +55,40 @@ export default class BrowserConfigHandler {
 
     await window.electron.setGlobalConfig(config);
 
-    alert('配置已保存');
+    await window.electron.showMessageBox({
+      type: 'info',
+      title: '保存成功',
+      message: '配置已保存'
+    });
+    
     await this.loadConfigValues();
     await window.electron.reinitialize();
   }
 
   async handleSaveAK() {
-    const accessKey = document.getElementById('accessKey')?.value;
-    if (!accessKey) {
-      alert('请输入Access Key');
+    const accessKeyInput = document.getElementById('accessKey');
+    if (!accessKeyInput?.value) {
+      await window.electron.showMessageBox({
+        type: 'warning',
+        title: '输入验证',
+        message: '请输入Access Key'
+      });
       return;
     }
 
     const config = await window.electron.getGlobalConfig();
-    config.modelSK = accessKey;
+    config.modelSK = accessKeyInput.value;
 
     await window.electron.setGlobalConfig(config);
-    alert('Access Key已保存在客户端');
+    await window.electron.showMessageBox({
+      type: 'info',
+      title: '保存成功',
+      message: 'Access Key已保存在客户端'
+    });
+    
+    // 清空输入框
+    accessKeyInput.value = '';
+    
     await this.loadConfigValues();
   }
 }

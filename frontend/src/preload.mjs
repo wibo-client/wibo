@@ -88,7 +88,11 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('context-menu-command', (event, command, elementInfo) => {
       callback(command, elementInfo);
     });
-  }
+  },
+
+  // 添加对话框相关方法
+  showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
+  showErrorBox: (title, message) => ipcRenderer.invoke('show-error-box', title, message)
 });
 
 // 认证相关 API
