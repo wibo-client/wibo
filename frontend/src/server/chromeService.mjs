@@ -191,7 +191,7 @@ class ChromeService {
             return this.browser;
         } catch (error) {
             logger.error('[ChromeService] 启动浏览器失败:', error);
-            throw new Error(`启动浏览器失败: ${error.message}`);
+            throw new Error(`启动浏览器失败 : 请确认你的电脑安装了chrome浏览器的较新版本。 : ${error.message}`);
         }
     }
 
