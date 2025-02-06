@@ -10,6 +10,7 @@ import com.wibot.persistence.RefineryTaskRepository;
 import com.wibot.persistence.entity.RefineryFactDO;
 import com.wibot.persistence.entity.RefineryTaskDO;
 import com.wibot.service.RefineryService.ExtractFactsResult;
+import com.wibot.service.dto.BatchExtractTask;
 import com.wibot.service.dto.ExtractedFact;
 import com.wibot.utils.JsonExtractor;
 
@@ -81,6 +82,8 @@ public class SearchService {
     @Autowired
     private MarkdownParagraphRepository markdownParagraphRepository;
 
+    public final int MAX_BATCH_SIZE = 28720;
+
     private final AtomicLong taskIdGenerator = new AtomicLong(0);
     private final ExecutorService executorService = Executors.newFixedThreadPool(3,
             new ThreadFactory() {
@@ -90,7 +93,7 @@ public class SearchService {
                 public Thread newThread(Runnable r) {
                     Thread thread = new Thread(r);
                     thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
-                    thread.setDaemon(false);
+                    thread.setDaemon(true);
                     return thread;
                 }
             });
@@ -560,7 +563,7 @@ public class SearchService {
 
             // 为每个文档创建一个处理任务
             Future<List<SearchResultVO>> docFuture = refineryService.submitTask(
-                    () -> processDocument(documentData, task, 0));
+                    () -> processDocument(documentData, task));
 
             documentFutures.add(docFuture);
         }
@@ -585,84 +588,91 @@ public class SearchService {
         return documentDataRepository.findByFilePathLike(sqlPattern);
     }
 
-    // 添加重试相关的常量
-    private static final int MAX_RETRIES = 3;
-    private static final long RETRY_DELAY_MS = 1000; // 1秒延迟
-
     // 添加处理单个文档的方法
-    private List<SearchResultVO> processDocument(DocumentDataPO documentData, CollectFactsTask task, int retryCount) {
-        List<SearchResultVO> docResults = new ArrayList<>();
+    private List<SearchResultVO> processDocument(DocumentDataPO documentData, CollectFactsTask task) {
         Long documentDataId = documentData.getId();
         String title = documentData.getFileName();
 
         try {
             List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
-            task.addSystemLog(
-                    String.format("📝 文档 %s: 找到 %d 个段落需要分析，本步骤较慢，多等等哦", documentData.getFileName(), paragraphs.size()));
+            task.addSystemLog(String.format("📝 文档 %s: 找到 %d 个段落需要分析", documentData.getFileName(), paragraphs.size()));
 
-            List<Map<String, Object>> batchInput = paragraphs.stream()
-                    .map(paragraph -> {
-                        Map<String, Object> content = new HashMap<>();
-                        content.put("id", paragraph.getId().toString());
-                        content.put("content", paragraph.getContent());
-                        return content;
-                    })
-                    .collect(Collectors.toList());
+            // 计算每个段落的JSON大小并分组
+            List<List<Map<String, Object>>> batches = new ArrayList<>();
+            List<Map<String, Object>> currentBatch = new ArrayList<>();
+            int currentBatchSize = 0;
 
-            ExtractFactsResult result = refineryService.extractFactsFromContent(batchInput, task.getQuery());
+            for (MarkdownParagraphPO paragraph : paragraphs) {
+                Map<String, Object> content = new HashMap<>();
+                content.put("id", paragraph.getId().toString());
+                content.put("content", paragraph.getContent());
 
-            int relevantFacts = (int) result.getFacts().stream()
-                    .filter(fact -> !fact.getFact().isEmpty())
-                    .count();
-            task.addSystemLog(String.format("✨ 文档 %s: AI分析完成，找到 %d 个相关内容", documentData.getFileName(), relevantFacts));
+                // 计算JSON大小
+                String jsonContent = objectMapper.writeValueAsString(content);
+                int contentSize = jsonContent.length();
 
-            Map<Long, String> summaryMap = result.getFacts().stream()
-                    .collect(Collectors.toMap(
-                            fact -> Long.parseLong(fact.getId()),
-                            ExtractedFact::getFact,
-                            (existing, replacement) -> existing));
+                // 如果加入当前内容后会超过最大批次大小，创建新批次
+                if (currentBatchSize + contentSize > MAX_BATCH_SIZE) {
+                    batches.add(new ArrayList<>(currentBatch));
+                    currentBatch.clear();
+                    currentBatchSize = 0;
+                }
 
-            return paragraphs.stream()
-                    .map(paragraph -> new SearchResultVO(
-                            paragraph.getId(),
-                            title,
-                            summaryMap.getOrDefault(paragraph.getId(), ""),
-                            paragraph.getCreatedDateTime(),
-                            documentData.getFilePath()))
-                    .filter(searchResult -> {
-                        String description = searchResult.getDescription();
-                        return description != null && !description.isEmpty();
-                    })
-                    .collect(Collectors.toList());
+                currentBatch.add(content);
+                currentBatchSize += contentSize;
+            }
 
-        } catch (Exception e) {
-            if (retryCount < MAX_RETRIES) {
-                task.addSystemLog(String.format("⚠️ 文档 %s: 处理出错 (第%d次重试): %s",
-                        documentData.getFileName(), retryCount + 1, e.getMessage()));
+            // 添加最后一个批次
+            if (!currentBatch.isEmpty()) {
+                batches.add(currentBatch);
+            }
+
+            task.addSystemLog(String.format("📦 文档已分成 %d 个批次进行处理", batches.size()));
+
+            // 提交所有批次的提取任务
+            List<Future<ExtractFactsResult>> futures = new ArrayList<>();
+            for (int i = 0; i < batches.size(); i++) {
+                BatchExtractTask extractTask = new BatchExtractTask(batches.get(i), task.getQuery(), i,
+                        refineryService);
+                futures.add(refineryService.submitTask(extractTask));
+            }
+
+            // 收集所有结果
+            Map<Long, List<String>> factMap = new HashMap<>();
+            for (Future<ExtractFactsResult> future : futures) {
                 try {
-                    Thread.sleep(RETRY_DELAY_MS * (retryCount + 1)); // 递增延迟
-                    return processDocument(documentData, task, retryCount + 1);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("处理被中断", ie);
+                    ExtractFactsResult result = future.get();
+                    for (ExtractedFact fact : result.getFacts()) {
+                        Long paragraphId = Long.parseLong(fact.getId());
+                        factMap.computeIfAbsent(paragraphId, k -> new ArrayList<>()).add(fact.getFact());
+                    }
+                } catch (Exception e) {
+                    task.addSystemLog("⚠️ 批次处理出错: " + e.getMessage());
+                    logger.error("Error processing batch", e);
                 }
             }
 
-            task.addSystemLog(String.format("❌ 文档 %s: 处理失败 (已重试%d次): %s",
-                    documentData.getFileName(), retryCount, e.getMessage()));
-            logger.error("Error processing document {} after {} retries: {}",
-                    documentData.getFilePath(), retryCount, e.getMessage());
-
-            // 所有重试都失败后，返回空描述的结果
-            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
             return paragraphs.stream()
-                    .map(paragraph -> new SearchResultVO(
-                            paragraph.getId(),
-                            title,
-                            "",
-                            paragraph.getCreatedDateTime(),
-                            documentData.getFilePath()))
+                    .map(paragraph -> {
+                        List<String> facts = factMap.getOrDefault(paragraph.getId(), Collections.emptyList());
+                        String combinedFacts = String.join("\n", facts);
+                        return new SearchResultVO(
+                                paragraph.getId(),
+                                title,
+                                combinedFacts,
+                                paragraph.getCreatedDateTime(),
+                                documentData.getFilePath());
+                    })
+                    .filter(searchResult -> !searchResult.getDescription().isEmpty())
                     .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            task.addSystemLog(String.format("❌ 文档 %s: 处理失败 (已重试%d次): %s",
+                    documentData.getFileName(), e.getMessage()));
+            logger.error("Error processing document {} after {} retries: {}",
+                    documentData.getFilePath(), e.getMessage());
+
+            return Collections.emptyList();
         }
     }
 }

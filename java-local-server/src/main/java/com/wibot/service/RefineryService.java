@@ -19,8 +19,10 @@ import com.wibot.persistence.entity.DocumentDataPO;
 import com.wibot.persistence.entity.MarkdownParagraphPO;
 import com.wibot.persistence.entity.RefineryFactDO;
 import com.wibot.persistence.entity.RefineryTaskDO;
+import com.wibot.service.dto.BatchProcessResult;
 import com.wibot.service.dto.ExtractFactResponse;
 import com.wibot.service.dto.ExtractedFact;
+import com.wibot.service.dto.PrecomputedFactsExtractTask;
 import com.wibot.utils.JsonExtractor;
 
 import jakarta.annotation.PostConstruct;
@@ -98,7 +100,7 @@ public class RefineryService implements DocumentEventListener {
                 public Thread newThread(Runnable r) {
                     Thread thread = new Thread(r);
                     thread.setName("RefineryService-Worker-" + threadNumber.getAndIncrement());
-                    thread.setDaemon(false);
+                    thread.setDaemon(true);
                     return thread;
                 }
             }, new ThreadPoolExecutor.CallerRunsPolicy());
@@ -270,7 +272,7 @@ public class RefineryService implements DocumentEventListener {
             List<Map<String, Object>> singleItemBatch = Collections.singletonList(reference);
 
             Future<BatchProcessResult> future = submitTask(
-                    new BatchProcessTask(singleItemBatch, question, task, batchIndex, this));
+                    new PrecomputedFactsExtractTask(singleItemBatch, question, task, batchIndex, this));
             futures.add(future);
 
             batchIndex++;
@@ -282,47 +284,6 @@ public class RefineryService implements DocumentEventListener {
 
         return futures;
     }
-
-    // private void updateTaskWithRetry(Long taskId, int responseLength, Long
-    // paragraphId, String response) {
-    // int maxRetries = 3;
-    // int retryCount = 0;
-    // boolean success = false;
-
-    // while (!success && retryCount < maxRetries) {
-    // try {
-    // RefineryTaskDO task = refineryTaskRepository.findById(taskId)
-    // .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
-
-    // // 更新task信息
-    // task.setFullUpdateTokenCost(task.getFullUpdateTokenCost() + responseLength);
-    // task.setProcessingCheckpoint(paragraphId.toString());
-
-    // // // 构建索引
-    // // documentIndexService.buildRefineryTaskIndex(taskId, response,
-    // paragraphId);
-
-    // success = true;
-
-    // } catch (Exception e) {
-    // retryCount++;
-    // if (retryCount == maxRetries) {
-    // logger.error("Failed to update task after {} retries for taskId: {}",
-    // maxRetries, taskId, e);
-    // throw new RuntimeException("Failed to update task after " + maxRetries + "
-    // retries", e);
-    // }
-    // logger.warn("Retry {} - Failed to update task: {}, will retry in 1 second",
-    // retryCount, taskId);
-    // try {
-    // Thread.sleep(1000);
-    // } catch (InterruptedException ie) {
-    // Thread.currentThread().interrupt();
-    // throw new RuntimeException("Task update interrupted", ie);
-    // }
-    // }
-    // }
-    // }
 
     /**
      * 用于封装LLM调用结果的类
@@ -626,51 +587,6 @@ public class RefineryService implements DocumentEventListener {
         // 删除数据库中的数据
         refineryFactRepository.deleteByRefineryTaskId(taskId);
         refineryTaskRepository.deleteById(taskId);
-    }
-
-    // 添加静态内部类 BatchProcessResult
-    private static class BatchProcessResult {
-        private final int tokenCost;
-        private final Long minId;
-
-        public BatchProcessResult(int tokenCost, Long minId) {
-            this.tokenCost = tokenCost;
-            this.minId = minId;
-        }
-
-        public int getTokenCost() {
-            return tokenCost;
-        }
-
-        public Long getMinId() {
-            return minId;
-        }
-    }
-
-    // 添加静态内部类 BatchProcessTask
-    private static class BatchProcessTask implements Callable<BatchProcessResult> {
-        private final List<Map<String, Object>> batch;
-        private final String question;
-        private final RefineryTaskDO task;
-        private final int batchIndex;
-        private final RefineryService service;
-
-        public BatchProcessTask(List<Map<String, Object>> batch, String question, RefineryTaskDO task, int batchIndex,
-                RefineryService service) {
-            this.batch = batch;
-            this.question = question;
-            this.task = task;
-            this.batchIndex = batchIndex;
-            this.service = service;
-        }
-
-        @Override
-        public BatchProcessResult call() {
-            BatchProcessResult batchProcessResult = service.processBatchAndGetTokenCost(batch, question, task.getId(),
-                    batchIndex);
-
-            return batchProcessResult;
-        }
     }
 
     @PreDestroy
