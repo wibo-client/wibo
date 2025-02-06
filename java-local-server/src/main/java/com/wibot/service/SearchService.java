@@ -11,7 +11,10 @@ import com.wibot.persistence.entity.RefineryFactDO;
 import com.wibot.persistence.entity.RefineryTaskDO;
 import com.wibot.service.RefineryService.ExtractFactsResult;
 import com.wibot.service.dto.BatchExtractTask;
+import com.wibot.service.dto.CollectFactsTask;
 import com.wibot.service.dto.ExtractedFact;
+import com.wibot.service.dto.SearchStrategy;
+import com.wibot.service.dto.TaskContext;
 import com.wibot.utils.JsonExtractor;
 
 import jakarta.annotation.PreDestroy;
@@ -28,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,28 +89,17 @@ public class SearchService {
     public final int MAX_BATCH_SIZE = 28720;
 
     private final AtomicLong taskIdGenerator = new AtomicLong(0);
-    private final ExecutorService executorService = Executors.newFixedThreadPool(3,
-            new ThreadFactory() {
-                private final AtomicInteger threadNumber = new AtomicInteger(1);
+    private final ExecutorService executorService = Executors.newFixedThreadPool(3, new ThreadFactory() {
+        private final AtomicInteger threadNumber = new AtomicInteger(1);
 
-                @Override
-                public Thread newThread(Runnable r) {
-                    Thread thread = new Thread(r);
-                    thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
-                    thread.setDaemon(true);
-                    return thread;
-                }
-            });
-
-    private static class TaskContext {
-        final CollectFactsTask task;
-        final Future<?> future;
-
-        TaskContext(CollectFactsTask task, Future<?> future) {
-            this.task = task;
-            this.future = future;
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread thread = new Thread(r);
+            thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
         }
-    }
+    });
 
     private static final ConcurrentHashMap<Long, TaskContext> taskContexts = new ConcurrentHashMap<>();
 
@@ -123,18 +116,12 @@ public class SearchService {
         }
     }
 
-    private enum SearchStrategy {
-        DIRECT_CONTENT, // 直接获取文档内容
-        SIMILAR_QUESTION, // 类似问题答案
-        NEW_QUESTION // 新问题处理
-    }
-
     public Map<String, Object> getCollectFactsStatus(Long taskId) {
         TaskContext context = taskContexts.get(taskId);
         if (context == null) {
             return null;
         }
-        return context.task.getStatus();
+        return context.getTask().getStatusMap();
     }
 
     private void processCollectFactsTask(CollectFactsTask task) {
@@ -165,98 +152,6 @@ public class SearchService {
             task.addSystemLog("❌ 任务处理失败: " + e.getMessage());
             setTaskStatus(task, CollectFactsTask.STATUS_FAILED);
             task.setError(e.getMessage());
-        }
-    }
-
-    private static class CollectFactsTask {
-        // 添加任务状态常量
-        public static final String STATUS_PENDING = "PENDING";
-        public static final String STATUS_PROCESSING = "PROCESSING";
-        public static final String STATUS_COMPLETED = "COMPLETED";
-        public static final String STATUS_FAILED = "FAILED";
-        public static final String STATUS_CANCELLED = "CANCELLED";
-
-        private final Long taskId;
-        private final String pathPrefix;
-        private final String query;
-        private volatile String status = STATUS_PENDING;
-        private volatile String error;
-        private volatile List<Map<String, Object>> results;
-        private SearchStrategy searchStrategy;
-        private List<Long> similarTaskIds;
-        private final List<String> systemLogs = Collections.synchronizedList(new ArrayList<>());
-
-        public CollectFactsTask(Long taskId, String pathPrefix, String query) {
-            this.taskId = taskId;
-            this.pathPrefix = pathPrefix;
-            this.query = query;
-        }
-
-        private boolean isTerminalStatus(String status) {
-            return STATUS_COMPLETED.equals(status) ||
-                    STATUS_FAILED.equals(status) ||
-                    STATUS_CANCELLED.equals(status);
-        }
-
-        public synchronized Map<String, Object> getStatus() {
-            Map<String, Object> statusMap = new HashMap<>();
-            statusMap.put("taskId", taskId);
-            statusMap.put("status", status);
-            statusMap.put("error", error);
-            statusMap.put("results", results);
-            statusMap.put("systemLogs", systemLogs); // 添加系统日志到状态
-
-            // 如果是终态，返回状态后清理任务
-            if (isTerminalStatus(status)) {
-                SearchService.taskContexts.remove(taskId);
-            }
-
-            return statusMap;
-        }
-
-        public void setStatus(String status) {
-            this.status = status;
-        }
-
-        public void setError(String error) {
-            this.error = error;
-        }
-
-        public void setResults(List<Map<String, Object>> results) {
-            this.results = results;
-        }
-
-        public Long getTaskId() {
-            return taskId;
-        }
-
-        public String getPathPrefix() {
-            return pathPrefix;
-        }
-
-        public String getQuery() {
-            return query;
-        }
-
-        public void setSearchStrategy(SearchStrategy strategy) {
-            this.searchStrategy = strategy;
-        }
-
-        public SearchStrategy getSearchStrategy() {
-            return searchStrategy;
-        }
-
-        public void setSimilarTaskIds(List<Long> taskIds) {
-            this.similarTaskIds = taskIds;
-        }
-
-        public List<Long> getSimilarTaskIds() {
-            return similarTaskIds;
-        }
-
-        // 添加日志方法
-        public void addSystemLog(String log) {
-            systemLogs.add(log);
         }
     }
 
@@ -293,7 +188,7 @@ public class SearchService {
 
     private CollectFactsTask createCollectFactsTask(String pathPrefix, String query) {
         Long taskId = taskIdGenerator.incrementAndGet();
-        return new CollectFactsTask(taskId, pathPrefix, query);
+        return new CollectFactsTask(taskId, pathPrefix, query, taskContexts);
     }
 
     private static class SimilarQuestionResult {
@@ -392,13 +287,13 @@ public class SearchService {
         }
 
         // 取消任务执行
-        if (context.future != null) {
-            context.future.cancel(true);
+        if (context.getFuture() != null) {
+            context.getFuture().cancel(true);
         }
 
         // 更新任务状态
-        context.task.setStatus(CollectFactsTask.STATUS_CANCELLED);
-        context.task.setError("Task cancelled by user");
+        context.getTask().setStatus(CollectFactsTask.STATUS_CANCELLED);
+        context.getTask().setError("Task cancelled by user");
     }
 
     // 修改任务状态设置方法，添加时间戳
@@ -549,34 +444,8 @@ public class SearchService {
             task.addSystemLog("✅ 成功定位目标文档");
         }
 
-        List<SearchResultVO> searchResults = new ArrayList<>();
-        List<Future<List<SearchResultVO>>> documentFutures = new ArrayList<>();
-        int processedDocs = 0;
-
-        // 首先批量提交所有文档的处理任务
-        for (DocumentDataPO documentData : documentDataList) {
-            processedDocs++;
-            final int currentDoc = processedDocs;
-
-            task.addSystemLog(String.format("📄 提交文档处理任务 (%d/%d): %s",
-                    currentDoc, documentDataList.size(), documentData.getFileName()));
-
-            // 为每个文档创建一个处理任务
-            Future<List<SearchResultVO>> docFuture = refineryService.submitTask(
-                    () -> processDocument(documentData, task));
-
-            documentFutures.add(docFuture);
-        }
-
-        // 等待所有文档处理完成并收集结果
-        for (Future<List<SearchResultVO>> future : documentFutures) {
-            try {
-                searchResults.addAll(future.get());
-            } catch (Exception e) {
-                logger.error("Error getting document processing results", e);
-                task.addSystemLog("⚠️ 获取处理结果时出错: " + e.getMessage());
-            }
-        }
+        // 为每个文档创建一个处理任务
+        List<SearchResultVO> searchResults = processDocuments(documentDataList, task);
 
         task.addSystemLog(String.format("🎯 所有文档处理完成，共找到 %d 个结果", searchResults.size()));
         searchResults.sort((r1, r2) -> Long.compare(r1.getId(), r2.getId()));
@@ -589,90 +458,140 @@ public class SearchService {
     }
 
     // 添加处理单个文档的方法
-    private List<SearchResultVO> processDocument(DocumentDataPO documentData, CollectFactsTask task) {
-        Long documentDataId = documentData.getId();
-        String title = documentData.getFileName();
+    private static class BatchProcessingInfo {
+        private final Future<ExtractFactsResult> future;
+        private final DocumentDataPO documentData;
 
-        try {
-            List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository.findByDocumentDataId(documentDataId);
-            task.addSystemLog(String.format("📝 文档 %s: 找到 %d 个段落需要分析", documentData.getFileName(), paragraphs.size()));
-
-            // 计算每个段落的JSON大小并分组
-            List<List<Map<String, Object>>> batches = new ArrayList<>();
-            List<Map<String, Object>> currentBatch = new ArrayList<>();
-            int currentBatchSize = 0;
-
-            for (MarkdownParagraphPO paragraph : paragraphs) {
-                Map<String, Object> content = new HashMap<>();
-                content.put("id", paragraph.getId().toString());
-                content.put("content", paragraph.getContent());
-
-                // 计算JSON大小
-                String jsonContent = objectMapper.writeValueAsString(content);
-                int contentSize = jsonContent.length();
-
-                // 如果加入当前内容后会超过最大批次大小，创建新批次
-                if (currentBatchSize + contentSize > MAX_BATCH_SIZE) {
-                    batches.add(new ArrayList<>(currentBatch));
-                    currentBatch.clear();
-                    currentBatchSize = 0;
-                }
-
-                currentBatch.add(content);
-                currentBatchSize += contentSize;
-            }
-
-            // 添加最后一个批次
-            if (!currentBatch.isEmpty()) {
-                batches.add(currentBatch);
-            }
-
-            task.addSystemLog(String.format("📦 文档已分成 %d 个批次进行处理", batches.size()));
-
-            // 提交所有批次的提取任务
-            List<Future<ExtractFactsResult>> futures = new ArrayList<>();
-            for (int i = 0; i < batches.size(); i++) {
-                BatchExtractTask extractTask = new BatchExtractTask(batches.get(i), task.getQuery(), i,
-                        refineryService);
-                futures.add(refineryService.submitTask(extractTask));
-            }
-
-            // 收集所有结果
-            Map<Long, List<String>> factMap = new HashMap<>();
-            for (Future<ExtractFactsResult> future : futures) {
-                try {
-                    ExtractFactsResult result = future.get();
-                    for (ExtractedFact fact : result.getFacts()) {
-                        Long paragraphId = Long.parseLong(fact.getId());
-                        factMap.computeIfAbsent(paragraphId, k -> new ArrayList<>()).add(fact.getFact());
-                    }
-                } catch (Exception e) {
-                    task.addSystemLog("⚠️ 批次处理出错: " + e.getMessage());
-                    logger.error("Error processing batch", e);
-                }
-            }
-
-            return paragraphs.stream()
-                    .map(paragraph -> {
-                        List<String> facts = factMap.getOrDefault(paragraph.getId(), Collections.emptyList());
-                        String combinedFacts = String.join("\n", facts);
-                        return new SearchResultVO(
-                                paragraph.getId(),
-                                title,
-                                combinedFacts,
-                                paragraph.getCreatedDateTime(),
-                                documentData.getFilePath());
-                    })
-                    .filter(searchResult -> !searchResult.getDescription().isEmpty())
-                    .collect(Collectors.toList());
-
-        } catch (Exception e) {
-            task.addSystemLog(String.format("❌ 文档 %s: 处理失败 (已重试%d次): %s",
-                    documentData.getFileName(), e.getMessage()));
-            logger.error("Error processing document {} after {} retries: {}",
-                    documentData.getFilePath(), e.getMessage());
-
-            return Collections.emptyList();
+        public BatchProcessingInfo(Future<ExtractFactsResult> future, DocumentDataPO documentData) {
+            this.future = future;
+            this.documentData = documentData;
         }
+    }
+
+    private List<SearchResultVO> processDocuments(List<DocumentDataPO> documentDataList, CollectFactsTask task) {
+
+        int processedDocs = 0;
+
+        // 修改为存储BatchProcessingInfo的列表
+        List<BatchProcessingInfo> batchProcessingInfos = new ArrayList<>();
+
+        // 首先批量提交所有文档的处理任务
+        for (DocumentDataPO documentData : documentDataList) {
+            processedDocs++;
+            final int currentDoc = processedDocs;
+            if (task.getStatus().equals(CollectFactsTask.STATUS_CANCELLED)) {
+                task.addSystemLog("❌ 任务已取消，停止处理文档");
+                break;
+            }
+            task.addSystemLog(String.format("📄 提交文档处理任务 (%d/%d): %s",
+                    currentDoc, documentDataList.size(), documentData.getFileName()));
+
+            Long documentDataId = documentData.getId();
+            try {
+                List<MarkdownParagraphPO> paragraphs = markdownParagraphRepository
+                        .findByDocumentDataIdOrderById(documentDataId);
+                task.addSystemLog(
+                        String.format("📝 文档 %s: 找到 %d 个段落需要分析", documentData.getFileName(), paragraphs.size()));
+
+                // 计算每个段落的JSON大小并分组
+                List<List<Map<String, Object>>> batches = new ArrayList<>();
+                List<Map<String, Object>> currentBatch = new ArrayList<>();
+                int currentBatchSize = 0;
+
+                for (MarkdownParagraphPO paragraph : paragraphs) {
+                    Map<String, Object> content = new HashMap<>();
+
+                    content.put("documentPartFileName", documentData.getFileName());
+                    content.put("id", paragraph.getId().toString());
+                    content.put("content", paragraph.getContent());
+
+                    // 计算JSON大小
+                    String jsonContent = objectMapper.writeValueAsString(content);
+                    int contentSize = jsonContent.length();
+
+                    // 如果加入当前内容后会超过最大批次大小，创建新批次
+                    if (currentBatchSize + contentSize > MAX_BATCH_SIZE) {
+                        batches.add(new ArrayList<>(currentBatch));
+                        currentBatch.clear();
+                        currentBatchSize = 0;
+                    }
+
+                    currentBatch.add(content);
+                    currentBatchSize += contentSize;
+                }
+
+                // 添加最后一个批次
+                if (!currentBatch.isEmpty()) {
+                    batches.add(currentBatch);
+                }
+
+                task.addSystemLog(String.format("当前文档已分成 %d 个批次进行处理", batches.size()));
+
+                for (int i = 0; i < batches.size(); i++) {
+                    BatchExtractTask extractTask = new BatchExtractTask(batches.get(i), task.getQuery(), i,
+                            refineryService, task);
+                    Future<ExtractFactsResult> future = refineryService.submitTask(extractTask);
+                    batchProcessingInfos.add(new BatchProcessingInfo(future, documentData));
+                }
+
+            } catch (Exception e) {
+                task.addSystemLog(String.format("❌ 文档 %s: 处理失败: %s",
+                        documentData.getFileName(), e.getMessage()));
+                logger.error("Error processing document {}: {}",
+                        documentData.getFilePath(), e.getMessage());
+            }
+        }
+        task.addSystemLog("🚀 所有批次任务已提交，会并行执行");
+
+        // 收集所有结果
+        Map<Long, List<String>> factMap = new HashMap<>();
+        Map<Long, DocumentDataPO> documentDataMap = new HashMap<>();
+        int totalBatches = batchProcessingInfos.size();
+
+        for (int i = 0; i < batchProcessingInfos.size(); i++) {
+            BatchProcessingInfo info = batchProcessingInfos.get(i);
+
+            if (task.getStatus().equals(CollectFactsTask.STATUS_CANCELLED)) {
+                info.future.cancel(true);
+                continue;
+            }
+            try {
+                task.addSystemLog(String.format("⏳ 正在处理第 %d/%d 批次...", i + 1, totalBatches));
+                ExtractFactsResult result = info.future.get();
+
+                for (ExtractedFact fact : result.getFacts()) {
+                    Long paragraphId = fact.getId();
+                    if (fact.getFact() != null && !fact.getFact().isEmpty()) {
+                        factMap.computeIfAbsent(paragraphId, k -> new ArrayList<>()).add(fact.getFact());
+                        documentDataMap.put(paragraphId, info.documentData);
+                    }
+                }
+
+            } catch (Exception e) {
+                task.addSystemLog(String.format("❌ 第 %d/%d 批次处理失败: %s", i + 1, totalBatches, e.getMessage()));
+                logger.error("Error processing batch {}/{}", i + 1, totalBatches, e);
+            }
+        }
+
+        // 使用 factMap 和 documentDataMap 构建搜索结果
+        List<SearchResultVO> searchResults = factMap.entrySet().stream()
+                .map(entry -> {
+                    Long paragraphId = entry.getKey();
+                    List<String> facts = entry.getValue();
+                    DocumentDataPO docData = documentDataMap.get(paragraphId);
+                    String combinedFacts = String.join("\n", facts);
+
+                    return new SearchResultVO(
+                            paragraphId,
+                            docData.getFileName(),
+                            combinedFacts,
+                            LocalDateTime.now(),
+                            docData.getFilePath());
+                })
+                .filter(searchResult -> !searchResult.getDescription().isEmpty())
+                .sorted((r1, r2) -> Long.compare(r1.getId(), r2.getId()))
+                .collect(Collectors.toList());
+
+        return searchResults;
     }
 }

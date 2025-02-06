@@ -1,4 +1,5 @@
 import { AbstractIndexHandler } from './abstractIndexHandler.mjs';
+import logger from '../utils/loggerUtils.mjs';
 
 export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
     constructor() {
@@ -97,7 +98,18 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                     }
                     lastLogCount = statusData.systemLogs.length;
                 }
-
+                logger.info(`Task is aborted? ${requestContext.abortSignal.aborted}`);
+                // 检查是否被中止
+                if (requestContext.abortSignal.aborted) {
+                    logger.info(`Task ${taskId} was aborted by user`);
+                    await fetch(`${this.BASE_URL}/collectFacts/${taskId}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    throw new Error('Task was aborted by user');
+                }
                 // 5. 检查任务状态并返回结果
                 switch (statusData.status) {
                     case 'COMPLETED':
@@ -117,16 +129,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                         throw new Error(`Unknown task status: ${statusData.status}`);
                 }
 
-                // 检查是否被中止
-                if (requestContext.isAborted) {
-                    await fetch(`${this.BASE_URL}/collectFacts/${taskId}/cancel`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                    });
-                    throw new Error('Task was aborted by user');
-                }
+                
             }
         } catch (error) {
             console.error('CollectFacts failed:', error);

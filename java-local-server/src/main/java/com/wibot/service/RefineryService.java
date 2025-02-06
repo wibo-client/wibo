@@ -374,7 +374,7 @@ public class RefineryService implements DocumentEventListener {
 
             boolean isFirst = true;
             for (ExtractedFact fact : result.getFacts()) {
-                Long paragraphId = Long.parseLong(fact.getId());
+                Long paragraphId = fact.getId();
                 if (isFirst) {
                     logger.info("Extracted facts: {}", result.getFacts());
                     isFirst = false;
