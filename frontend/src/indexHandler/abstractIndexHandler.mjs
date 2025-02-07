@@ -35,7 +35,7 @@ export class AbstractIndexHandler {
         throw new Error('Method not implemented.');
     }
 
-    async fetchAggregatedContent(summaryList,requestContext) {
+    async fetchAggregatedContent(summaryList, requestContext) {
         throw new Error('Method not implemented.');
     }
 
@@ -129,7 +129,7 @@ export class AbstractIndexHandler {
             let addedCount = 0;
             for (const item of result) {
                 if (addedCount >= resultsPerQuery) break;
-                
+
                 // 检查标题是否已存在
                 if (!seenTitles.has(item.title)) {
                     searchResults.push(item);
@@ -233,16 +233,17 @@ export class AbstractIndexHandler {
 
         // 获取配置的限制数量
         const pageFetchLimit = await this.globalContext.configHandler.getPageFetchLimit();
-        
+
         // 限制处理数量
         const limitedResults = searchResults.slice(0, pageFetchLimit);
         requestContext.sendSystemLog(`🔍 将处理前 ${pageFetchLimit} 条搜索结果`);
 
-        const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(limitedResults,requestContext);
+        const detailsSearchResults = await requestContext.selectedPlugin.fetchAggregatedContent(limitedResults, requestContext);
         requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 个详细内容，开始回答问题，你可以通过调整 [单次查询详情页抓取数量] 来调整依托多少内容来回答问题`);
 
         requestContext.results.detailsSearchResults = detailsSearchResults;
     }
+
 
 
     async refineBatch(currentBatch, message, requestContext, roundIndex, batchIndex) {
@@ -258,6 +259,7 @@ export class AbstractIndexHandler {
                 break;
             } catch (error) {
                 console.error(`Error in LLM call attempt ${j + 1}:`, error);
+                requestContext.sendSystemLog(`❌ 第 ${roundIndex} 轮精炼，第 ${batchIndex} 个批次处理失败，尝试重新精炼...`);
             }
         }
 
@@ -267,11 +269,10 @@ export class AbstractIndexHandler {
             const result = refinedAnswer.join('').split('\n\n--- 分割线 ---\n\n');
             return Array.isArray(result) ? result : [result];
         } else {
-            requestContext.sendSystemLog('❌ 内容精炼失败');
+            requestContext.sendSystemLog('❌ 多次尝试后，内容精炼仍然失败');
             return null;
         }
     }
-
     // 输入： requestContext.results.parsedFacts;
     async deepSearch_refineParsedFacts(message, path, requestContext) {
         const searchResults = requestContext.results.parsedFacts;
