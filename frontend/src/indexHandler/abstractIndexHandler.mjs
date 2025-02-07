@@ -273,6 +273,7 @@ export class AbstractIndexHandler {
             return null;
         }
     }
+
     // 输入： requestContext.results.parsedFacts;
     async deepSearch_refineParsedFacts(message, path, requestContext) {
         const searchResults = requestContext.results.parsedFacts;
@@ -319,31 +320,32 @@ export class AbstractIndexHandler {
             }
 
             let newRefinedContent = [];
-            let currentBatch = [];
-
-            // 按批次处理内容
+            let batches = [];
             let batchIndex = 1;
+
+            // 创建批次任务
+            let currentBatch = [];
             for (const content of refinedContent) {
                 if (currentBatch.join(' ').length + content.length <= this.MAX_CONTENT_SIZE) {
                     currentBatch.push(content);
                 } else {
-                    const refinedBatch = await this.refineBatch(currentBatch, message, requestContext, i + 1, batchIndex++);
-                    if (refinedBatch === null) {
-                        break;
-                    }
-                    newRefinedContent = newRefinedContent.concat(refinedBatch);
+                    batches.push(this.refineBatch(currentBatch, message, requestContext, i + 1, batchIndex++));
                     currentBatch = [content];
                 }
             }
-
-            // 处理剩余的批次
             if (currentBatch.length > 0) {
-                const refinedBatch = await this.refineBatch(currentBatch, message, requestContext, i + 1, batchIndex++);
-                if (refinedBatch !== null) {
-                    newRefinedContent = newRefinedContent.concat(refinedBatch);
-                }
+                batches.push(this.refineBatch(currentBatch, message, requestContext, i + 1, batchIndex++));
             }
 
+            // 并发处理所有批次
+            const results = await Promise.all(batches);
+
+            // 收集所有结果
+            for (const result of results) {
+                if (result !== null) {
+                    newRefinedContent = newRefinedContent.concat(result);
+                }
+            }
             refinedContent = newRefinedContent;
         }
 

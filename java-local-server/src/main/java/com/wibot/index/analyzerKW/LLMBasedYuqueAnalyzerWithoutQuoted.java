@@ -59,8 +59,8 @@ public class LLMBasedYuqueAnalyzerWithoutQuoted implements SearchEngineAnalyzer 
         DashScopeChatOptions ops = opsBuilder.build();
 
         Prompt analyzePrompt = new Prompt(messages, ops);
-        CallResponseSpec calls = singletonLLMChat.getChatClient().prompt(analyzePrompt).call();
-        String jsonResult = calls.content();
+        String jsonResult = singletonLLMChat.sendThrottledRequest(analyzePrompt);
+
         logger.info("Received JSON result from LLM: {}", jsonResult);
 
         // Parse the JSON result to extract the tokens

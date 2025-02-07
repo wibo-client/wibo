@@ -9,10 +9,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.ChatClient.CallResponseSpec;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,13 +17,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
-import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions.DashscopeChatOptionsBuilder;
 import com.wibot.index.SearchDocumentResult;
 import com.wibot.service.SingletonLLMChat;
-import com.wibot.service.SystemConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -76,8 +70,7 @@ public class LLMBasedRerankImpl implements DocumentRerankInterface {
         DashScopeChatOptions ops = opsBuilder.build();
 
         Prompt knowLodgeEvalPrompt = new Prompt(messages, ops);
-        CallResponseSpec calls = singletonLLMChat.getChatClient().prompt(knowLodgeEvalPrompt).call();
-        String jsonResult = calls.content();
+        String jsonResult = singletonLLMChat.sendThrottledRequest(knowLodgeEvalPrompt);
         logger.info("Received JSON result from LLM: {}", jsonResult);
 
         // Parse the JSON result to extract the document IDs in the new order

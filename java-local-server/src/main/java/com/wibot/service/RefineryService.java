@@ -89,7 +89,7 @@ public class RefineryService implements DocumentEventListener {
 
     // 替换原有的线程池定义
     private final ExecutorService batchProcessor = new ThreadPoolExecutor(3, // 核心线程数
-            3, // 最大线程数
+            20, // 最大线程数
             60L, // 空闲线程存活时间
             TimeUnit.SECONDS, // 时间单位
             new ArrayBlockingQueue<>(200), // 队列大小为200
@@ -328,10 +328,7 @@ public class RefineryService implements DocumentEventListener {
 
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
-                    String response = singletonLLMChat.getChatClient()
-                            .prompt(prompt)
-                            .call()
-                            .content();
+                    String response = singletonLLMChat.sendThrottledRequest(prompt);
 
                     String jsonStr = JsonExtractor.extractJsonFromResponse(response);
                     if (jsonStr == null) {

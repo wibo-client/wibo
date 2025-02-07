@@ -66,10 +66,9 @@ public class OCRServiceImpl implements OCRService {
                 List<Media> mediaList = List.of(new Media(MimeTypeUtils.IMAGE_PNG, imageBytes));
                 UserMessage message = new UserMessage(prompt, mediaList);
                 message.getMetadata().put("message_format", "image");
-
-                ChatResponse fluxResponse = singletonLLMChat.getChatModel().call(new Prompt(message,
-                        DashScopeChatOptions.builder().withModel(model).withMultiModel(true).build()));
-
+                Prompt mediaPrompt = new Prompt(message,
+                DashScopeChatOptions.builder().withModel(model).withMultiModel(true).build());
+                ChatResponse fluxResponse = singletonLLMChat.sendThrottledMediaRequest(mediaPrompt);
                 String result = fluxResponse.getResult().getOutput().getContent();
                 logger.info("Successfully recognized text: {}", result);
                 return result;

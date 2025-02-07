@@ -30,7 +30,8 @@ export default class BrowserConfigHandler {
       const configFields = [
         'browserTimeout',
         'searchItemNumbers',
-        'pageFetchLimit'
+        'pageFetchLimit',
+        'llmConcurrency'  // 添加新的配置项
       ];
 
       configFields.forEach(key => {
@@ -52,6 +53,7 @@ export default class BrowserConfigHandler {
     config.browserTimeout = document.getElementById('browserTimeout')?.value;
     config.searchItemNumbers = document.getElementById('searchItemNumbers')?.value;
     config.pageFetchLimit = document.getElementById('pageFetchLimit')?.value;
+    config.llmConcurrency = document.getElementById('llmConcurrency')?.value;  // 添加新配置项的保存
 
     await window.electron.setGlobalConfig(config);
 
@@ -60,7 +62,7 @@ export default class BrowserConfigHandler {
       title: '保存成功',
       message: '配置已保存'
     });
-    
+
     await this.loadConfigValues();
     await window.electron.reinitialize();
   }
@@ -85,10 +87,10 @@ export default class BrowserConfigHandler {
       title: '保存成功',
       message: 'Access Key已保存在客户端'
     });
-    
+
     // 清空输入框
     accessKeyInput.value = '';
-    
+
     await this.loadConfigValues();
   }
 }

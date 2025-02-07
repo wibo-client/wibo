@@ -16,7 +16,8 @@ export default class ConfigHandler {
       modelBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       modelName: 'qwen-plus',
       authToken: null,
-      defaultHandlerPath: '/baidu/' // 新增默认处理器路径配置
+      defaultHandlerPath: '/baidu/', // 新增默认处理器路径配置
+      llmConcurrency: 20  // 添加默认的LLM并发限制
     };
   }
 
@@ -109,4 +110,10 @@ export default class ConfigHandler {
     config.defaultHandlerPath = path;
     await this.setGlobalConfig(config);
   }
+
+  async getLlmConcurrency() {
+    const config = await this.getGlobalConfig();
+    return config.llmConcurrency || this.defaultConfig.llmConcurrency;
+  }
+
 }

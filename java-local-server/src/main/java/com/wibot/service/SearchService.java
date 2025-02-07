@@ -46,6 +46,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import com.wibot.persistence.DocumentDataRepository;
 import com.wibot.persistence.MarkdownParagraphRepository;
@@ -90,17 +92,24 @@ public class SearchService {
     public final int MAX_BATCH_SIZE = 28720;
 
     private final AtomicLong taskIdGenerator = new AtomicLong(0);
-    private final ExecutorService executorService = Executors.newFixedThreadPool(3, new ThreadFactory() {
-        private final AtomicInteger threadNumber = new AtomicInteger(1);
-
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread thread = new Thread(r);
-            thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
+    private final ExecutorService executorService = new ThreadPoolExecutor(
+            3, // 核心线程数
+            20, // 最大线程数
+            60L, // 空闲线程存活时间
+            TimeUnit.SECONDS, // 时间单位
+            new LinkedBlockingQueue<>(100), // 任务队列，限制队列大小为100
+            new ThreadFactory() {
+                private final AtomicInteger threadNumber = new AtomicInteger(1);
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r);
+                    thread.setName("SearchService-Worker-" + threadNumber.getAndIncrement());
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：当队列满时，在调用者线程中执行任务
+    );
 
     private static final ConcurrentHashMap<Long, TaskContext> taskContexts = new ConcurrentHashMap<>();
 
@@ -261,10 +270,7 @@ public class SearchService {
             Message userMessage = promptTemplate.createMessage(params);
             Prompt prompt = new Prompt(Collections.singletonList(userMessage));
 
-            String response = singletonLLMChat.getChatClient()
-                    .prompt(prompt)
-                    .call()
-                    .content();
+            String response = singletonLLMChat.sendThrottledRequest(prompt);
 
             // 5. 提取JSON结果
             String jsonStr = JsonExtractor.extractJsonFromResponse(response);

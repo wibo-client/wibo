@@ -45,7 +45,7 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
         requestContext.checkAborted();
         const searchResults = requestContext.results.searchResults;
         requestContext.sendSystemLog(`🔍 开始获取详细的网页内容以供分析`);
-        const detailsSearchResults = await this.fetchAggregatedContent(searchResults,requestContext);
+        const detailsSearchResults = await this.fetchAggregatedContent(searchResults, requestContext);
         requestContext.results.detailsSearchResults = detailsSearchResults;
         requestContext.sendSystemLog(`✅ 获取到 ${detailsSearchResults.length} 条详细内容`);
         requestContext.checkAborted();
@@ -78,7 +78,7 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
 
         const validResults = results.filter(Boolean);
         requestContext.sendSystemLog(`📊 总计: 成功获取 ${validResults.length} 个网页内容，失败 ${summaryList.length - validResults.length} 个`);
-        
+
         return validResults;
     }
 
@@ -90,8 +90,7 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
         logger.debug(`detailsSearchResults: ${detailsSearchResults[0].content}`);
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                requestContext.checkAborted();  // 添加检查
-                // 检查聚合内容是否为空
+                requestContext.checkAborted();
                 if (!detailsSearchResults || detailsSearchResults.length === 0) {
                     requestContext.sendSystemLog('ℹ️ 无法获取详细内容');
                     requestContext.results.parsedFacts = [];
@@ -100,10 +99,8 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
 
                 let currentLength = 0;
                 let partIndex = 1;
-                const tasks = [];
-                const maxConcurrentTasks = 2;
                 const groupAnswers = [];
-                const todoTasksRef = [];
+                let todoTasksRef = [];
 
                 const createJsonPrompt = (jsonReference, message) => {
                     const prompt = `请基于 参考信息 references 里 content 字段里的内容，提取有助于回答问题的关键事实，
@@ -153,87 +150,49 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                 }
 
                 let taskBatchIndex = 0;
+                const processReferences = async (refs, batchIndex) => {
+                    const jsonPrompt = createJsonPrompt(refs, message);
+                    requestContext.sendSystemLog(`🤖 分析内容(本步骤较慢) ,批次 ${batchIndex}，分析 ${refs.length} 条内容`);
+                    let groupAnswer;
+                    for (let i = 0; i < 3; i++) {
+                        try {
+                            logger.info(`json prompt: ${JSON.stringify(jsonPrompt, null, 2)}`);
+                            requestContext.checkAborted();
+                            groupAnswer = await this.globalContext.llmCaller.callSync([{
+                                role: 'user',
+                                content: JSON.stringify(jsonPrompt, null, 2)
+                            }]);
+                            break;
+                        } catch (error) {
+                            console.error(`Error in LLM call attempt ${i + 1}:`, error);
+                        }
+                    }
+                    if (groupAnswer) {
+                        groupAnswers.push(groupAnswer.join(''));
+                        requestContext.sendSystemLog(`✅ 批次 ${batchIndex}内容分析完成`);
+                    } else {
+                        requestContext.sendSystemLog('❌ 内容分析失败');
+                    }
+                };
+
                 for (const doc of detailsSearchResults) {
                     const jsonReference = createJsonReference(doc);
-
                     let jsonStr = JSON.stringify(jsonReference, null, 2);
+
                     if (currentLength + jsonStr.length < this.MAX_CONTENT_SIZE) {
                         todoTasksRef.push(jsonReference);
                         currentLength += jsonStr.length;
-                        continue;
                     } else {
-                        const currentBatchIndex = ++taskBatchIndex; // 在这里获取独立的批次号
-                        const currentBatchRefs = [...todoTasksRef];
-
-                        const jsonPrompt = createJsonPrompt(currentBatchRefs, message);
-                        tasks.push(async () => {
-                            requestContext.sendSystemLog(`🤖 分析内容(本步骤较慢) ,批次 ${currentBatchIndex}，分析 ${currentBatchRefs.length} 条内容`);
-                            let groupAnswer;
-                            for (let i = 0; i < 3; i++) {
-                                try {
-                                    logger.info(`json prompt: ${JSON.stringify(jsonPrompt, null, 2)}`);
-                                    requestContext.checkAborted();  // 添加检查
-                                    groupAnswer = await this.globalContext.llmCaller.callSync([{
-                                        role: 'user',
-                                        content: JSON.stringify(jsonPrompt, null, 2)
-                                    }]);
-                                    break;
-                                } catch (error) {
-                                    console.error(`Error in LLM call attempt ${i + 1}:`, error);
-                                }
-                            }
-                            if (groupAnswer) {
-                                groupAnswers.push(groupAnswer.join(''));
-                                requestContext.sendSystemLog(`✅ 批次 ${currentBatchIndex}内容分析完成`);
-                            } else {
-                                requestContext.sendSystemLog('❌ 内容分析失败');
-                            }
-                        });
-                        if (tasks.length >= maxConcurrentTasks) {
-                            await Promise.all(tasks.map(task => task()));
-                            tasks.length = 0;
-                        }
-                        todoTasksRef.length = 0;
-                        currentLength = 0;
+                        await processReferences(todoTasksRef, ++taskBatchIndex);
+                        todoTasksRef = [jsonReference];
+                        currentLength = jsonStr.length;
                     }
                 }
 
                 if (todoTasksRef.length > 0) {
-                    const currentBatchIndex = ++taskBatchIndex; // 在这里获取独立的批次号
-                    // 创建最后一批的副本
-                    const finalBatchRefs = [...todoTasksRef];
-                    const jsonPrompt = createJsonPrompt(finalBatchRefs, message);
-
-                    tasks.push(async () => {
-                        requestContext.sendSystemLog(`🤖 分析内容（本步骤较慢）,批次 ${currentBatchIndex}，分析 ${finalBatchRefs.length} 条内容，剩余 0 条待分析`);
-                        let groupAnswer;
-                        for (let i = 0; i < 3; i++) {
-                            try {
-                                logger.info(`json prompt: ${JSON.stringify(jsonPrompt, null, 2)}`);
-                                  
-                                requestContext.checkAborted();  // 添加检查
-                                groupAnswer = await this.globalContext.llmCaller.callSync([{
-                                    role: 'user',
-                                    content: JSON.stringify(jsonPrompt, null, 2)
-                                }]);
-                                break;
-                            } catch (error) {
-                                console.error(`Error in LLM call attempt ${i + 1}:`, error);
-                            }
-                        }
-                        if (groupAnswer) {
-                            groupAnswers.push(groupAnswer.join(''));
-                            requestContext.sendSystemLog('✅ 最后的一个批次，内容分析完成');
-                        } else {
-                            requestContext.sendSystemLog('❌ 内容分析失败,一般是因为模型返回不符合预期');
-                            console.error('Error in LLM call attempt:', groupAnswer);
-                        }
-                    });
+                    await processReferences(todoTasksRef, ++taskBatchIndex);
                 }
 
-                await Promise.all(tasks.map(task => task()));
-
-                // 解析 JSON 并提取 fact
                 const parsedFacts = [];
                 let hasValidResponse = false;
 
@@ -247,7 +206,6 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
 
                         const jsonResponse = JSON.parse(jsonString);
 
-                        // 验证 JSON 结构
                         if (jsonResponse && typeof jsonResponse === 'object' && 'answer' in jsonResponse) {
                             hasValidResponse = true;
 
@@ -274,7 +232,6 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                     }
                 }
 
-                // 改进的结果处理逻辑
                 if (hasValidResponse) {
                     const resultMessage = parsedFacts.length > 0
                         ? `✅ 成功解析 ${parsedFacts.length} 条事实`
@@ -284,12 +241,10 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                     return;
                 }
 
-                // 如果没有有效响应，但还有重试机会
                 if (attempt < 2) {
                     throw new Error('未获得有效响应，准备重试');
                 }
 
-                // 最后一次尝试也失败了，返回空数组
                 requestContext.sendSystemLog('ℹ️ 未能获取有效内容');
                 requestContext.results.parsedFacts = [];
                 return;

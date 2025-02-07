@@ -272,7 +272,7 @@
             <textarea id="ignoredDirectories" class="ignore-directories-input"
               placeholder="每行输入一个要忽略的目录路径&#10;例如:&#10;node_modules&#10;.git&#10;temp"></textarea>
           </div>
-          
+
           <!-- 增加保存按钮 -->
           <div class="index-settings-actions">
             <button id="saveIndexSettings" class="btn">保存索引设置</button>
@@ -331,6 +331,10 @@
       <div class="form-group">
         <label for="pageFetchLimit">网页快速检问参考条目数：</label>
         <input type="number" id="pageFetchLimit" class="form-control" placeholder="最多5条，也会收到llm的上下文窗口的限制" />
+      </div>
+      <div class="form-group">
+        <label for="llmConcurrency">LLM并发请求数量限制：</label>
+        <input type="number" id="llmConcurrency" class="form-control" placeholder="默认20，建议不要设置太大以免被限流" />
       </div>
       <button id="saveBrowserConfigButton" class="btn">保存</button>
     </div>
