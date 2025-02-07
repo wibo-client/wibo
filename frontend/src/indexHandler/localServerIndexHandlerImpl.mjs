@@ -98,7 +98,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                     }
                     lastLogCount = statusData.systemLogs.length;
                 }
-                logger.info(`Task is aborted? ${requestContext.abortSignal.aborted}`);
+                logger.debug(`Task is aborted? ${requestContext.abortSignal.aborted}`);
                 // 检查是否被中止
                 if (requestContext.abortSignal.aborted) {
                     logger.info(`Task ${taskId} was aborted by user`);

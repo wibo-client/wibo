@@ -20,7 +20,6 @@ public class RefineryTaskDO {
     private int fullUpdateTokenCost;
     private int incrementalTokenCost;
 
-
     private int hitCount;
 
     @Column(nullable = false)

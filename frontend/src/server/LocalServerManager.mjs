@@ -25,7 +25,7 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
 
         this.MAX_PROCESS_HISTORY = 5;
 

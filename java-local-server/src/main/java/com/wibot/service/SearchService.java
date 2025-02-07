@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -166,8 +167,8 @@ public class SearchService {
         // 2. 确定策略并更新任务
         SimilarQuestionResult similarResult = null;
         if (pathPrefix.endsWith("/") || pathPrefix.endsWith("\\")) {
-            // 只有在目录模式下才检查相似问题
-            similarResult = findSimilarQuestions(query);
+            // 只有在目录模式下才检查相似问题，同时传入pathPrefix
+            similarResult = findSimilarQuestions(query, pathPrefix);
             if (similarResult.hasSimilar) {
                 task.setSearchStrategy(SearchStrategy.SIMILAR_QUESTION);
                 task.setSimilarTaskIds(similarResult.similarTaskIds);
@@ -212,7 +213,8 @@ public class SearchService {
         }
     }
 
-    private SimilarQuestionResult findSimilarQuestions(String query) {
+    // 修改 findSimilarQuestions 方法，增加 pathPrefix 参数
+    private SimilarQuestionResult findSimilarQuestions(String query, String currentPathPrefix) {
         try {
             // 1. 获取所有活跃的任务及其问题
             List<RefineryTaskDO> activeTasks = refineryTaskRepository.findByStatus(RefineryTaskDO.STATUS_ACTIVE);
@@ -221,12 +223,32 @@ public class SearchService {
                 return new SimilarQuestionResult(false, Collections.emptyList());
             }
 
-            // 2. 构建历史问题列表
+            // 2. 构建历史问题列表，同时检查路径关系
             StringBuilder historyQuestions = new StringBuilder();
             for (RefineryTaskDO task : activeTasks) {
-                historyQuestions.append("TaskID: ").append(task.getId())
-                        .append("\n问题: ").append(task.getKeyQuestion())
-                        .append("\n\n");
+                // 检查路径关系：只有当当前路径包含在历史任务的目录路径中时才考虑
+                String taskDirectoryPath = task.getDirectoryPath();
+
+                // 标准化路径（确保都以分隔符结尾）
+                if (!taskDirectoryPath.endsWith("/") && !taskDirectoryPath.endsWith("\\")) {
+                    taskDirectoryPath += File.separator;
+                }
+                if (!currentPathPrefix.endsWith("/") && !currentPathPrefix.endsWith("\\")) {
+                    currentPathPrefix += File.separator;
+                }
+
+                // 只有当前查询路径在历史任务目录范围内时，才添加到比较列表
+                if (currentPathPrefix.startsWith(taskDirectoryPath)) {
+                    historyQuestions.append("TaskID: ").append(task.getId())
+                            .append("\n问题: ").append(task.getKeyQuestion())
+                            .append("\n目录: ").append(task.getDirectoryPath())
+                            .append("\n\n");
+                }
+            }
+
+            // 如果没有找到任何符合路径条件的历史问题，直接返回
+            if (historyQuestions.length() == 0) {
+                return new SimilarQuestionResult(false, Collections.emptyList());
             }
 
             // 3. 构建prompt参数
