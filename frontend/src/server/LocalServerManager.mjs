@@ -25,7 +25,7 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
 
         this.MAX_PROCESS_HISTORY = 5;
 
@@ -76,7 +76,7 @@ export default class LocalServerManager {
     setJavaProcess(processInfo) {
         const history = this.getProcessHistory();
         const timestamp = Date.now();
-        
+
         // 添加时间戳到进程信息
         const enhancedProcessInfo = {
             ...processInfo,
@@ -86,10 +86,10 @@ export default class LocalServerManager {
 
         // 添加新进程信息到历史记录
         history.unshift(enhancedProcessInfo);
-        
+
         // 保持历史记录在限定大小内
         const trimmedHistory = history.slice(0, this.MAX_PROCESS_HISTORY);
-        
+
         this.store.set('javaProcessHistory', trimmedHistory);
         this.store.set('javaProcess', enhancedProcessInfo);
     }
@@ -294,15 +294,15 @@ export default class LocalServerManager {
         try {
             // 检查进程是否存在
             process.kill(savedProcess.pid, 0);
-            
+
             // 检查端口是否还在监听
             const isHealthy = await this.checkHealth(savedProcess.port);
-            
+
             if (!isHealthy) {
                 logger.warn('[ProcessCheck] Process exists but health check failed');
                 return false;
             }
-            
+
             // 检查进程是否是我们启动的Java进程（仅限非Windows平台）
             if (process.platform !== 'win32') {
                 try {
@@ -315,7 +315,7 @@ export default class LocalServerManager {
                     // 忽略ps命令执行错误
                 }
             }
-            
+
             return true;
         } catch (e) {
             logger.warn('[ProcessCheck] Process check failed:', e.message);
@@ -610,7 +610,7 @@ export default class LocalServerManager {
                 process.on('SIGTERM', cleanup);
                 process.on('SIGINT', cleanup);
                 process.on('SIGQUIT', cleanup);
-                
+
                 this.cleanupHandlersRegistered = true;
             }
 
@@ -678,7 +678,7 @@ export default class LocalServerManager {
         try {
             const pid = savedProcess.pid;
             logger.info('[LocalServer] Stopping server... PID: ' + pid);
-            
+
             if (process.platform === 'win32') {
                 spawn('taskkill', ['/pid', pid, '/f', '/t']);
             } else {
@@ -687,7 +687,7 @@ export default class LocalServerManager {
                 process.kill(pid, 'SIGTERM');
                 process.kill(pid, 'SIGKILL');
                 logger.info('[LocalServer] Sent SIGKILL signal');
-                
+
             }
 
             this.deleteJavaProcess();
@@ -732,12 +732,12 @@ export default class LocalServerManager {
     async destroy() {
         // 清理所有进程
         await this.cleanupExistingProcesses();
-        
+
         // 清理状态同步定时器
         if (this.syncStateInterval) {
             clearInterval(this.syncStateInterval);
         }
-        
+
         // 重置状态
         this.inited = false;
         this.store.set('serverDesiredState', false);
@@ -748,11 +748,11 @@ export default class LocalServerManager {
         return new Promise((resolve, reject) => {
             const proc = spawn(command, args);
             let output = '';
-            
+
             proc.stdout.on('data', (data) => {
                 output += data.toString();
             });
-            
+
             proc.on('error', reject);
             proc.on('close', (code) => {
                 if (code === 0) {
