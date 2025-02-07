@@ -51,10 +51,23 @@ class MainWindow {
         role: 'copy'
       },
       {
+        label: '复制为 Markdown',
+        click: (menuItem, browserWindow, event) => {
+          const position = this.rightClickPosition;
+          if (position) {
+            this.window.webContents.send('context-menu-command', 'copy-as-markdown', {
+              x: position.x,
+              y: position.y
+            });
+          }
+        }
+      },
+      {
         label: '粘贴',
         accelerator: 'CmdOrCtrl+V',
         role: 'paste'
       },
+
       { type: 'separator' },
       {
         label: '删除当前对话',

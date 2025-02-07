@@ -92,7 +92,12 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 添加对话框相关方法
   showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
-  showErrorBox: (title, message) => ipcRenderer.invoke('show-error-box', title, message)
+  showErrorBox: (title, message) => ipcRenderer.invoke('show-error-box', title, message),
+
+  // 添加剪贴板方法
+  clipboard: {
+    writeText: (text) => ipcRenderer.invoke('clipboard-write-text', text),
+  }
 });
 
 // 认证相关 API

@@ -161,7 +161,17 @@ export default class ChatHandler {
     messageGroup.setAttribute('data-message-id', messageData.id); // 改用 id 而不是 timestamp
     // 添加path信息到data属性
     messageGroup.setAttribute('data-path', messageData.path || '');
-    messageGroup.innerHTML = messageData.html;
+
+    // 如果存在原始markdown内容，则创建隐藏元素存储
+    if (messageData.markdown) {
+      const hiddenMarkdown = document.createElement('div');
+      hiddenMarkdown.className = 'original-markdown';
+      hiddenMarkdown.style.display = 'none';
+      hiddenMarkdown.textContent = messageData.markdown;
+      messageGroup.appendChild(hiddenMarkdown);
+    }
+
+    messageGroup.innerHTML += messageData.html;
     return messageGroup;
   }
 
@@ -461,7 +471,13 @@ export default class ChatHandler {
       // 用户输入信息
       const userMessageElement = document.createElement('div');
       userMessageElement.className = 'message user';
-      userMessageElement.innerHTML = marked("### 你 : \n\n" + message + "\n\n");
+      const userMarkdown = "### 你 : \n\n" + message + "\n\n";
+      const userHiddenMarkdown = document.createElement('div');
+      userHiddenMarkdown.className = 'original-markdown';
+      userHiddenMarkdown.style.display = 'none';
+      userHiddenMarkdown.textContent = userMarkdown;
+      userMessageElement.innerHTML = marked(userMarkdown);
+      userMessageElement.appendChild(userHiddenMarkdown);
       messageGroup.appendChild(userMessageElement);
 
       // 系统执行信息
@@ -525,8 +541,12 @@ export default class ChatHandler {
 
       const wibaMessageElement = document.createElement('div');
       wibaMessageElement.className = 'message wiba';
-      wibaMessageElement.innerHTML = '';
+      const wibaHiddenMarkdown = document.createElement('div');
+      wibaHiddenMarkdown.className = 'original-markdown';
+      wibaHiddenMarkdown.style.display = 'none';
       wiboContainer.appendChild(wibaMessageElement);
+      wiboContainer.appendChild(wibaHiddenMarkdown);
+
       messageGroup.appendChild(wiboContainer);
 
       // 将整个消息组添加到反馈框
@@ -542,6 +562,7 @@ export default class ChatHandler {
         onChunk: (chunk) => {
           wholeMessage += chunk;
           wibaMessageElement.innerHTML = marked(wholeMessage);
+          wibaHiddenMarkdown.textContent = wholeMessage;
 
           // 为 WIBO 消息中的链接添加点击处理
           wibaMessageElement.querySelectorAll('a').forEach(link => {
@@ -594,6 +615,12 @@ export default class ChatHandler {
             fullContent += `   描述: ${doc.description || doc.summary || '暂无描述'}\n\n`;
           });
 
+          // 存储原始 Markdown
+          const referenceHiddenMarkdown = document.createElement('div');
+          referenceHiddenMarkdown.className = 'original-markdown';
+          referenceHiddenMarkdown.style.display = 'none';
+          referenceHiddenMarkdown.textContent = fullContent;
+
           referenceMessageElement.innerHTML = `
             <div class="reference-full-content">
               ${marked(fullContent)}
@@ -603,7 +630,7 @@ export default class ChatHandler {
             </div>
           `;
 
-          // 将引用消息添加到同一个 wibo-container 中
+          referenceMessageElement.appendChild(referenceHiddenMarkdown);
           wiboContainer.appendChild(referenceMessageElement);
 
           // 修改链接处理逻辑
@@ -618,7 +645,7 @@ export default class ChatHandler {
             if (link.classList.contains('reference-toggle')) {
               const fullContentElement = referenceMessageElement.querySelector('.reference-full-content');
               fullContentElement.classList.toggle('expanded');
-              
+
               if (fullContentElement.classList.contains('expanded')) {
                 link.textContent = '收起参考';
               } else {
@@ -686,6 +713,77 @@ export default class ChatHandler {
     // 监听右键菜单命令
     window.electron.onContextMenuCommand(async (command, elementInfo) => {
       switch (command) {
+        case 'copy-as-markdown':
+          if (elementInfo.x && elementInfo.y) {
+            // 获取所有消息组
+            const messageGroups = document.querySelectorAll('.message-group');
+            let nearestDistance = Infinity;
+            let nearestMarkdown = null;
+
+            // 遍历所有消息组
+            messageGroups.forEach(group => {
+              // 获取组内的 original-markdown 元素
+              const markdowns = group.querySelectorAll('.original-markdown');
+
+              markdowns.forEach(markdown => {
+                const parentMessage = markdown.closest('.message');
+                if (!parentMessage) return;
+
+                const rect = parentMessage.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                const distance = Math.sqrt(
+                  Math.pow(centerX - elementInfo.x, 2) +
+                  Math.pow(centerY - elementInfo.y, 2)
+                );
+
+                if (distance < nearestDistance) {
+                  nearestDistance = distance;
+                  nearestMarkdown = markdown;
+                }
+              });
+            });
+
+            // 如果找到最近的 Markdown，使用 IPC 复制其内容
+            if (nearestMarkdown) {
+              const markdownContent = nearestMarkdown.textContent;
+              try {
+                await window.electron.clipboard.writeText(markdownContent);
+
+                // 显示复制成功提示
+                const messageElement = nearestMarkdown.closest('.message');
+                if (messageElement) {
+                  const notification = document.createElement('div');
+                  notification.className = 'copy-notification';
+                  notification.textContent = '✓ Markdown已复制';
+                  notification.style.position = 'absolute';
+                  notification.style.right = '10px';
+                  notification.style.top = '10px';
+                  notification.style.background = 'rgba(0, 0, 0, 0.7)';
+                  notification.style.color = 'white';
+                  notification.style.padding = '5px 10px';
+                  notification.style.borderRadius = '4px';
+                  notification.style.zIndex = '1000';
+                  notification.style.opacity = '1';
+                  notification.style.transition = 'opacity 0.5s ease-in-out';
+
+                  messageElement.style.position = 'relative';
+                  messageElement.appendChild(notification);
+
+                  // 2秒后淡出并移除通知
+                  setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => notification.remove(), 500);
+                  }, 2000);
+                }
+              } catch (error) {
+                console.error('复制 Markdown 失败:', error);
+              }
+            }
+          }
+          break;
+
         case 'delete-current-message':
           let selectedMessage = document.querySelector('.message-group.selected');
 
@@ -794,7 +892,7 @@ export default class ChatHandler {
         const message = userMessage.textContent.replace(/^### 你 : /, '').trim();
         // 从data属性获取path
         const path = messageGroup.getAttribute('data-path');
-        
+
         if (!path) {
           console.error('未找到目录路径信息');
           const systemContent = e.target.closest('.message.system').querySelector('.system-content');
@@ -804,7 +902,7 @@ export default class ChatHandler {
           systemContent.appendChild(logElement);
           return;
         }
-        
+
         const systemContent = e.target.closest('.message.system').querySelector('.system-content');
 
         try {
@@ -814,7 +912,7 @@ export default class ChatHandler {
           };
 
           await window.refineryHandler.addRefineryTask(taskData);
-          
+
           const logElement = document.createElement('div');
           logElement.className = 'execution-log';
           logElement.textContent = '✅ 已成功设置为常问问题';
@@ -822,7 +920,7 @@ export default class ChatHandler {
         } catch (error) {
           console.error('设置常问问题失败:', error);
           const errorMessage = error.message || '设置常问问题失败';
-          
+
           const logElement = document.createElement('div');
           logElement.className = 'execution-log';
           logElement.textContent = `❌ ${errorMessage}`;

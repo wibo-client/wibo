@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, clipboard } from 'electron'; // 添加 clipboard 导入
 import PluginHandlerImpl from './indexHandler/pluginHandlerImpl.mjs';
 import LLMCall from './llmCaller/LLMCall.mjs';
 import MainWindow from './mainWindow.mjs';
@@ -407,6 +407,17 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('show-error-box', async (event, title, message) => {
     return dialog.showErrorBox(title, message);
+  });
+
+  // 添加剪贴板写入处理器
+  ipcMain.handle('clipboard-write-text', async (event, text) => {
+    try {
+      clipboard.writeText(text);
+      return { success: true };
+    } catch (error) {
+      console.error('写入剪贴板失败:', error);
+      throw error;
+    }
   });
 
   // 确保在应用退出时清理 Java 进程
