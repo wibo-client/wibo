@@ -162,16 +162,23 @@ export default class ChatHandler {
     // 添加path信息到data属性
     messageGroup.setAttribute('data-path', messageData.path || '');
 
-    // 如果存在原始markdown内容，则创建隐藏元素存储
+    // 如果存在原始markdown内容，在相应message元素内部创建hidden元素
     if (messageData.markdown) {
+      const messageElement = document.createElement('div');
+      messageElement.className = 'message wiba';
+
       const hiddenMarkdown = document.createElement('div');
       hiddenMarkdown.className = 'original-markdown';
       hiddenMarkdown.style.display = 'none';
       hiddenMarkdown.textContent = messageData.markdown;
-      messageGroup.appendChild(hiddenMarkdown);
+
+      messageElement.appendChild(hiddenMarkdown);
+      messageElement.innerHTML += marked(messageData.markdown);
+      messageGroup.appendChild(messageElement);
+    } else {
+      messageGroup.innerHTML = messageData.html;
     }
 
-    messageGroup.innerHTML += messageData.html;
     return messageGroup;
   }
 
@@ -544,8 +551,8 @@ export default class ChatHandler {
       const wibaHiddenMarkdown = document.createElement('div');
       wibaHiddenMarkdown.className = 'original-markdown';
       wibaHiddenMarkdown.style.display = 'none';
+      wibaMessageElement.appendChild(wibaHiddenMarkdown); // 移动到message元素内部
       wiboContainer.appendChild(wibaMessageElement);
-      wiboContainer.appendChild(wibaHiddenMarkdown);
 
       messageGroup.appendChild(wiboContainer);
 
@@ -559,25 +566,43 @@ export default class ChatHandler {
       const requestId = uuidv4(); // 生成 UUID
       const requestContext = {
         requestId, // 传递生成的 UUID
+        lastUpdateTime: 0, // 添加最后更新时间记录
         onChunk: (chunk) => {
           wholeMessage += chunk;
-          wibaMessageElement.innerHTML = marked(wholeMessage);
-          wibaHiddenMarkdown.textContent = wholeMessage;
+          const currentTime = Date.now();
+          const messageLength = wholeMessage.length;
 
-          // 为 WIBO 消息中的链接添加点击处理
-          wibaMessageElement.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', async (e) => {
-              e.preventDefault();
-              const url = link.getAttribute('href');
-              if (url && !url.startsWith('#')) {
-                try {
-                  await window.electron.shell.openExternal(url);
-                } catch (error) {
-                  console.error('打开链接失败:', error);
-                }
+          // 确定更新间隔
+          // 短消息(<200字符)时实时更新,长消息时降低更新频率
+          const updateInterval = messageLength < 500 ? 0 : 6000; // 250ms = 1/4秒
+
+          // 检查是否应该更新
+          if (currentTime - requestContext.lastUpdateTime >= updateInterval) {
+            wibaMessageElement.innerHTML = marked(wholeMessage);
+            wibaHiddenMarkdown.textContent = wholeMessage;
+            wibaMessageElement.appendChild(wibaHiddenMarkdown); // 确保hidden元素始终在message内部
+
+            // 为 WIBO 消息中的链接添加点击处理
+            wibaMessageElement.querySelectorAll('a').forEach(link => {
+              if (!link.hasAttribute('data-handled')) {
+                link.addEventListener('click', async (e) => {
+                  e.preventDefault();
+                  const url = link.getAttribute('href');
+                  if (url && !url.startsWith('#')) {
+                    try {
+                      await window.electron.shell.openExternal(url);
+                    } catch (error) {
+                      console.error('打开链接失败:', error);
+                    }
+                  }
+                });
+                link.setAttribute('data-handled', 'true');
               }
             });
-          });
+
+            // 更新最后更新时间
+            requestContext.lastUpdateTime = currentTime;
+          }
         },
         onSystemLog: (log) => {
           const logElement = document.createElement('div');

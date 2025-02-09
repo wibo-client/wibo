@@ -89,12 +89,18 @@ public class SearchService {
     @Autowired
     private MarkdownParagraphRepository markdownParagraphRepository;
 
+    @Autowired
+    private SystemConfigService systemConfigService;
+    
+    private final AtomicLong lastConfigCheck = new AtomicLong(0);
+    private static final long CONFIG_CHECK_INTERVAL = 10000; // 20秒
+
     public final int MAX_BATCH_SIZE = 28720;
 
     private final AtomicLong taskIdGenerator = new AtomicLong(0);
-    private final ExecutorService executorService = new ThreadPoolExecutor(
+    private final ThreadPoolExecutor executorService = new ThreadPoolExecutor(
             3, // 核心线程数
-            20, // 最大线程数
+            20, // 最大线程数（初始值，将被动态更新）
             60L, // 空闲线程存活时间
             TimeUnit.SECONDS, // 时间单位
             new LinkedBlockingQueue<>(100), // 任务队列，限制队列大小为100
@@ -110,6 +116,18 @@ public class SearchService {
             },
             new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：当队列满时，在调用者线程中执行任务
     );
+
+    private void checkAndUpdateThreadPoolConfig() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastConfigCheck.get() > CONFIG_CHECK_INTERVAL) {
+            int maxThreads = systemConfigService.getIntValue(SystemConfigService.CONFIG_LLM_CONCURRENCY, 20);
+            if (maxThreads != executorService.getMaximumPoolSize()) {
+                executorService.setMaximumPoolSize(maxThreads);
+                logger.info("Updated SearchService thread pool max size to: {}", maxThreads);
+            }
+            lastConfigCheck.set(currentTime);
+        }
+    }
 
     private static final ConcurrentHashMap<Long, TaskContext> taskContexts = new ConcurrentHashMap<>();
 
@@ -299,7 +317,8 @@ public class SearchService {
         }
     }
 
-    private Long submitTask(CollectFactsTask task) {
+    private Long submitTask(CollectFactsTask task) {  
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         Future<?> future = executorService.submit(() -> processCollectFactsTask(task));
         taskContexts.put(task.getTaskId(), new TaskContext(task, future));
         return task.getTaskId();
@@ -330,6 +349,7 @@ public class SearchService {
     }
 
     private List<SearchResultVO> processDirectContent(CollectFactsTask task) {
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         task.addSystemLog("🔍 开始直接内容查询...");
         List<SearchResultVO> results = fetchDocumentContent(task, task.getPathPrefix());
         task.addSystemLog(String.format("✅ 直接内容查询完成，找到 %d 个匹配结果", results.size()));
@@ -337,6 +357,7 @@ public class SearchService {
     }
 
     private List<SearchResultVO> processSimilarQuestion(CollectFactsTask task) {
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         List<Long> similarTaskIds = task.getSimilarTaskIds();
         if (similarTaskIds == null || similarTaskIds.isEmpty()) {
             task.addSystemLog("⚠️ 未找到相似问题");
@@ -415,6 +436,7 @@ public class SearchService {
     }
 
     private List<SearchResultVO> processNewQuestion(CollectFactsTask task) {
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         task.addSystemLog("🔄 准备处理新问题查询...");
 
         String pathPrefix = task.getPathPrefix();
@@ -497,7 +519,7 @@ public class SearchService {
     }
 
     private List<SearchResultVO> processDocuments(List<DocumentDataPO> documentDataList, CollectFactsTask task) {
-
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         int processedDocs = 0;
 
         // 修改为存储BatchProcessingInfo的列表

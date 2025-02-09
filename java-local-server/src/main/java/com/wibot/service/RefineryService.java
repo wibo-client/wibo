@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class RefineryService implements DocumentEventListener {
@@ -87,15 +88,20 @@ public class RefineryService implements DocumentEventListener {
     @Autowired
     private ObjectMapper objectMapper; // 替换原有的 private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // 替换原有的线程池定义
-    private final ExecutorService batchProcessor = new ThreadPoolExecutor(3, // 核心线程数
-            20, // 最大线程数
-            60L, // 空闲线程存活时间
-            TimeUnit.SECONDS, // 时间单位
-            new ArrayBlockingQueue<>(200), // 队列大小为200
+    @Autowired
+    private SystemConfigService systemConfigService;
+    
+    private final AtomicLong lastConfigCheck = new AtomicLong(0);
+    private static final long CONFIG_CHECK_INTERVAL = 10000; // 20秒
+    
+    private final ThreadPoolExecutor batchProcessor = new ThreadPoolExecutor(
+            3, // 核心线程数
+            20, // 最大线程数（初始值，将被动态更新）
+            60L,
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(200),
             new ThreadFactory() {
                 private final AtomicInteger threadNumber = new AtomicInteger(1);
-
                 @Override
                 public Thread newThread(Runnable r) {
                     Thread thread = new Thread(r);
@@ -103,7 +109,21 @@ public class RefineryService implements DocumentEventListener {
                     thread.setDaemon(true);
                     return thread;
                 }
-            }, new ThreadPoolExecutor.CallerRunsPolicy());
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
+    
+    private void checkAndUpdateThreadPoolConfig() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastConfigCheck.get() > CONFIG_CHECK_INTERVAL) {
+            int maxThreads = systemConfigService.getIntValue(SystemConfigService.CONFIG_LLM_CONCURRENCY, 20);
+            if (maxThreads != batchProcessor.getMaximumPoolSize()) {
+                batchProcessor.setMaximumPoolSize(maxThreads);
+                logger.info("Updated RefineryService thread pool max size to: {}", maxThreads);
+            }
+            lastConfigCheck.set(currentTime);
+        }
+    }
 
     public RefineryTaskVO createTask(RefineryTaskVO taskVO) {
         // 检查是否已存在相同的任务
@@ -255,6 +275,7 @@ public class RefineryService implements DocumentEventListener {
 
     private List<Future<BatchProcessResult>> extractFactsFromParagraph(List<MarkdownParagraphPO> paragraphs,
             String question, RefineryTaskDO task) {
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         List<Future<BatchProcessResult>> futures = new ArrayList<>();
         int batchIndex = 1;
 
@@ -602,6 +623,7 @@ public class RefineryService implements DocumentEventListener {
 
     // 添加任务提交方法
     public <T> Future<T> submitTask(Callable<T> task) {
+        checkAndUpdateThreadPoolConfig(); // 添加配置检查
         return batchProcessor.submit(task);
     }
 

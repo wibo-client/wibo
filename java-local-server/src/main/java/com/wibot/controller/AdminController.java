@@ -152,7 +152,7 @@ public class AdminController {
 
     @PostMapping("/admin/sync-config")
     @ResponseBody
-    public Map<String, Object> syncConfig(@RequestBody Map<String, Object> request) {
+    public synchronized Map<String, Object>  syncConfig(@RequestBody Map<String, Object> request) {
         Map<String, Object> response = new HashMap<>();
         try {
             // 处理 API Key
@@ -162,10 +162,10 @@ public class AdminController {
             }
 
             // 处理 LLM 并发度
-            Object llmConcurrency = request.get("llmConcurrency");
+            String llmConcurrency = (String) request.get("llmConcurrency");
             if (llmConcurrency != null) {
                 systemConfigService.saveConfig(SystemConfigService.CONFIG_LLM_CONCURRENCY, 
-                    ((Number) llmConcurrency).intValue());
+                    Integer.parseInt(llmConcurrency));
             }
 
             response.put("success", true);

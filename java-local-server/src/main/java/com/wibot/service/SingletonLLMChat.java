@@ -8,8 +8,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 
 import org.springframework.ai.chat.prompt.Prompt;
 import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
@@ -20,7 +18,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@EnableScheduling
 public class SingletonLLMChat {
     private static final Logger logger = LoggerFactory.getLogger(SingletonLLMChat.class);
     @Autowired
@@ -30,22 +27,38 @@ public class SingletonLLMChat {
     private ChatClient chatClient;
     private ChatModel chatModel;
     
-    private final Semaphore throttleSemaphore = new Semaphore(20); // 限制并发请求数为3
+    private Semaphore throttleSemaphore;  // 移除final修饰符，允许重新初始化
     private static final int MAX_RETRIES = 3;
     private static final long RETRY_DELAY_MS = 1000; // 重试延迟1秒
+    private static final long CONFIG_EXPIRE_INTERVAL = 10000; // 10秒
+    private long lastInitTime = 0;
+    
+    private synchronized void checkConfigExpired() {
+        long currentTime = System.currentTimeMillis();
+        if (inited && currentTime - lastInitTime > CONFIG_EXPIRE_INTERVAL) {
+            logger.debug("Config expired, will reinitialize on next request");
+            this.inited = false;
+        }
+    }
 
     public synchronized void init() {
+        checkConfigExpired();
+        
         if (inited) {
             return;
         }
-        inited = true;
 
         String apiKey = getApiKeyConf();
-
         if (apiKey == null || apiKey.isEmpty()) {
             logger.error("API Key is empty. Please set the API Key in the management interface.");
             throw new RuntimeException("API Key is empty. Please set the API Key in the management interface.");
         }
+        
+        // 初始化并发度信号量
+        int concurrency = systemConfigService.getIntValue(SystemConfigService.CONFIG_LLM_CONCURRENCY, 20);
+        this.throttleSemaphore = new Semaphore(concurrency);
+        logger.info("Initialized LLM concurrency limit to: {}", concurrency);
+        
         String chatModelConf = getChatModelConf();
 
         DashScopeApi dashScopeApi = new DashScopeApi(apiKey);
@@ -55,6 +68,9 @@ public class SingletonLLMChat {
                         DashScopeChatOptions.builder().withModel(chatModelConf).withIncrementalOutput(false).build())
                 .build();
 
+        this.lastInitTime = System.currentTimeMillis();
+        this.inited = true;
+        logger.info("LLM chat configuration initialized at: {}", this.lastInitTime);
     }
 
     private String getChatModelConf() {
@@ -75,12 +91,6 @@ public class SingletonLLMChat {
         return systemConfigService.getValue(SystemConfigService.CONFIG_API_KEY, "");
     }
 
-    @Scheduled(fixedRate = 10000) // 每20秒执行一次
-    public synchronized void resetConfig() {
-        logger.debug("Resetting LLM chat configuration");
-        this.inited = false;
-    }
-
     /**
      * 发送带限流和重试机制的LLM请求
      * @param prompt 提示词
@@ -88,6 +98,7 @@ public class SingletonLLMChat {
      * @throws RuntimeException 如果所有重试都失败
      */
     public String sendThrottledRequest(Prompt prompt) {
+        init();
         int attempts = 0;
         while (attempts < MAX_RETRIES) {
             attempts++;
@@ -132,6 +143,7 @@ public class SingletonLLMChat {
      * @throws RuntimeException 如果所有重试都失败
      */
     public ChatResponse sendThrottledMediaRequest(Prompt mediaPrompt) {
+        init();
         int attempts = 0;
         while (attempts < MAX_RETRIES) {
             attempts++;
