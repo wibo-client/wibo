@@ -25,7 +25,7 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
 
         this.MAX_PROCESS_HISTORY = 5;
 
@@ -163,8 +163,8 @@ export default class LocalServerManager {
                         pid: 0  // 调试模式下不需要真实PID
                     });
                 }
-                // 如果健康检查成功，同步AK
-                await this.syncApiKey(this.portForDebug);
+                // 如果健康检查成功，同步配置
+                await this.syncConfig(this.portForDebug);
             } catch (e) {
                 processExists = false;
             }
@@ -172,9 +172,9 @@ export default class LocalServerManager {
             try {
                 process.kill(savedProcess.pid, 0);
                 processExists = await this.checkHealth(savedProcess.port);
-                // 如果健康检查成功，同步AK
+                // 如果健康检查成功，同步配置
                 if (processExists) {
-                    await this.syncApiKey(savedProcess.port);
+                    await this.syncConfig(savedProcess.port);
                 }
             } catch (e) {
                 processExists = false;
@@ -697,33 +697,36 @@ export default class LocalServerManager {
         }
     }
 
-    // 新增：同步API密钥的方法
-    async syncApiKey(port) {
+    // 修改：同步配置的方法(原syncApiKey)
+    async syncConfig(port) {
         if (this.inited === false) {
             return;
         }
         try {
             const apiKey = await this.globalContext.configHandler.getModelSK();
+            const llmConcurrency = await this.globalContext.configHandler.getLlmConcurrency();
+
             if (!apiKey) {
                 console.log('No API key available to sync');
                 return;
             }
 
-            const response = await fetch(`http://localhost:${port}/admin/save-ak`, {
+            const response = await fetch(`http://localhost:${port}/admin/sync-config`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ak: apiKey })
+                body: JSON.stringify({
+                    apiKey: apiKey,
+                    llmConcurrency: llmConcurrency
+                })
             });
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-
-            //console.log('Successfully synced API key with Java server');
         } catch (error) {
-            console.error('Failed to sync API key:', error);
+            console.error('Failed to sync config:', error);
             // 不抛出错误，因为这是辅助功能
         }
     }

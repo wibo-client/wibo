@@ -19,6 +19,7 @@ import java.util.Optional;
 public class SystemConfigService {
 
     public static final String CONFIG_API_KEY = "llm.api.Key";
+    public static final String CONFIG_LLM_CONCURRENCY = "llm.concurrency";
     public static final String CONFIG_CHAT_MODEL = "llm.chat.model";
     public static final String CONFIG_OCR_MODEL = "llm.ocr.model";
 

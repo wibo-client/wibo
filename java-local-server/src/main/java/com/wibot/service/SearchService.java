@@ -503,6 +503,8 @@ public class SearchService {
         // 修改为存储BatchProcessingInfo的列表
         List<BatchProcessingInfo> batchProcessingInfos = new ArrayList<>();
 
+        int totalBatchCount = 0; // 添加总批次计数器
+
         // 首先批量提交所有文档的处理任务
         for (DocumentDataPO documentData : documentDataList) {
             processedDocs++;
@@ -553,11 +555,12 @@ public class SearchService {
                     batches.add(currentBatch);
                 }
 
-                task.addSystemLog(String.format("当前文档已分成 %d 个批次进行处理", batches.size()));
+                totalBatchCount += batches.size(); // 累计所有文档的批次总数
+                task.addSystemLog(String.format("📝 文档 %s: 分成 %d 个批次进行处理", 
+                    documentData.getFileName(), batches.size()));
 
                 for (int i = 0; i < batches.size(); i++) {
-                    BatchExtractTask extractTask = new BatchExtractTask(batches.get(i), task.getQuery(), i,
-                            refineryService, task);
+                    BatchExtractTask extractTask = new BatchExtractTask(batches.get(i), task.getQuery(), totalBatchCount + i, refineryService, task);
                     Future<ExtractFactsResult> future = refineryService.submitTask(extractTask);
                     batchProcessingInfos.add(new BatchProcessingInfo(future, documentData));
                 }
@@ -569,7 +572,8 @@ public class SearchService {
                         documentData.getFilePath(), e.getMessage());
             }
         }
-        task.addSystemLog("🚀 所有批次任务已提交，会并行执行");
+
+        task.addSystemLog(String.format("🚀 所有文档共分成 %d 个批次并行执行", totalBatchCount));
 
         // 收集所有结果
         Map<Long, List<String>> factMap = new HashMap<>();
@@ -584,7 +588,8 @@ public class SearchService {
                 continue;
             }
             try {
-                task.addSystemLog(String.format("⏳ 正在处理第 %d/%d 批次...", i + 1, totalBatches));
+                task.addSystemLog(String.format("⏳ 正在处理第 %d/%d 批次...", 
+                    i + 1, totalBatchCount));
                 ExtractFactsResult result = info.future.get();
 
                 for (ExtractedFact fact : result.getFacts()) {
@@ -596,7 +601,7 @@ public class SearchService {
                 }
 
             } catch (Exception e) {
-                task.addSystemLog(String.format("❌ 第 %d/%d 批次处理失败: %s", i + 1, totalBatches, e.getMessage()));
+                task.addSystemLog(String.format("❌ 第 %d/%d 批次处理失败: %s", i + 1, totalBatchCount, e.getMessage()));
                 logger.error("Error processing batch {}/{}", i + 1, totalBatches, e);
             }
         }

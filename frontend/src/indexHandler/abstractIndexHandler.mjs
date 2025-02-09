@@ -259,7 +259,7 @@ export class AbstractIndexHandler {
                 break;
             } catch (error) {
                 console.error(`Error in LLM call attempt ${j + 1}:`, error);
-                requestContext.sendSystemLog(`❌ 第 ${roundIndex} 轮精炼，第 ${batchIndex} 个批次处理失败，尝试重新精炼...`);
+                requestContext.sendSystemLog(`❌ 第 ${roundIndex} 轮精炼，第 ${batchIndex} 个批次处理失败，错误信息：${error.message} ，正在尝试重新处理...`);
             }
         }
 

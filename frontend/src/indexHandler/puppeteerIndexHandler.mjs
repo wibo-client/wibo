@@ -99,8 +99,8 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
 
                 let currentLength = 0;
                 let partIndex = 1;
-                const groupAnswers = [];
-                let todoTasksRef = [];
+                const referenceGroups = [];
+                let currentGroup = [];
 
                 const createJsonPrompt = (jsonReference, message) => {
                     const prompt = `请基于 参考信息 references 里 content 字段里的内容，提取有助于回答问题的关键事实，
@@ -149,49 +149,50 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                     };
                 }
 
-                let taskBatchIndex = 0;
-                const processReferences = async (refs, batchIndex) => {
-                    const jsonPrompt = createJsonPrompt(refs, message);
-                    requestContext.sendSystemLog(`🤖 分析内容(本步骤较慢) ,批次 ${batchIndex}，分析 ${refs.length} 条内容`);
-                    let groupAnswer;
-                    for (let i = 0; i < 3; i++) {
-                        try {
-                            logger.info(`json prompt: ${JSON.stringify(jsonPrompt, null, 2)}`);
-                            requestContext.checkAborted();
-                            groupAnswer = await this.globalContext.llmCaller.callSync([{
-                                role: 'user',
-                                content: JSON.stringify(jsonPrompt, null, 2)
-                            }]);
-                            break;
-                        } catch (error) {
-                            console.error(`Error in LLM call attempt ${i + 1}:`, error);
-                        }
-                    }
-                    if (groupAnswer) {
-                        groupAnswers.push(groupAnswer.join(''));
-                        requestContext.sendSystemLog(`✅ 批次 ${batchIndex}内容分析完成`);
-                    } else {
-                        requestContext.sendSystemLog('❌ 内容分析失败');
-                    }
-                };
-
+                // 将文档分组
                 for (const doc of detailsSearchResults) {
                     const jsonReference = createJsonReference(doc);
                     let jsonStr = JSON.stringify(jsonReference, null, 2);
 
                     if (currentLength + jsonStr.length < this.MAX_CONTENT_SIZE) {
-                        todoTasksRef.push(jsonReference);
+                        currentGroup.push(jsonReference);
                         currentLength += jsonStr.length;
                     } else {
-                        await processReferences(todoTasksRef, ++taskBatchIndex);
-                        todoTasksRef = [jsonReference];
+                        referenceGroups.push([...currentGroup]);
+                        currentGroup = [jsonReference];
                         currentLength = jsonStr.length;
                     }
                 }
-
-                if (todoTasksRef.length > 0) {
-                    await processReferences(todoTasksRef, ++taskBatchIndex);
+                if (currentGroup.length > 0) {
+                    referenceGroups.push(currentGroup);
                 }
+
+                // 并行处理所有组
+                const processGroup = async (refs, batchIndex) => {
+                    requestContext.sendSystemLog(`🤖 开始分析内容批次 ${batchIndex}，包含 ${refs.length} 条内容`);
+                    const jsonPrompt = createJsonPrompt(refs, message);
+
+                    for (let i = 0; i < 3; i++) {
+                        try {
+                            requestContext.checkAborted();
+                            const groupAnswer = await this.globalContext.llmCaller.callSync([{
+                                role: 'user',
+                                content: JSON.stringify(jsonPrompt, null, 2)
+                            }]);
+                            requestContext.sendSystemLog(`✅ 批次 ${batchIndex} 内容分析完成`);
+                            return groupAnswer.join('');
+                        } catch (error) {
+                            if (i < 2) {
+                                requestContext.sendSystemLog(`⚠️ 批次 ${batchIndex} 第 ${i + 1} 次尝试失败，正在重试...`);
+                            }
+                        }
+                    }
+                    throw new Error(`批次 ${batchIndex} 处理失败`);
+                };
+
+                const groupAnswers = await Promise.all(
+                    referenceGroups.map((group, index) => processGroup(group, index + 1))
+                );
 
                 const parsedFacts = [];
                 let hasValidResponse = false;
@@ -199,13 +200,9 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                 for (const answer of groupAnswers) {
                     try {
                         const jsonString = JsonUtils.extractJsonFromResponse(answer);
-                        if (!jsonString) {
-                            console.error('无法提取有效的JSON字符串:', answer);
-                            continue;
-                        }
+                        if (!jsonString) continue;
 
                         const jsonResponse = JSON.parse(jsonString);
-
                         if (jsonResponse && typeof jsonResponse === 'object' && 'answer' in jsonResponse) {
                             hasValidResponse = true;
 
@@ -219,15 +216,9 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                                     }
                                 }
                             }
-                        } else {
-                            console.error('JSON响应格式不符合预期:', jsonResponse);
                         }
                     } catch (error) {
-                        console.error('JSON解析错误:', {
-                            error: error.message,
-                            stack: error.stack,
-                            rawResponse: answer
-                        });
+                        console.error('JSON解析错误:', error.message);
                         continue;
                     }
                 }
@@ -250,8 +241,8 @@ export class PuppeteerIndexHandler extends AbstractIndexHandler {
                 return;
 
             } catch (error) {
-                console.error(`第 ${attempt + 1} 次尝试失败:`, error.message);
-                requestContext.sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : ''}`);
+                console.error(`第 ${attempt + 1} 次尝试失败: `, error.message);
+                requestContext.sendSystemLog(`⚠️ 第 ${attempt + 1} 次尝试失败，${attempt < 2 ? '正在重试...' : ''} `);
 
                 if (attempt === 2) {
                     requestContext.results.parsedFacts = [];

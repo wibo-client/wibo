@@ -13,6 +13,7 @@ import com.wibot.service.SystemConfigService;
 import com.wibot.service.DirectorySyncService;
 import java.util.Map;
 import java.util.List;
+import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,5 +148,33 @@ public class AdminController {
     @ResponseBody
     public Map<String, Object> syncNow() {
         return directorySyncService.manualSync();
+    }
+
+    @PostMapping("/admin/sync-config")
+    @ResponseBody
+    public Map<String, Object> syncConfig(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // 处理 API Key
+            String apiKey = (String) request.get("apiKey");
+            if (apiKey != null) {
+                apiKeyService.saveAK(apiKey);
+            }
+
+            // 处理 LLM 并发度
+            Object llmConcurrency = request.get("llmConcurrency");
+            if (llmConcurrency != null) {
+                systemConfigService.saveConfig(SystemConfigService.CONFIG_LLM_CONCURRENCY, 
+                    ((Number) llmConcurrency).intValue());
+            }
+
+            response.put("success", true);
+            response.put("message", "配置同步成功");
+        } catch (Exception e) {
+            logger.error("配置同步失败", e);
+            response.put("success", false);
+            response.put("message", "同步失败: " + e.getMessage());
+        }
+        return response;
     }
 }
