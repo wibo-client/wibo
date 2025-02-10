@@ -16,9 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions.DashscopeChatOptionsBuilder;
 import com.wibot.index.SearchDocumentResult;
 import com.wibot.service.SingletonLLMChat;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -66,10 +63,7 @@ public class LLMBasedRerankImpl implements DocumentRerankInterface {
         PromptTemplate promptTemplate = new PromptTemplate(rerankPrompt);
         Message userMessage = promptTemplate.createMessage(params);
         messages.add(userMessage);
-        DashscopeChatOptionsBuilder opsBuilder = DashScopeChatOptions.builder();
-        DashScopeChatOptions ops = opsBuilder.build();
-
-        Prompt knowLodgeEvalPrompt = new Prompt(messages, ops);
+        Prompt knowLodgeEvalPrompt = new Prompt(messages);
         String jsonResult = singletonLLMChat.sendThrottledRequest(knowLodgeEvalPrompt);
         logger.info("Received JSON result from LLM: {}", jsonResult);
 

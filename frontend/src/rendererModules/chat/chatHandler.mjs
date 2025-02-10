@@ -567,6 +567,7 @@ export default class ChatHandler {
       const requestContext = {
         requestId, // 传递生成的 UUID
         lastUpdateTime: 0, // 添加最后更新时间记录
+        
         onChunk: (chunk) => {
           wholeMessage += chunk;
           const currentTime = Date.now();
@@ -603,6 +604,15 @@ export default class ChatHandler {
             // 更新最后更新时间
             requestContext.lastUpdateTime = currentTime;
           }
+        },
+          onComplete: () => { // 添加 onComplete 回调
+            // 强制最终更新
+            wibaMessageElement.innerHTML = marked(wholeMessage);
+            wibaHiddenMarkdown.textContent = wholeMessage;
+            wibaMessageElement.appendChild(wibaHiddenMarkdown);
+
+            // 添加链接处理
+            this.setupLinks(wibaMessageElement);
         },
         onSystemLog: (log) => {
           const logElement = document.createElement('div');

@@ -19,9 +19,11 @@ import java.util.Optional;
 public class SystemConfigService {
 
     public static final String CONFIG_API_KEY = "llm.api.Key";
-    public static final String CONFIG_LLM_CONCURRENCY = "llm.concurrency";
+    public static final String CONFIG_MODEL_BASE_URL = "llm.chat.base.url";
     public static final String CONFIG_CHAT_MODEL = "llm.chat.model";
     public static final String CONFIG_OCR_MODEL = "llm.ocr.model";
+    public static final String CONFIG_LLM_CONCURRENCY = "llm.concurrency";
+    public static final String CONFIG_LLM_PROVIDER = "llm.provider";
 
     public static final String CONFIG_MIN_TEXT_LENGTH = "pdf.minTextLength";
     public static final String CONFIG_PPT_MAX_WIDTH = "ppt.maxWidth";
@@ -40,7 +42,7 @@ public class SystemConfigService {
 
     // 文件类型索引配置前缀
     public static final String CONFIG_FILE_TYPE_PREFIX = "filetype.";
-    
+
     // 忽略目录配置
     public static final String CONFIG_IGNORED_DIRECTORIES = "index.ignored.directories";
 
@@ -87,7 +89,7 @@ public class SystemConfigService {
         try {
             // 先查询是否存在
             Optional<SystemConfigPO> existingConfig = configRepository.findByConfigKey(key);
-            
+
             if (existingConfig.isPresent()) {
                 // 如果存在，更新现有记录
                 SystemConfigPO config = existingConfig.get();
@@ -103,7 +105,7 @@ public class SystemConfigService {
                 config.setUpdatedAt(LocalDateTime.now());
                 configRepository.save(config);
             }
-            
+
             // 保存时清除所有缓存
             configCache.clear();
             lastClearTime = System.currentTimeMillis();
@@ -122,10 +124,10 @@ public class SystemConfigService {
      */
     public <T> T getConfig(String key, Class<T> clazz, T defaultValue) {
         checkAndClearCache();
-        
+
         String cacheKey = key + "_" + clazz.getName();
         CacheEntry entry = configCache.get(cacheKey);
-        
+
         if (entry != null) {
             @SuppressWarnings("unchecked")
             T cachedValue = (T) entry.value;
@@ -137,7 +139,7 @@ public class SystemConfigService {
             try {
                 String configValue = config.get().getConfigValue();
                 T value;
-                
+
                 // 如果是String类型，直接返回
                 if (clazz == String.class) {
                     @SuppressWarnings("unchecked")
@@ -152,7 +154,7 @@ public class SystemConfigService {
                         value = convertValue(configValue, clazz);
                     }
                 }
-                
+
                 configCache.put(cacheKey, new CacheEntry(value));
                 return value;
             } catch (Exception e) {
@@ -227,12 +229,12 @@ public class SystemConfigService {
     }
 
     // /**
-    //  * 删除配置
-    //  * 
-    //  * @param key 配置键
-    //  */
+    // * 删除配置
+    // *
+    // * @param key 配置键
+    // */
     // public void deleteConfig(String key) {
-    //     configRepository.deleteByConfigKey(key);
+    // configRepository.deleteByConfigKey(key);
     // }
 
     /**

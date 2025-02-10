@@ -26,6 +26,18 @@ export default class BrowserConfigHandler {
         document.getElementById('masked-ak').textContent = `当前AK: ${maskedSK}`;
       }
 
+      // 显示 modelBaseUrl
+      if (config.modelBaseUrl) {
+        document.getElementById('masked-modelBaseUrl').textContent = `当前API地址: ${config.modelBaseUrl}`;
+        document.getElementById('modelBaseUrl').value = config.modelBaseUrl;
+      }
+
+      // 显示 modelName
+      if (config.modelName) {
+        document.getElementById('masked-modelName').textContent = `当前模型: ${config.modelName}`;
+        document.getElementById('modelName').value = config.modelName;
+      }
+
       // 加载基础配置项
       const configFields = [
         'browserTimeout',
@@ -69,27 +81,49 @@ export default class BrowserConfigHandler {
 
   async handleSaveAK() {
     const accessKeyInput = document.getElementById('accessKey');
-    if (!accessKeyInput?.value) {
+    const modelBaseUrlInput = document.getElementById('modelBaseUrl');
+    const modelNameInput = document.getElementById('modelName');
+
+    const config = await window.electron.getGlobalConfig();
+    let hasChanges = false;
+    
+    // 更新配置，只在有新输入时更新对应的值
+    if (accessKeyInput?.value) {
+      config.modelSK = accessKeyInput.value;
+      hasChanges = true;
+    }
+    
+    if (modelBaseUrlInput?.value) {
+      config.modelBaseUrl = modelBaseUrlInput.value;
+      hasChanges = true;
+    }
+    
+    if (modelNameInput?.value) {
+      config.modelName = modelNameInput.value;
+      hasChanges = true;
+    }
+
+    // 如果没有任何改变，提示用户
+    if (!hasChanges) {
       await window.electron.showMessageBox({
-        type: 'warning',
-        title: '输入验证',
-        message: '请输入Access Key'
+        type: 'info',
+        title: '提示',
+        message: '没有检测到任何修改'
       });
       return;
     }
-
-    const config = await window.electron.getGlobalConfig();
-    config.modelSK = accessKeyInput.value;
 
     await window.electron.setGlobalConfig(config);
     await window.electron.showMessageBox({
       type: 'info',
       title: '保存成功',
-      message: 'Access Key已保存在客户端'
+      message: '配置已保存在客户端'
     });
 
     // 清空输入框
     accessKeyInput.value = '';
+    modelBaseUrlInput.value = '';
+    modelNameInput.value = '';
 
     await this.loadConfigValues();
   }

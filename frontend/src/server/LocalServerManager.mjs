@@ -511,7 +511,7 @@ export default class LocalServerManager {
                 '--spring.profiles.active=product'
             ];
 
-            // 使用 custom-jre 的 java 可执行文件启动进程
+            // 使用 custom-jre 的 java可执行文件启动进程
             javaProcess = spawn(this.javaBinPath, args, {
                 // 不分离进程,这样父进程结束时子进程也会结束
                 detached: false,
@@ -705,6 +705,8 @@ export default class LocalServerManager {
         try {
             const apiKey = await this.globalContext.configHandler.getModelSK();
             const llmConcurrency = await this.globalContext.configHandler.getLlmConcurrency();
+            const modelBaseUrl = await this.globalContext.configHandler.getModelBaseUrl();
+            const modelName = await this.globalContext.configHandler.getModelName();
 
             if (!apiKey) {
                 console.log('No API key available to sync');
@@ -718,7 +720,9 @@ export default class LocalServerManager {
                 },
                 body: JSON.stringify({
                     apiKey: apiKey,
-                    llmConcurrency: llmConcurrency
+                    llmConcurrency: llmConcurrency,
+                    modelBaseUrl: modelBaseUrl,
+                    modelName: modelName
                 })
             });
 

@@ -8,9 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions.DashscopeChatOptionsBuilder;
 import com.wibot.service.SingletonLLMChat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,11 +54,8 @@ public class LLMBasedAnalyzerQuoted implements SearchEngineAnalyzer {
         PromptTemplate promptTemplate = new PromptTemplate(tokenAnalyzerPrompt);
         Message userMessage = promptTemplate.createMessage(params);
         messages.add(userMessage);
-        DashscopeChatOptionsBuilder opsBuilder = DashScopeChatOptions.builder();
-        DashScopeChatOptions ops = opsBuilder.build();
-
-        Prompt analyzePrompt = new Prompt(messages, ops);
-        String jsonResult =  singletonLLMChat.sendThrottledRequest(analyzePrompt);
+        Prompt analyzePrompt = new Prompt(messages);
+        String jsonResult = singletonLLMChat.sendThrottledRequest(analyzePrompt);
         logger.info("Received JSON result from LLM: {}", jsonResult);
 
         // Parse the JSON result to extract the tokens

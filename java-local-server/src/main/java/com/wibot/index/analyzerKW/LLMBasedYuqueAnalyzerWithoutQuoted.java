@@ -16,8 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions.DashscopeChatOptionsBuilder;
 import com.wibot.service.SingletonLLMChat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,10 +53,7 @@ public class LLMBasedYuqueAnalyzerWithoutQuoted implements SearchEngineAnalyzer 
         PromptTemplate promptTemplate = new PromptTemplate(yuqueTokenAnalyzerPrompt);
         Message userMessage = promptTemplate.createMessage(params);
         messages.add(userMessage);
-        DashscopeChatOptionsBuilder opsBuilder = DashScopeChatOptions.builder();
-        DashScopeChatOptions ops = opsBuilder.build();
-
-        Prompt analyzePrompt = new Prompt(messages, ops);
+        Prompt analyzePrompt = new Prompt(messages);
         String jsonResult = singletonLLMChat.sendThrottledRequest(analyzePrompt);
 
         logger.info("Received JSON result from LLM: {}", jsonResult);

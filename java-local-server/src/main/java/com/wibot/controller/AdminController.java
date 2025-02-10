@@ -152,7 +152,7 @@ public class AdminController {
 
     @PostMapping("/admin/sync-config")
     @ResponseBody
-    public synchronized Map<String, Object>  syncConfig(@RequestBody Map<String, Object> request) {
+    public synchronized Map<String, Object> syncConfig(@RequestBody Map<String, Object> request) {
         Map<String, Object> response = new HashMap<>();
         try {
             // 处理 API Key
@@ -162,10 +162,22 @@ public class AdminController {
             }
 
             // 处理 LLM 并发度
-            String llmConcurrency = (String) request.get("llmConcurrency");
+            String llmConcurrency = String.valueOf(request.get("llmConcurrency"));
             if (llmConcurrency != null) {
-                systemConfigService.saveConfig(SystemConfigService.CONFIG_LLM_CONCURRENCY, 
-                    Integer.parseInt(llmConcurrency));
+                systemConfigService.saveConfig(SystemConfigService.CONFIG_LLM_CONCURRENCY,
+                        Integer.valueOf(llmConcurrency));
+            }
+
+            // 处理 Model Base URL
+            String modelBaseUrl = (String) request.get("modelBaseUrl");
+            if (modelBaseUrl != null) {
+                systemConfigService.saveConfig(SystemConfigService.CONFIG_MODEL_BASE_URL, modelBaseUrl);
+            }
+
+            // 处理 Model Name - 使用已有的 CONFIG_CHAT_MODEL
+            String modelName = (String) request.get("modelName");
+            if (modelName != null) {
+                systemConfigService.saveConfig(SystemConfigService.CONFIG_CHAT_MODEL, modelName);
             }
 
             response.put("success", true);
