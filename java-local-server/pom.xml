@@ -30,7 +30,7 @@
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-bom</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0.0-M5</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -117,6 +117,12 @@
       <groupId>org.apache.pdfbox</groupId>
       <artifactId>pdfbox</artifactId>
       <version>2.0.24</version>
+       <exclusions>
+        <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+        </exclusion>
+    </exclusions>
   </dependency>
 <dependency>
     <groupId>org.springframework.ai</groupId>
@@ -169,18 +175,17 @@
 <dependency>
   <groupId>ch.qos.logback</groupId>
   <artifactId>logback-access</artifactId>
-  <version>1.5.8</version>
-</dependency>
-<dependency>
-    <groupId>ch.qos.logback.access</groupId>
-    <artifactId>common</artifactId>
-    <version>2.0.1</version>
+  <version>1.5.16</version>
 </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
   </dependency>
-
+<dependency>
+    <groupId>jakarta.xml.bind</groupId>
+    <artifactId>jakarta.xml.bind-api</artifactId>
+    <version>4.0.2</version>
+</dependency>
 
     <!-- JSON Web Token 库 -->
     <dependency>
@@ -229,6 +234,12 @@
         <groupId>com.aliyun.oss</groupId>
         <artifactId>aliyun-sdk-oss</artifactId>
         <version>3.13.1</version>
+         <exclusions>
+            <exclusion>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+            </exclusion>
+        </exclusions>
     </dependency>
     <!-- <dependency>
       <groupId>com.twelvemonkeys.imageio</groupId>
@@ -236,11 +247,11 @@
       <version>3.12.0</version>
     </dependency> -->
 
-    <dependency>
+    <!--<dependency>
     <groupId>javax.xml.bind</groupId>
     <artifactId>jaxb-api</artifactId>
     <version>2.3.1</version>
-</dependency>
+</dependency>-->
     <!-- https://mvnrepository.com/artifact/org.apache.lucene/lucene-analyzers-common -->
 
  <!-- Apache POI dependency -->
@@ -322,11 +333,27 @@
         <artifactId>spring-data-commons</artifactId>
         <version>3.3.6</version>
     </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>${slf4j.version}</version>
+    </dependency>
    <!--<dependency>
         <groupId>org.apache.tomcat.embed</groupId>
         <artifactId>tomcat-embed-core</artifactId>
         <version>10.1.33</version>
     </dependency>-->
+    <dependency>
+         <groupId>org.hibernate.orm</groupId>
+        <artifactId>hibernate-core</artifactId>
+        <version>6.5.3.Final</version>
+        <exclusions>
+            <exclusion>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
     <dependency>
         <groupId>org.springframework</groupId>
         <artifactId>spring-beans</artifactId>

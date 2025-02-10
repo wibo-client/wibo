@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.wibot.service.SearchService;
-
 public class CollectFactsTask {
     // 添加任务状态常量
     public static final String STATUS_PENDING = "PENDING";

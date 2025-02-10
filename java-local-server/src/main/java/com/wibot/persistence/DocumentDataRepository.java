@@ -9,7 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.ListCrudRepository;
 import org.springframework.stereotype.Repository;
 
 import com.wibot.persistence.entity.DocumentDataPO;
@@ -81,9 +80,9 @@ public interface DocumentDataRepository
          */
         @Modifying
         @Query("UPDATE DocumentDataPO d SET d.lastProcessingUpdate = :lastProcessingUpdate WHERE d.processorId = :processorId AND d.processedState = :processedState")
-        void updateLastProcessingUpdateForProcessor(@Param("processorId") String processorId, 
-                                                    @Param("lastProcessingUpdate") LocalDateTime lastProcessingUpdate,
-                                                    @Param("processedState") String processedState);
+        void updateLastProcessingUpdateForProcessor(@Param("processorId") String processorId,
+                        @Param("lastProcessingUpdate") LocalDateTime lastProcessingUpdate,
+                        @Param("processedState") String processedState);
 
         // @Query("SELECT d FROM DocumentDataPO d WHERE d.filePath LIKE
         // CONCAT(:directoryPath, '%')")
@@ -105,7 +104,7 @@ public interface DocumentDataRepository
         /**
          * 根据文件路径前缀和处理状态查找文档
          *
-         * @param path 文件路径前缀
+         * @param path           文件路径前缀
          * @param processedState 处理状态
          * @return 文档数据列表
          */
@@ -114,26 +113,26 @@ public interface DocumentDataRepository
         /**
          * 根据文件路径前缀和多个处理状态查找文档
          *
-         * @param path 文件路径前缀
+         * @param path            文件路径前缀
          * @param processedStates 处理状态列表
          * @return 文档数据列表
          */
         List<DocumentDataPO> findByFilePathStartingWithAndProcessedStateIn(String path, List<String> processedStates);
-        
+
         /**
          * 更新指定目录下所有文件的处理状态
          *
          * @param directoryPath 目录路径
-         * @param oldState 原状态
-         * @param newState 新状态
+         * @param oldState      原状态
+         * @param newState      新状态
          */
         @Modifying
         @Query("UPDATE DocumentDataPO d SET d.processedState = :newState WHERE d.filePath LIKE CONCAT(:directoryPath, '%') AND d.processedState = :oldState")
-        void updateProcessedStateByDirectory(@Param("directoryPath") String directoryPath, 
-                                             @Param("oldState") String oldState, 
-                                             @Param("newState") String newState);
+        void updateProcessedStateByDirectory(@Param("directoryPath") String directoryPath,
+                        @Param("oldState") String oldState,
+                        @Param("newState") String newState);
 
         List<DocumentDataPO> findByFilePathLike(String filePathPattern);
-        
+
         long countByFilePathStartingWith(String pathPrefix);
 }

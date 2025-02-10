@@ -206,7 +206,7 @@ export class AbstractIndexHandler {
             fullContent: aggregatedContent.map((doc, index) => ({
                 index: index + 1,
                 title: doc.title || '',
-                url: doc.realUrl || '',
+                url: (doc.realUrl || doc.url||''),
                 date: doc.date || '',
                 description: (doc.description || doc.summary || '')
                     .replace(/<\/?h[1-6][^>]*>/gi, "") // 去掉所有的 <h1> 到 <h6> 标签

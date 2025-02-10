@@ -6,10 +6,12 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.retry.RetryUtils;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.ApiKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import com.wibot.config.OpenAIConfig;
 
@@ -54,6 +56,7 @@ public class SingletonLLMChat {
 
         String baseUrl = systemConfigService.getValue(SystemConfigService.CONFIG_MODEL_BASE_URL,
                 "https://dashscope.aliyuncs.com/compatible-mode/v1");
+        // String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode";
         String modelName = getChatModelConf();
         String apiKey = getApiKeyConf();
 
@@ -67,24 +70,16 @@ public class SingletonLLMChat {
         // 设置并发限制
         int concurrency = systemConfigService.getIntValue(SystemConfigService.CONFIG_LLM_CONCURRENCY, 20);
         this.throttleSemaphore = new Semaphore(concurrency);
-        ApiKey apiKeyInstance = new ApiKey() {
 
-            @Override
-            public String getValue() {
-                return config.getApiKey();
-            }
-        };
         // 创建 OpenAiApi
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(config.getBaseUrl())
-                .apiKey(apiKeyInstance)
-                .build();
+        OpenAiApi openAiApi = new OpenAiApi(config.getBaseUrl(), config.getApiKey(), "/chat/completions",
+                "/embeddings", RestClient.builder(),
+                WebClient.builder(), RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER);
 
         // 创建 ChatModel
         this.chatModel = new OpenAiChatModel(openAiApi,
                 OpenAiChatOptions.builder()
                         .model(config.getModel())
-                        .maxTokens(2000)
                         .build());
 
         // 创建 ChatClient

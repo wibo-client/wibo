@@ -149,8 +149,20 @@ public class DirectorySyncService {
 
                 Path filePath = Paths.get(path);
                 long lastModified = Files.getLastModifiedTime(filePath).toMillis();
-                return lastModified > existingDoc.getUpdateDateTime().atZone(ZoneId.systemDefault()).toInstant()
+                boolean modified = lastModified > existingDoc.getUpdateDateTime().atZone(ZoneId.systemDefault())
+                        .toInstant()
                         .toEpochMilli();
+                if (modified) {
+                    long epoch = existingDoc.getUpdateDateTime().atZone(ZoneId.systemDefault()).toInstant()
+                            .toEpochMilli();
+                    String modifiedDateTimeString = new Date(lastModified).toString();
+                    String existingDateTimeString = new Date(epoch).toString();
+                    logger.info(path + " modified: " + modified + " lastModified: " + "date time :"
+                            + modifiedDateTimeString + " . " + lastModified
+                            + " existingDoc: "
+                            + epoch + " date time : " + existingDateTimeString);
+                }
+                return modified;
             } catch (IOException e) {
                 logger.error("Failed to check file update: " + path, e);
                 return false;

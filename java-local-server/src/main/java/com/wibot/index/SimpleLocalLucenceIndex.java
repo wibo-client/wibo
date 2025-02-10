@@ -22,6 +22,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
+import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
@@ -188,7 +189,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     }
 
     // 在同一文件中
-    private Query parseQuery(String queryStr) throws Exception {
+    private Query parseQuery(String queryStr) {
         logger.debug("Building query for: {}", queryStr);
         String cleanedQuery = cleanText(queryStr);
 
@@ -198,7 +199,12 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
         // 可选：添加模糊搜索参数（例如模糊度 2）
         parser.setFuzzyMinSim(0.7f);
         parser.setPhraseSlop(2); // 根据需要调整
-        Query query = parser.parse(cleanedQuery + "~2"); // "~2" 表示模糊度或者短语搜索可选
+        Query query = null;
+        try {
+            query = parser.parse(cleanedQuery + "~2");
+        } catch (ParseException e) {
+            e.printStackTrace();
+        } // "~2" 表示模糊度或者短语搜索可选
 
         logger.debug("MultiField fuzzy query: {}", query);
         return query;
@@ -624,6 +630,7 @@ public class SimpleLocalLucenceIndex implements DocumentIndexInterface, LocalInd
     }
 
     // 辅助方法：记录分词日志
+    @SuppressWarnings("unused")
     private void logTokenization(String content) {
         // try (TokenStream ts = analyzer.tokenStream("content", content)) {
         // CharTermAttribute termAttr = ts.addAttribute(CharTermAttribute.class);

@@ -127,20 +127,13 @@ export default class ChatHandler {
 
   setupHistoryLinks(container) {
     container.querySelectorAll('a').forEach(link => {
-      if (!link.hasAttribute('data-handled')) {
-        link.addEventListener('click', async (e) => {
-          e.preventDefault();
-          const url = link.getAttribute('href');
-          if (url && !url.startsWith('#')) {
-            try {
-              await window.electron.shell.openExternal(url);
-            } catch (error) {
-              console.error('打开链接失败:', error);
-            }
-          }
-        });
-        link.setAttribute('data-handled', 'true');
-      }
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const url = link.getAttribute('href');
+        if (url) {
+          await this.handleLinkClick(url);
+        }
+      });
     });
   }
 
@@ -575,7 +568,7 @@ export default class ChatHandler {
 
           // 确定更新间隔
           // 短消息(<200字符)时实时更新,长消息时降低更新频率
-          const updateInterval = messageLength < 500 ? 0 : 6000; // 250ms = 1/4秒
+          const updateInterval = messageLength < 300 ? 0 : 6000; // 250ms = 1/4秒
 
           // 检查是否应该更新
           if (currentTime - requestContext.lastUpdateTime >= updateInterval) {
@@ -584,22 +577,7 @@ export default class ChatHandler {
             wibaMessageElement.appendChild(wibaHiddenMarkdown); // 确保hidden元素始终在message内部
 
             // 为 WIBO 消息中的链接添加点击处理
-            wibaMessageElement.querySelectorAll('a').forEach(link => {
-              if (!link.hasAttribute('data-handled')) {
-                link.addEventListener('click', async (e) => {
-                  e.preventDefault();
-                  const url = link.getAttribute('href');
-                  if (url && !url.startsWith('#')) {
-                    try {
-                      await window.electron.shell.openExternal(url);
-                    } catch (error) {
-                      console.error('打开链接失败:', error);
-                    }
-                  }
-                });
-                link.setAttribute('data-handled', 'true');
-              }
-            });
+            this.setupLinks(wibaMessageElement);
 
             // 更新最后更新时间
             requestContext.lastUpdateTime = currentTime;
@@ -642,8 +620,9 @@ export default class ChatHandler {
 
           // 构建完整内容
           let fullContent = '### 参考文档\n\n';
-          referenceData.fullContent.forEach(doc => {
-            fullContent += `${doc.index}. [${doc.title}](${doc.url})\n`;
+          referenceData.fullContent.forEach(doc => {    
+            const encodedUrl = encodeURI(doc.url);
+            fullContent += `${doc.index}. [${doc.title}](${encodedUrl})\n`;
             if (doc.date) {
               fullContent += `   日期: ${doc.date}\n`;
             }
@@ -658,6 +637,7 @@ export default class ChatHandler {
 
           referenceMessageElement.innerHTML = `
             <div class="reference-full-content">
+
               ${marked(fullContent)}
             </div>
             <div class="reference-actions">
@@ -689,13 +669,9 @@ export default class ChatHandler {
               return;
             }
 
-            // 处理普通链接
-            if (url && !url.startsWith('#')) {
-              try {
-                await window.electron.shell.openExternal(url);
-              } catch (error) {
-                console.error('打开链接失败:', error);
-              }
+            // 使用统一的链接处理方法
+            if (url) {
+              await this.handleLinkClick(url);
             }
           });
         }
@@ -964,4 +940,42 @@ export default class ChatHandler {
       }
     });
   }
+
+  // 添加新的链接处理方法
+  setupLinks(container) {
+    container.querySelectorAll('a').forEach(link => {
+
+        link.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const url = link.getAttribute('href');
+          if (url) {
+            await this.handleLinkClick(url);
+          }
+        });
+        link.setAttribute('data-handled', 'true');
+    });
+  }
+
+  isLocalPath(url) {
+    // 检查是否是绝对路径 (Windows 或 Unix 风格)
+    return /^([a-zA-Z]:\\|\\\\|\/)/.test(url);
+  }
+
+  async handleLinkClick(url) {
+    try {
+      if (this.isLocalPath(url)) {
+        // 对于本地路径,打开所在目录
+        await window.electron.shell.showItemInFolder(url);
+      } else if (!url.startsWith('#')) {
+        // 对于外部链接,使用默认浏览器打开
+        await window.electron.shell.openExternal(url);
+      }
+    } catch (error) {
+      console.error('打开链接失败:', error);
+      // 可以添加错误提示
+      const errorMessage = this.isLocalPath(url) ? '打开文件目录失败' : '打开链接失败';
+      console.error(`${errorMessage}:`, error);
+    }
+  }
+
 }

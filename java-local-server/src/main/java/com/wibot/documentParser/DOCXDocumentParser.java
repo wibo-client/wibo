@@ -4,7 +4,6 @@ import org.apache.poi.openxml4j.exceptions.OLE2NotOfficeXmlFileException;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,14 +12,7 @@ import com.wibot.persistence.entity.DocumentDataPO;
 
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
-import org.apache.poi.poifs.filesystem.POIFSFileSystem;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import java.io.ByteArrayInputStream;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * DOCX Document Parser
@@ -66,8 +58,13 @@ public class DOCXDocumentParser extends AbstractDocumentParser {
 
     private String parseDoc(HWPFDocument document) {
         // 处理旧版DOC文件
-        WordExtractor extractor = new WordExtractor(document);
-        return String.join("\n\n", extractor.getParagraphText());
+        try (WordExtractor extractor = new WordExtractor(document)) {
+            String[] paragraphs = extractor.getParagraphText();
+            return String.join("\n\n", paragraphs);
+        } catch (Exception e) {
+            logger.error("Error extracting text from document", e);
+            return "";
+        }
     }
 
     @Override

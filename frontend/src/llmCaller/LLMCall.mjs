@@ -41,7 +41,7 @@ export class LLMCall {
     }
   }
 
-  async callAsync(userPrompts, stream = false, onStreamChunk = null) {
+  async callAsync(userPrompts, stream = false, onStreamChunk = null, onComplete = null) {
     try {
       await this.semaphore.acquire(); // 获取信号量
       await this.updateClientIfNeeded();
@@ -53,8 +53,16 @@ export class LLMCall {
       });
 
       if (stream && onStreamChunk) {
+        let hasContent = false;
         for await (const chunk of completion) {
-          onStreamChunk(chunk.choices[0].delta.content);
+          const content = chunk.choices[0].delta.content;
+          if (content) {
+            hasContent = true;
+            onStreamChunk(content);
+          }
+        }
+        if (onComplete) {
+          onComplete(); // 流式输出完成时调用完成回调
         }
         this.semaphore.release(); // 释放信号量
         return null;

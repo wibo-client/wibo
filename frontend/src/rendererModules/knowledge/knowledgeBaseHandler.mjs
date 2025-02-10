@@ -18,7 +18,7 @@ export default class KnowledgeBaseHandler {
 
         this.initializeIndexSettings(); // 在构造函数中调用初始化方法
         this.updateMonitoredDirs();
-        this.updateUploadConfig();
+        // this.updateUploadConfig();
       }
     });
   }
@@ -330,49 +330,49 @@ export default class KnowledgeBaseHandler {
   }
 
   async toggleRemoteUpload() {
-    const remoteUploadToggle = document.getElementById('remoteUploadToggle');
-    const configSection = document.getElementById('remoteUploadConfig');
+    // const remoteUploadToggle = document.getElementById('remoteUploadToggle');
+    // const configSection = document.getElementById('remoteUploadConfig');
 
-    if (!configSection || !remoteUploadToggle) return;
+    // if (!configSection || !remoteUploadToggle) return;
 
-    const enable = remoteUploadToggle.checked;
-    configSection.style.display = enable ? 'block' : 'none';
+    // const enable = remoteUploadToggle.checked;
+    // configSection.style.display = enable ? 'block' : 'none';
 
-    try {
-      const response = await fetch(`${this.BASE_URL}/admin/toggle-remote-upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enable })
-      });
+    // try {
+    //   const response = await fetch(`${this.BASE_URL}/admin/toggle-remote-upload`, {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ enable })
+    //   });
 
-      const data = await response.json();
-      if (data.success) {
-        if (enable) {
-          await this.updateUploadConfig();
-        }
-      } else {
-        remoteUploadToggle.checked = !enable;
-        configSection.style.display = !enable ? 'block' : 'none';
-        await window.electron.showErrorBox('操作失败', data.message);
-      }
-    } catch (error) {
-      remoteUploadToggle.checked = !enable;
-      configSection.style.display = !enable ? 'block' : 'none';
-      await window.electron.showErrorBox('操作失败', error.message);
-    }
+    //   const data = await response.json();
+    //   if (data.success) {
+    //     if (enable) {
+    //       await this.updateUploadConfig();
+    //     }
+    //   } else {
+    //     remoteUploadToggle.checked = !enable;
+    //     configSection.style.display = !enable ? 'block' : 'none';
+    //     await window.electron.showErrorBox('操作失败', data.message);
+    //   }
+    // } catch (error) {
+    //   remoteUploadToggle.checked = !enable;
+    //   configSection.style.display = !enable ? 'block' : 'none';
+    //   await window.electron.showErrorBox('操作失败', error.message);
+    // }
   }
 
   async updateUploadConfig() {
-    try {
-      const response = await fetch(`${this.BASE_URL}/admin/get-upload-config`);
-      const data = await response.json();
-      if (data.success) {
-        document.getElementById('uploadUrl').textContent = data.uploadUrl;
-        document.getElementById('uploadDir').value = data.uploadDir || 'remoteFile';
-      }
-    } catch (error) {
-      console.error('[本地索引服务] 获取上传配置失败:', error.message);
-    }
+    // try {
+    //   const response = await fetch(`${this.BASE_URL}/admin/get-upload-config`);
+    //   const data = await response.json();
+    //   if (data.success) {
+    //     document.getElementById('uploadUrl').textContent = data.uploadUrl;
+    //     document.getElementById('uploadDir').value = data.uploadDir || 'remoteFile';
+    //   }
+    // } catch (error) {
+    //   console.error('[本地索引服务] 获取上传配置失败:', error.message);
+    // }
   }
 
   // 修改 submitLocalDirectory 方法

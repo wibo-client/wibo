@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, clipboard } from 'electron'; // 添加 clipboard 导入
+import { app, BrowserWindow, ipcMain, dialog, clipboard, shell } from 'electron'; // 添加 clipboard 和 shell 导入
 import PluginHandlerImpl from './indexHandler/pluginHandlerImpl.mjs';
 import LLMCall from './llmCaller/LLMCall.mjs';
 import MainWindow from './mainWindow.mjs';
@@ -11,6 +11,8 @@ import ContentCrawler from './contentHandler/contentCrawler.mjs'; // 添加 Cont
 import ChatStore from './config/chatStore.mjs'; // 添加 ChatStore 的导入
 import ReferenceHandler from './references/referenceHandler.mjs';
 import LogHandler from './logHandler/logHandler.mjs';  // 添加这行
+import path from 'path'; // 添加 path 导入
+import fs from 'fs';  // 添加 fs 模块导入
 
 // 添加常量定义
 const MAX_BATCH_SIZE_5000 = 28720;
@@ -130,11 +132,11 @@ app.whenReady().then(async () => {
     }
   });
 
-  async function callLLMAsync(messages, sendSystemLog, sendLLMStream) {
-
+  async function callLLMAsync(messages, sendSystemLog, sendLLMStream, onComplete) {
     await globalContext.llmCaller.callAsync(messages,
-      true,
-      (chunk) => sendLLMStream(chunk)
+      true, 
+      (chunk) => sendLLMStream(chunk),
+      onComplete // 添加 onComplete 回调
     );
   }
 
@@ -230,7 +232,12 @@ app.whenReady().then(async () => {
         await callLLMAsync(
           [{ role: 'user', content: message }],
           requestContext.sendSystemLog,
-          requestContext.sendLLMStream
+          requestContext.sendLLMStream,
+          // 添加完成回调
+          () => {
+            requestContext.sendSystemLog('✅ 回答完成');
+            event.sender.send('llm-complete', requestId);
+          }
         );
         requestContext.sendSystemLog('✅ 开始回答');
       }
@@ -416,6 +423,37 @@ app.whenReady().then(async () => {
       return { success: true };
     } catch (error) {
       console.error('写入剪贴板失败:', error);
+      throw error;
+    }
+  });
+
+  // 修改打开文件目录的处理器,增加文件存在性检查
+  ipcMain.handle('show-item-in-folder', async (event, filePath) => {
+    try {
+      // 处理路径分隔符
+      const normalizedPath = decodeURIComponent(filePath).replace(/\\/g, path.sep).replace(/\//g, path.sep);
+      
+      // 获取文件所在目录
+      const dirPath = path.dirname(normalizedPath);
+      
+      // 检查目录是否存在
+      if (!fs.existsSync(dirPath)) {
+        throw new Error(`目录不存在: ${dirPath}`);
+      }
+
+      // 先检查文件是否存在
+      const fileExists = fs.existsSync(normalizedPath);
+      if (fileExists) {
+        // 如果文件存在,显示并选中文件
+        shell.showItemInFolder(normalizedPath);
+      } else {
+        // 如果文件不存在,只打开目录
+        shell.openPath(dirPath);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('打开文件目录失败:', error);
       throw error;
     }
   });

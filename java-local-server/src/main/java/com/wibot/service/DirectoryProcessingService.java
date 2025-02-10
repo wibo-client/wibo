@@ -208,6 +208,9 @@ public class DirectoryProcessingService {
         String newMd5 = calculateMD5(filePath);
         if (existing.getMd5() != null && existing.getMd5().equals(newMd5)) {
             logger.debug("File unchanged, skipping processing: {}", filePath);
+            existing.setUpdateDateTime(
+                    LocalDateTime.ofInstant(Files.getLastModifiedTime(filePath).toInstant(), ZoneId.systemDefault()));
+            documentDataRepository.save(existing);
             return;
         }
 
@@ -216,6 +219,10 @@ public class DirectoryProcessingService {
         newDoc.setMd5(newMd5);
         newDoc.setVersion(existing.getVersion());
         newDoc.setProcessedState(DocumentDataPO.PROCESSED_STATE_FILE_SAVED);
+        newDoc.setUpdateDateTime(
+                LocalDateTime.ofInstant(Files.getLastModifiedTime(filePath).toInstant(), ZoneId.systemDefault()));
+        newDoc.setCreateTime(
+                LocalDateTime.ofInstant(Files.getLastModifiedTime(filePath).toInstant(), ZoneId.systemDefault()));
         documentDataRepository.save(newDoc);
         logger.debug("File status updated: {}", filePath);
     }
@@ -266,18 +273,32 @@ public class DirectoryProcessingService {
         return fileName.substring(lastIndexOf + 1);
     }
 
+    private static final long MAX_DIRECT_READ_SIZE = 10 * 1024 * 1024; // 10MB
+
     private String calculateMD5(Path filePath) throws IOException, NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");
-        try (InputStream is = Files.newInputStream(filePath)) {
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = is.read(buffer)) != -1) {
-                md.update(buffer, 0, bytesRead);
+        long fileSize = Files.size(filePath);
+
+        if (fileSize < MAX_DIRECT_READ_SIZE) {
+            // 小文件直接读取全部内容
+            byte[] content = Files.readAllBytes(filePath);
+            return bytesToHex(md.digest(content));
+        } else {
+            // 大文件分块读取
+            try (InputStream is = Files.newInputStream(filePath)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = is.read(buffer)) != -1) {
+                    md.update(buffer, 0, bytesRead);
+                }
             }
+            return bytesToHex(md.digest());
         }
-        byte[] md5Bytes = md.digest();
+    }
+
+    private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
-        for (byte b : md5Bytes) {
+        for (byte b : bytes) {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();

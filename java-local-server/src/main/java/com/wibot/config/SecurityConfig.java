@@ -15,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
+    @SuppressWarnings({ "deprecation", "removal" })
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         logger.info("Configuring HttpSecurity");

@@ -5,24 +5,14 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.wibot.index.DocumentIndexInterface;
-import com.wibot.persistence.HandlerConfigRepository;
-
 
 @Component
 public class HandlerImpl implements PathBasedIndexHandlerSelector {
     private NavigableMap<String, DocumentIndexInterface> handlerMap = new TreeMap<>();
-
-    @Autowired
-    private HandlerConfigRepository handlerConfigRepository;
-    @Autowired
-    private ApplicationContext context;
 
     @Autowired
     private DocumentIndexInterface defaultHandler;

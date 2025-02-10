@@ -27,6 +27,13 @@ contextBridge.exposeInMainWorld('electron', {
       }
     });
 
+    // 添加完成事件监听器
+    ipcRenderer.on('llm-complete', (event, id) => {
+      if (id === requestId && context?.onComplete) {
+        context.onComplete();
+      }
+    });
+
     return ipcRenderer.invoke('send-message', message, type, path, requestId);
   },
 
@@ -48,7 +55,9 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Shell 相关方法
   shell: {
-    openExternal: (url) => shell.openExternal(url)
+    openExternal: (url) => shell.openExternal(url),
+    // 添加打开文件目录的方法
+    showItemInFolder: (path) => ipcRenderer.invoke('show-item-in-folder', path)
   },
 
   // 插件相关方法

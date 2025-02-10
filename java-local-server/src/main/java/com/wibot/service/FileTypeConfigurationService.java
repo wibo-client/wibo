@@ -71,6 +71,7 @@ public class FileTypeConfigurationService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public Map<String, Object> updateIndexSettings(Map<String, Object> config) {
         initializeDefaultConfigs();
         Map<String, Object> response = new HashMap<>();

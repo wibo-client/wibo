@@ -33,6 +33,8 @@ public class App {
         System.out.println("系统最大内存: " + maxMemoryMB + " MB");
 
         // SignalHandlerImpl.registerSignalHandlers();
+        @SuppressWarnings("unused")
         ApplicationContext context = SpringApplication.run(App.class, args);
+
     }
 }
