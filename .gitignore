@@ -23,3 +23,4 @@ frontend/*-audit.json
 frontend/chrome
 chrome/
 data-prepare/wibo-localserver
+frontend/notarize.js
