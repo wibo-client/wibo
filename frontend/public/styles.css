@@ -1,50 +1,67 @@
 /* 基础样式 */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  height: 95vh;
-  /* 修改为100vh */
+  height: 100vh;
   margin: 0;
-  padding: 0px 20px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   background-color: #f0f2f5;
 }
 
+h3 {
+  margin: 10px 20px;
+}
+
+/* 主容器布局 */
+body>h3+.tabs {
+  display: flex;
+  flex: 1;
+  margin: 0;
+  height: calc(100vh - 60px);
+}
+
 /* 标签页样式 */
 .tabs {
-  display: flex;
-  cursor: pointer;
-  border-bottom: 2px solid #ccc;
+  flex-direction: column;
+  width: 260px;
+  background-color: #f7f7f8;
+  border-right: 1px solid #e5e5e5;
+  padding: 10px 0;
 }
 
 .tab {
   padding: 10px 20px;
-  border: 1px solid #ccc;
-  border-bottom: none;
-  background-color: #e0e0e0;
-  border-radius: 5px 5px 0 0;
-  margin-right: 5px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  text-align: left;
+  margin: 2px 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.tab:hover {
+  background-color: #e5e5e5;
 }
 
 .tab.active {
-  background-color: #fff;
-  border-bottom: 2px solid #fff;
-  font-weight: bold;
+  background-color: #e5e5e5;
+  font-weight: 500;
 }
 
 /* 内容区域样式 */
 .tab-content {
   display: none;
-  border: 1px solid #ccc;
   padding: 20px;
   background-color: #fff;
-  border-radius: 0 0 5px 5px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  margin-top: -1px;
   flex: 1;
-  /* 修改 */
   overflow: auto;
-  /* 新增 */
+  position: absolute;
+  left: 260px;
+  right: 0;
+  top: 45px;
+  bottom: 0;
 }
 
 .tab-content.active {
@@ -95,7 +112,6 @@ body {
   cursor: pointer;
 }
 
-
 /* 开关样式 */
 .switch {
   position: relative;
@@ -143,7 +159,6 @@ input:checked+.slider:before {
   transform: translateX(21px);
 }
 
-
 /* 开关组样式 */
 .switch-label-group {
   display: flex;
@@ -174,8 +189,6 @@ input:checked+.slider:before {
   font-family: monospace;
 }
 
-
-
 /* 响应式布局 */
 @media (max-width: 768px) {
   .file-types-container {
@@ -204,7 +217,6 @@ input:checked+.slider:before {
   outline: 0;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, .25);
 }
-
 
 .index-settings-actions {
   margin-top: 20px;
