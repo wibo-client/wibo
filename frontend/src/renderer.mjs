@@ -7,6 +7,7 @@ import QuickNavigationHandler from './rendererModules/navigation/quickNavigation
 import LogViewerHandler from './rendererModules/logs/logViewerHandler.mjs';
 import RefineryHandler from './rendererModules/refinery/refineryHandler.mjs'; // 新增
 import KnowledgeLocalServerStatusHandler from './rendererModules/knowledge/knowledgeLocalServerStatusHandler.mjs';
+import UserHandler from './rendererModules/user/userHandler.mjs';
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM 加载完成');
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const quickNavigationHandler = new QuickNavigationHandler();
   const logViewerHandler = new LogViewerHandler(); // 添加日志查看器模块
   const refineryHandler = new RefineryHandler(); // 新增知识精炼处理器
+  const userHandler = new UserHandler(); // 初始化用户处理模块
 
   // 将 refineryHandler 添加到 window 对象中，使其他模块可以访问
   window.refineryHandler = refineryHandler;
