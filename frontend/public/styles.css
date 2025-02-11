@@ -28,6 +28,7 @@ body>h3+.tabs {
   background-color: #f7f7f8;
   border-right: 1px solid #e5e5e5;
   padding: 10px 0;
+  transition: transform 0.3s ease;
 }
 
 .tab {
@@ -62,6 +63,7 @@ body>h3+.tabs {
   right: 0;
   top: 45px;
   bottom: 0;
+  transition: left 0.3s ease;
 }
 
 .tab-content.active {
@@ -226,4 +228,31 @@ input:checked+.slider:before {
 
 .index-settings-actions .btn {
   min-width: 120px;
+}
+
+/* 侧边栏收起按钮样式 */
+.sidebar-toggle {
+  position: fixed;
+  left: 220px;
+  top: 10px;
+  z-index: 1000;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 5px;
+  transition: left 0.3s ease;
+}
+
+/* 侧边栏收起状态 */
+body.sidebar-collapsed .tabs {
+  transform: translateX(-260px);
+}
+
+body.sidebar-collapsed .tab-content {
+  left: 0;
+}
+
+body.sidebar-collapsed .sidebar-toggle {
+  left: 10px;
 }

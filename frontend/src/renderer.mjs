@@ -45,6 +45,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 添加快捷导航内容加载
   quickNavigationHandler.setupQuickNavigation();
+
+  // 添加侧边栏切换功能
+  const sidebarToggle = document.querySelector('.sidebar-toggle');
+  sidebarToggle.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-collapsed');
+    // 更改emoji
+    sidebarToggle.textContent = document.body.classList.contains('sidebar-collapsed') ? '📖' : '📑';
+  });
 });
 
 // 只保留基础功能和模块初始化相关代码
