@@ -1,4 +1,4 @@
-import AuthClass from '../../auth/auth.mjs';
+import AuthClass from '../auth/auth.mjs';
 
 export default class UserHandler {
   constructor() {
