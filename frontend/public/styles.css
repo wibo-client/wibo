@@ -10,7 +10,7 @@ body {
 }
 
 h3 {
-  margin: 10px 20px;
+  margin: 10px 3px;
 }
 
 /* 主容器布局 */
@@ -24,7 +24,7 @@ body>h3+.tabs {
 /* 标签页样式 */
 .tabs {
   flex-direction: column;
-  width: 260px;
+  width: 190px;
   background-color: #f7f7f8;
   border-right: 1px solid #e5e5e5;
   padding: 10px 0;

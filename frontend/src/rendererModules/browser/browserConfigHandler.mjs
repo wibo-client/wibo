@@ -10,6 +10,28 @@ export default class BrowserConfigHandler {
       saveBrowserConfigButton.addEventListener('click', () => this.handleSaveConfig());
     }
 
+    // 添加高级设置切换按钮事件监听
+    const toggleAdvancedSettings = document.getElementById('toggleAdvancedSettings');
+    const advancedSettings = document.getElementById('advancedSettings');
+    if (toggleAdvancedSettings && advancedSettings) {
+      // 初始状态设为隐藏
+      advancedSettings.style.display = 'none';
+      toggleAdvancedSettings.textContent = '显示高级设置';
+
+      toggleAdvancedSettings.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isHidden = advancedSettings.style.display === 'none';
+        advancedSettings.style.display = isHidden ? 'block' : 'none';
+        toggleAdvancedSettings.textContent = isHidden ? '隐藏高级设置' : '显示高级设置';
+      });
+    }
+
+    // 添加还原默认设置按钮事件监听
+    const restoreDefaultSettings = document.getElementById('restoreDefaultSettings');
+    if (restoreDefaultSettings) {
+      restoreDefaultSettings.addEventListener('click', () => this.handleRestoreDefaults());
+    }
+
     // 添加AK保存按钮的事件监听
     const saveConfigButton = document.getElementById('saveConfigButton');
     if (saveConfigButton) {
@@ -86,18 +108,18 @@ export default class BrowserConfigHandler {
 
     const config = await window.electron.getGlobalConfig();
     let hasChanges = false;
-    
+
     // 更新配置，只在有新输入时更新对应的值
     if (accessKeyInput?.value) {
       config.modelSK = accessKeyInput.value;
       hasChanges = true;
     }
-    
+
     if (modelBaseUrlInput?.value) {
       config.modelBaseUrl = modelBaseUrlInput.value;
       hasChanges = true;
     }
-    
+
     if (modelNameInput?.value) {
       config.modelName = modelNameInput.value;
       hasChanges = true;
@@ -126,5 +148,46 @@ export default class BrowserConfigHandler {
     modelNameInput.value = '';
 
     await this.loadConfigValues();
+  }
+
+  async handleRestoreDefaults() {
+    const result = await window.electron.showMessageBox({
+      type: 'question',
+      title: '确认还原',
+      message: '确定要还原为默认设置吗？这将重置所有模型相关配置。',
+      buttons: ['确定', '取消']
+    });
+
+    // 修改这里：检查返回对象中的 response 属性
+    if (result.response === 0) { // 用户点击了"确定"
+      try {
+        const defaultConfig = {
+          modelBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          modelName: 'qwen-plus'
+        };
+
+        const currentConfig = await window.electron.getGlobalConfig();
+        const newConfig = {
+          ...currentConfig,
+          ...defaultConfig
+        };
+
+        await window.electron.setGlobalConfig(newConfig);
+        await this.loadConfigValues();
+
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '还原成功',
+          message: '已还原为默认设置'
+        });
+      } catch (error) {
+        console.error('还原默认设置失败:', error);
+        await window.electron.showMessageBox({
+          type: 'error',
+          title: '错误',
+          message: '还原默认设置失败: ' + error.message
+        });
+      }
+    }
   }
 }
