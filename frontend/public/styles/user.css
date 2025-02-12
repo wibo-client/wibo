@@ -13,10 +13,27 @@
   padding: 5px;
   border-radius: 50%;
   transition: background-color 0.2s;
+  position: relative;
 }
 
 .user-menu-trigger:hover {
   background-color: rgba(0, 0, 0, 0.1);
+}
+
+.user-menu-trigger::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #2196F3;
+  border-radius: 50%;
+  top: 2px;
+  right: 2px;
+  display: none;
+}
+
+.user-logged-in .user-menu-trigger::after {
+  display: block;
 }
 
 .user-menu-dropdown {
@@ -93,6 +110,16 @@
   border-radius: 4px;
 }
 
+.auth-dialog-content input[type="text"],
+.auth-dialog-content input[type="password"] {
+  width: 100%;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
 .auth-buttons {
   display: flex;
   justify-content: flex-end;
@@ -141,6 +168,8 @@
   display: block;
   margin: 10px auto;
   border: 1px solid #ddd;
+  max-width: 100%;
+  height: auto;
 }
 
 .captcha-content input {
