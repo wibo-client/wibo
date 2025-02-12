@@ -4,21 +4,19 @@
 
 class AuthClass {
   constructor() {
-    this.sessionId = Date.now().toString(); // 生成会话ID
+    this.captchaImg = null; // 添加验证码图片引用
+    this.currentCaptcha = null;
   }
 
   async login(username, password) {
     try {
-      // 获取验证码
-      const captchaBlob = await window.auth.generateCaptcha();
-
       // 显示验证码对话框
-      const captchaCode = await this.showCaptchaDialog(captchaBlob);
+      const captchaCode = await this.showCaptchaDialog();
       if (!captchaCode) {
-        throw new Error('验证码输入已取消');
+        return false;
       }
 
-      // 进行登录
+      // 进行登录，移除 sessionId 参数
       const result = await window.auth.login(username, password, captchaCode);
 
       if (result.token) {
@@ -33,34 +31,101 @@ class AuthClass {
     }
   }
 
-  async showCaptchaDialog(captchaImage) {
+  async refreshCaptcha(imgElement) {
+    try {
+      // 使用await确保验证码加载完成
+      const newCaptchaBase64 = await window.auth.generateCaptcha();
+      if (imgElement) {
+        // 更新前记录旧的src以便释放
+        const oldSrc = imgElement.src;
+        imgElement.src = `data:image/png;base64,${newCaptchaBase64}`;
+        // 确保新图片加载完成
+        await new Promise((resolve) => {
+          imgElement.onload = resolve;
+        });
+        // 释放旧的URL
+        if (oldSrc.startsWith('data:')) {
+          URL.revokeObjectURL(oldSrc);
+        }
+      }
+    } catch (error) {
+      console.error('刷新验证码失败:', error);
+      await window.electron.showErrorBox('刷新验证码失败');
+    }
+  }
+
+  async showCaptchaDialog() {
     return new Promise((resolve) => {
       const dialog = document.createElement('div');
       dialog.className = 'captcha-dialog';
+
       dialog.innerHTML = `
         <div class="captcha-content">
           <h3>请输入验证码</h3>
-          <img src="data:image/png;base64,${captchaImage.toString('base64')}" alt="验证码">
-          <input type="text" id="captchaInput" placeholder="输入验证码" maxlength="4">
+          <div class="captcha-image-container">
+            <img alt="验证码" title="点击刷新">
+            <div class="refresh-hint">点击图片或按钮刷新验证码</div>
+          </div>
+          <input type="text" id="captchaInput" placeholder="输入验证码" maxlength="4" autocomplete="off">
           <div class="captcha-buttons">
             <button id="confirmCaptcha">确认</button>
             <button id="cancelCaptcha">取消</button>
+            <button id="refreshCaptcha">刷新验证码</button>
           </div>
         </div>
       `;
+
       document.body.appendChild(dialog);
 
-      // 绑定事件
+      // 先获取图片元素引用
+      const imgElement = dialog.querySelector('img');
+
+      // 设置初始验证码
+      this.refreshCaptcha(imgElement).catch(console.error);
+
+      // 添加刷新事件处理
+      const refreshHandlers = [
+        imgElement,
+        dialog.querySelector('#refreshCaptcha')
+      ];
+
+      refreshHandlers.forEach(el => {
+        if (el) { // 添加空检查
+          el.addEventListener('click', async () => {
+            try {
+              await this.refreshCaptcha(imgElement);
+            } catch (error) {
+              await window.electron.showErrorBox('刷新失败', error.message);
+            }
+          });
+        }
+      });
+
+      // 绑定确认按钮事件
       dialog.querySelector('#confirmCaptcha').onclick = () => {
-        const code = dialog.querySelector('#captchaInput').value;
+        const code = dialog.querySelector('#captchaInput').value.trim();
+        if (!code) {
+          window.electron.showErrorBox('验证失败', '请输入验证码');
+          return;
+        }
         document.body.removeChild(dialog);
         resolve(code);
       };
 
+      // 绑定取消按钮事件
       dialog.querySelector('#cancelCaptcha').onclick = () => {
         document.body.removeChild(dialog);
         resolve(null);
       };
+
+      // 添加回车键确认功能
+      const input = dialog.querySelector('#captchaInput');
+      input.focus();
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          dialog.querySelector('#confirmCaptcha').click();
+        }
+      });
     });
   }
 

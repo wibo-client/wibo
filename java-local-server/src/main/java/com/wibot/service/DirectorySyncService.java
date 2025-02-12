@@ -106,6 +106,15 @@ public class DirectorySyncService {
                 .filter(doc -> DocumentDataPO.PROCESSED_STATE_IGNORED.equals(doc.getProcessedState()))
                 .collect(Collectors.toMap(DocumentDataPO::getFilePath, doc -> doc));
 
+
+                    // 添加目录存在性检查
+    if (!Files.exists(dirPath)) {
+        logger.warn("Directory does not exist: {}. Skipping synchronization.", directoryPath);
+        // 可选：更新任务状态或从数据库中移除
+        task.setIndexStatus(UserDirectoryIndexPO.STATUS_DELETED);
+        indexRepository.save(task);
+        return;
+    }
         // Get files in the current file system
         Set<String> currentFiles = new HashSet<>();
         try (Stream<Path> paths = Files.walk(dirPath)) {

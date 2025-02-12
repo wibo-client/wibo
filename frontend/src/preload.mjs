@@ -111,6 +111,7 @@ contextBridge.exposeInMainWorld('electron', {
 
 // 认证相关 API
 contextBridge.exposeInMainWorld('auth', {
+  // 移除sessionId参数
   login: (username, password, captchaCode) =>
     ipcRenderer.invoke('auth-login', username, password, captchaCode),
   register: (username, password) =>

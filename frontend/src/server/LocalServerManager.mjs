@@ -25,7 +25,7 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = ''; // 添加调试端口配置，可以根据需要修改端口号
+        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
 
         this.MAX_PROCESS_HISTORY = 5;
 
@@ -730,7 +730,7 @@ export default class LocalServerManager {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
         } catch (error) {
-            console.error('Failed to sync config:', error);
+            console.error('Failed to sync config:', error.stack);
             // 不抛出错误，因为这是辅助功能
         }
     }

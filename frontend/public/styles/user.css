@@ -180,8 +180,8 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   text-align: center;
-  font-size: 18px;
-  letter-spacing: 4px;
+  font-size: 20px;
+  letter-spacing: 8px;
 }
 
 .captcha-buttons {
@@ -205,4 +205,27 @@
 
 .captcha-buttons button:last-child {
   background: #f1f3f4;
+}
+
+.captcha-image-container {
+  position: relative;
+  margin: 15px 0;
+  text-align: center;
+}
+
+.captcha-image-container img {
+  cursor: pointer;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  transition: opacity 0.2s;
+}
+
+.captcha-image-container img:hover {
+  opacity: 0.8;
+}
+
+.refresh-hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 5px;
 }

@@ -1,8 +1,24 @@
-import Store from 'electron-store';
+import logger from '../../utils/loggerUtils.mjs';
 
 class AuthService {
   constructor() {
-    this.baseUrl = 'http://localhost:8989/api'; // 配置API基础URL
+    this.baseUrl = 'http://localhost:8989/api';
+    this.currentSessionId = null;
+  }
+
+  // 添加通用的请求配置
+  getRequestConfig(options = {}) {
+    return {
+      ...options,
+      credentials: 'include', // 确保包含cookies
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        // 移除可能影响CORS的自定义headers
+        ...options.headers
+      }
+    };
   }
 
   async register(username, password) {
@@ -18,41 +34,92 @@ class AuthService {
         })
       });
 
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.message);
+      // 检查HTTP状态码
+      if (!response.ok) {
+        const text = await response.text();
+        try {
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.message || '服务器错误');
+        } catch (e) {
+          throw new Error(`服务器错误: ${text || response.statusText}`);
+        }
       }
 
-      return data.data; // 返回用户信息
+      // 尝试解析JSON响应
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('JSON解析错误:', e);
+        console.error('原始响应:', await response.text());
+        throw new Error('服务器返回了无效的数据格式');
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || '操作失败');
+      }
+
+      return data.data;
 
     } catch (error) {
+      console.error('注册请求失败:', error);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        throw new Error('无法连接到服务器，请检查网络连接');
+      }
       throw new Error(`注册失败: ${error.message}`);
     }
   }
 
   async login(username, password, captchaCode) {
     try {
-      const response = await fetch(`${this.baseUrl}/user/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include', // 重要：包含 cookies 以支持 session
-        body: JSON.stringify({
-          username,
-          password,
-          captcha: captchaCode
+      if (!this.currentSessionId) {
+        logger.error('No valid session found');
+        throw new Error('会话已失效，请重新获取验证码');
+      }
+
+      logger.info('Logging in with session:', this.currentSessionId);
+
+      const response = await fetch(`${this.baseUrl}/user/login`,
+        this.getRequestConfig({
+          method: 'POST',
+          headers: {
+            'Cookie': `JSESSIONID=${this.currentSessionId}`
+          },
+          body: JSON.stringify({
+            username,
+            password,
+            captcha: captchaCode
+          })
         })
+      );
+
+      logger.debug('Login Response:', {
+        status: response.status,
+        headers: Object.fromEntries(response.headers.entries())
       });
+
+      if (!response.ok) {
+        const text = await response.text();
+        try {
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.message || '服务器错误');
+        } catch (e) {
+          throw new Error(`服务器错误: ${text || response.statusText}`);
+        }
+      }
 
       const data = await response.json();
       if (!data.success) {
-        throw new Error(data.message);
+        throw new Error(data.message || '登录失败');
       }
 
-      return data.data; // 返回 LoginResponse 对象
+      // 登录成功后清除当前session
+      this.currentSessionId = null;
+
+      return data.data;
 
     } catch (error) {
+      logger.error('登录请求失败:', error);
       throw new Error(`登录失败: ${error.message}`);
     }
   }
@@ -80,19 +147,37 @@ class AuthService {
 
   async generateCaptcha() {
     try {
-      const response = await fetch(`${this.baseUrl}/captcha`, {
-        credentials: 'include' // 重要：包含 cookies 以支持 session
-      });
+      const response = await fetch(`${this.baseUrl}/captcha`,
+        this.getRequestConfig()
+      );
 
       if (!response.ok) {
         throw new Error('获取验证码失败');
       }
 
-      const blob = await response.blob();
-      return blob;
+      // 从Set-Cookie头中提取JSESSIONID
+      const cookies = response.headers.get('Set-Cookie');
+      if (cookies) {
+        const sessionMatch = cookies.match(/JSESSIONID=([^;]+)/);
+        if (sessionMatch) {
+          this.currentSessionId = sessionMatch[1];
+          logger.info('Captured Session ID:', this.currentSessionId);
+        }
+      }
+
+      logger.debug('Captcha Response:', {
+        status: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+        sessionId: this.currentSessionId
+      });
+
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      return base64;
 
     } catch (error) {
-      throw new Error(`生成验证码失败: ${error.message}`);
+      logger.error('验证码请求失败:', error);
+      throw error;
     }
   }
 }

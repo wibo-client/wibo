@@ -3,9 +3,17 @@ import AuthClass from '../../auth/auth.mjs';
 export default class UserHandler {
   constructor() {
     this.auth = new AuthClass();
-    this.setupUI();
-    this.bindEvents();
-    this.checkLoginStatus();
+    try {
+      this.setupUI();
+      this.bindEvents();
+      this.checkLoginStatus().catch(error => {
+        console.error('检查登录状态失败:', error);
+        window.electron.showErrorBox('初始化失败', '检查登录状态时发生错误: ' + error.message);
+      });
+    } catch (error) {
+      console.error('初始化用户处理器失败:', error);
+      window.electron.showErrorBox('初始化失败', '初始化用户界面时发生错误: ' + error.message);
+    }
   }
 
   setupUI() {
@@ -25,9 +33,14 @@ export default class UserHandler {
   }
 
   async checkLoginStatus() {
-    const currentUser = await this.auth.getCurrentUser();
-    if (currentUser) {
-      this.updateUIAfterLogin(currentUser);
+    try {
+      const currentUser = await this.auth.getCurrentUser();
+      if (currentUser) {
+        this.updateUIAfterLogin(currentUser);
+      }
+    } catch (error) {
+      console.error('检查登录状态失败:', error);
+      window.electron.showErrorBox('登录状态检查失败', error.message);
     }
   }
 
@@ -62,72 +75,110 @@ export default class UserHandler {
   }
 
   async showLoginDialog() {
-    const dialog = document.createElement('div');
-    dialog.className = 'auth-dialog';
-    dialog.innerHTML = `
-      <div class="auth-dialog-content">
-        <h3>🔐 登录</h3>
-        <input type="text" id="loginUsername" placeholder="用户名" />
-        <input type="password" id="loginPassword" placeholder="密码" />
-        <div class="auth-buttons">
-          <button id="confirmLogin">确认</button>
-          <button id="cancelLogin">取消</button>
+    try {
+      const dialog = document.createElement('div');
+      dialog.className = 'auth-dialog';
+      dialog.innerHTML = `
+        <div class="auth-dialog-content">
+          <h3>🔐 登录</h3>
+          <input type="text" id="loginUsername" placeholder="用户名" required />
+          <input type="password" id="loginPassword" placeholder="密码" required />
+          <div class="auth-buttons">
+            <button id="confirmLogin">确认</button>
+            <button id="cancelLogin">取消</button>
+          </div>
         </div>
-      </div>
-    `;
-    document.body.appendChild(dialog);
+      `;
+      document.body.appendChild(dialog);
 
-    dialog.querySelector('#confirmLogin').onclick = async () => {
-      const username = dialog.querySelector('#loginUsername').value;
-      const password = dialog.querySelector('#loginPassword').value;
-      const success = await this.auth.login(username, password);
-      if (success) {
+      dialog.querySelector('#confirmLogin').onclick = async () => {
+        try {
+          const username = dialog.querySelector('#loginUsername').value.trim();
+          const password = dialog.querySelector('#loginPassword').value;
+
+          if (!username || !password) {
+            throw new Error('用户名和密码不能为空');
+          }
+
+          const success = await this.auth.login(username, password);
+          if (success) {
+            document.body.removeChild(dialog);
+            await this.checkLoginStatus();
+            await window.electron.showMessageBox({
+              type: 'info',
+              title: '登录成功',
+              message: '欢迎回来，' + username
+            });
+          }
+        } catch (error) {
+          console.error('登录失败:', error);
+          await window.electron.showErrorBox('登录失败', error.message);
+        }
+      };
+
+      dialog.querySelector('#cancelLogin').onclick = () => {
         document.body.removeChild(dialog);
-        this.checkLoginStatus();
-      }
-    };
-
-    dialog.querySelector('#cancelLogin').onclick = () => {
-      document.body.removeChild(dialog);
-    };
+      };
+    } catch (error) {
+      console.error('显示登录对话框失败:', error);
+      await window.electron.showErrorBox('系统错误', '显示登录界面时发生错误: ' + error.message);
+    }
   }
 
   async showRegisterDialog() {
-    const dialog = document.createElement('div');
-    dialog.className = 'auth-dialog';
-    dialog.innerHTML = `
-      <div class="auth-dialog-content">
-        <h3>📝 注册</h3>
-        <input type="text" id="registerUsername" placeholder="用户名" />
-        <input type="password" id="registerPassword" placeholder="密码" />
-        <input type="password" id="confirmPassword" placeholder="确认密码" />
-        <div class="auth-buttons">
-          <button id="confirmRegister">确认</button>
-          <button id="cancelRegister">取消</button>
+    try {
+      const dialog = document.createElement('div');
+      dialog.className = 'auth-dialog';
+      dialog.innerHTML = `
+        <div class="auth-dialog-content">
+          <h3>📝 注册</h3>
+          <input type="text" id="registerUsername" placeholder="用户名" required />
+          <input type="password" id="registerPassword" placeholder="密码" required />
+          <input type="password" id="confirmPassword" placeholder="确认密码" required />
+          <div class="auth-buttons">
+            <button id="confirmRegister">确认</button>
+            <button id="cancelRegister">取消</button>
+          </div>
         </div>
-      </div>
-    `;
-    document.body.appendChild(dialog);
+      `;
+      document.body.appendChild(dialog);
 
-    dialog.querySelector('#confirmRegister').onclick = async () => {
-      const username = dialog.querySelector('#registerUsername').value;
-      const password = dialog.querySelector('#registerPassword').value;
-      const confirmPassword = dialog.querySelector('#confirmPassword').value;
+      dialog.querySelector('#confirmRegister').onclick = async () => {
+        try {
+          const username = dialog.querySelector('#registerUsername').value.trim();
+          const password = dialog.querySelector('#registerPassword').value;
+          const confirmPassword = dialog.querySelector('#confirmPassword').value;
 
-      if (password !== confirmPassword) {
-        await window.electron.showErrorBox('注册失败', '两次输入的密码不一致');
-        return;
-      }
+          // 输入验证
+          if (!username || !password) {
+            throw new Error('用户名和密码不能为空');
+          }
 
-      const success = await this.auth.register(username, password);
-      if (success) {
+          if (password !== confirmPassword) {
+            throw new Error('两次输入的密码不一致');
+          }
+
+          if (password.length < 6) {
+            throw new Error('密码长度不能少于6位');
+          }
+
+          const success = await this.auth.register(username, password);
+          if (success) {
+            document.body.removeChild(dialog);
+          }
+        } catch (error) {
+          console.error('注册失败:', error);
+          await window.electron.showErrorBox('注册失败', error.message);
+        }
+      };
+
+      dialog.querySelector('#cancelRegister').onclick = () => {
         document.body.removeChild(dialog);
-      }
-    };
-
-    dialog.querySelector('#cancelRegister').onclick = () => {
-      document.body.removeChild(dialog);
-    };
+      };
+    } catch (error) {
+      console.error('显示注册对话框失败:', error);
+      await window.electron.showErrorBox('系统错误', '显示注册界面时发生错误: ' + error.message);
+    }
   }
 
   updateUIAfterLogin(user) {
@@ -143,15 +194,26 @@ export default class UserHandler {
   }
 
   async handleLogout() {
-    await this.auth.removeToken();
-    const userInfo = document.querySelector('.user-info');
-    const loginBtn = document.querySelector('.login-btn');
-    const registerBtn = document.querySelector('.register-btn');
-    const logoutBtn = document.querySelector('.logout-btn');
+    try {
+      await this.auth.removeToken();
+      const userInfo = document.querySelector('.user-info');
+      const loginBtn = document.querySelector('.login-btn');
+      const registerBtn = document.querySelector('.register-btn');
+      const logoutBtn = document.querySelector('.logout-btn');
 
-    userInfo.textContent = '未登录';
-    loginBtn.style.display = 'block';
-    registerBtn.style.display = 'block';
-    logoutBtn.style.display = 'none';
+      userInfo.textContent = '未登录';
+      loginBtn.style.display = 'block';
+      registerBtn.style.display = 'block';
+      logoutBtn.style.display = 'none';
+
+      await window.electron.showMessageBox({
+        type: 'info',
+        title: '退出成功',
+        message: '您已成功退出登录'
+      });
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      await window.electron.showErrorBox('退出失败', '退出登录时发生错误: ' + error.message);
+    }
   }
 }
