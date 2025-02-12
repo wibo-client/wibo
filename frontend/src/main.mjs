@@ -13,6 +13,7 @@ import ReferenceHandler from './references/referenceHandler.mjs';
 import LogHandler from './logHandler/logHandler.mjs';  // 添加这行
 import path from 'path'; // 添加 path 导入
 import fs from 'fs';  // 添加 fs 模块导入
+import AuthService from './server/services/AuthService.mjs'; // 添加 AuthService 的导入
 
 // 添加常量定义
 const MAX_BATCH_SIZE_5000 = 28720;
@@ -70,6 +71,52 @@ app.whenReady().then(async () => {
   console.log('App is ready.');
 
   await init(); // 初始化全局变量
+
+  // 初始化 AuthService
+  const authService = new AuthService();
+
+  // 添加认证相关的 IPC 处理器
+  ipcMain.handle('auth-login', async (event, username, password, captchaCode, sessionId) => {
+    try {
+      const result = await authService.login(username, password, captchaCode, sessionId);
+      if (result.token) {
+        await globalContext.configHandler.setToken(result.token);
+      }
+      return result;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('auth-register', async (event, username, password) => {
+    try {
+      return await authService.register(username, password);
+    } catch (error) {
+      console.error('Register failed:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('auth-get-current-user', async (event) => {
+    try {
+      const token = await globalContext.configHandler.getToken();
+      if (!token) return null;
+      return await authService.getCurrentUser(token);
+    } catch (error) {
+      console.error('Get current user failed:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('auth-generate-captcha', async (event, sessionId) => {
+    try {
+      return await authService.generateCaptcha(sessionId);
+    } catch (error) {
+      console.error('Generate captcha failed:', error);
+      throw error;
+    }
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -134,7 +181,7 @@ app.whenReady().then(async () => {
 
   async function callLLMAsync(messages, sendSystemLog, sendLLMStream, onComplete) {
     await globalContext.llmCaller.callAsync(messages,
-      true, 
+      true,
       (chunk) => sendLLMStream(chunk),
       onComplete // 添加 onComplete 回调
     );
@@ -432,10 +479,10 @@ app.whenReady().then(async () => {
     try {
       // 处理路径分隔符
       const normalizedPath = decodeURIComponent(filePath).replace(/\\/g, path.sep).replace(/\//g, path.sep);
-      
+
       // 获取文件所在目录
       const dirPath = path.dirname(normalizedPath);
-      
+
       // 检查目录是否存在
       if (!fs.existsSync(dirPath)) {
         throw new Error(`目录不存在: ${dirPath}`);
@@ -450,7 +497,7 @@ app.whenReady().then(async () => {
         // 如果文件不存在,只打开目录
         shell.openPath(dirPath);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('打开文件目录失败:', error);

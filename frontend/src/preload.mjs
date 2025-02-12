@@ -111,6 +111,12 @@ contextBridge.exposeInMainWorld('electron', {
 
 // 认证相关 API
 contextBridge.exposeInMainWorld('auth', {
+  login: (username, password, captchaCode, sessionId) =>
+    ipcRenderer.invoke('auth-login', username, password, captchaCode, sessionId),
+  register: (username, password) =>
+    ipcRenderer.invoke('auth-register', username, password),
+  getCurrentUser: () => ipcRenderer.invoke('auth-get-current-user'),
+  generateCaptcha: (sessionId) => ipcRenderer.invoke('auth-generate-captcha', sessionId),
   getToken: () => ipcRenderer.invoke('get-token'),
   setToken: (token) => ipcRenderer.invoke('set-token', token),
   removeToken: () => ipcRenderer.invoke('remove-token')
