@@ -15,7 +15,6 @@ export default class ConfigHandler {
       modelSK: null,
       modelBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       modelName: 'qwen-plus',
-      authToken: null,
       defaultHandlerPath: '/baidu/', // 新增默认处理器路径配置
       llmConcurrency: 20,  // 添加默认的LLM并发限制
       llmProvider: 'wibo', // 新增：默认使用wibo实现
@@ -44,18 +43,6 @@ export default class ConfigHandler {
       ...value
     };
     this.store.set('appGlobalConfig', newConfig);
-  }
-
-  getToken() {
-    return this.store.get('authToken', this.defaultConfig.authToken);
-  }
-
-  setToken(token) {
-    this.store.set('authToken', token);
-  }
-
-  removeToken() {
-    this.store.delete('authToken');
   }
 
   async getPageFetchLimit() {

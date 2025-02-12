@@ -20,7 +20,7 @@ class AuthClass {
       const result = await window.auth.login(username, password, captchaCode);
 
       if (result.token) {
-        await window.auth.setToken(result.token);
+
         return true;
       }
       return false;
@@ -154,19 +154,6 @@ class AuthClass {
       console.error('获取当前用户失败:', error);
       return null;
     }
-  }
-
-  // Token 相关方法保持不变
-  async getToken() {
-    return await window.auth.getToken();
-  }
-
-  async setToken(token) {
-    return await window.auth.setToken(token);
-  }
-
-  async removeToken() {
-    return await window.auth.removeToken();
   }
 }
 

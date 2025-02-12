@@ -77,12 +77,10 @@ app.whenReady().then(async () => {
 
   await init(); // 初始化全局变量
   // 添加认证相关的 IPC 处理器
-  ipcMain.handle('auth-login', async (event, username, password, captchaCode, sessionId) => {
+  ipcMain.handle('auth-login', async (event, username, password, captchaCode) => {
     try {
-      const result = await globalContext.authService.login(username, password, captchaCode, sessionId);
-      if (result.token) {
-        await globalContext.configHandler.setToken(result.token);
-      }
+      const result = await globalContext.authService.login(username, password, captchaCode);
+      // 移除对 configHandler 的依赖，因为 token 现在由 AuthService 管理
       return result;
     } catch (error) {
       console.error('Login failed:', error);
@@ -99,11 +97,18 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('auth-logout', async () => {
+    try {
+      return await globalContext.authService.logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+      throw error;
+    }
+  });
+
   ipcMain.handle('auth-get-current-user', async (event) => {
     try {
-      const token = await globalContext.configHandler.getToken();
-      if (!token) return null;
-      return await globalContext.authService.getCurrentUser(token);
+      return await globalContext.authService.getCurrentUser();
     } catch (error) {
       console.error('Get current user failed:', error);
       throw error;
@@ -150,17 +155,6 @@ app.whenReady().then(async () => {
     await globalContext.pluginHandler.addPluginTemplateFromFile(filePath);
   });
 
-  ipcMain.handle('get-token', () => {
-    return globalContext.configHandler.getToken();
-  });
-
-  ipcMain.handle('set-token', (event, token) => {
-    globalContext.configHandler.setToken(token);
-  });
-
-  ipcMain.handle('remove-token', () => {
-    globalContext.configHandler.removeToken();
-  });
 
   ipcMain.handle('get-plugin-instance-map', async () => {
     try {

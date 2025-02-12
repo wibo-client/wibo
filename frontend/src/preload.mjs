@@ -120,10 +120,5 @@ contextBridge.exposeInMainWorld('auth', {
     ipcRenderer.invoke('auth-get-current-user'),
   generateCaptcha: () =>
     ipcRenderer.invoke('auth-generate-captcha'),
-  getToken: () =>
-    ipcRenderer.invoke('get-token'),
-  setToken: (token) =>
-    ipcRenderer.invoke('set-token', token),
-  removeToken: () =>
-    ipcRenderer.invoke('remove-token')
+  logout: () => ipcRenderer.invoke('auth-logout'),
 });

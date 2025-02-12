@@ -195,7 +195,7 @@ export default class UserHandler {
 
   async handleLogout() {
     try {
-      await this.auth.removeToken();
+      await this.auth.logout();
       const userInfo = document.querySelector('.user-info');
       const loginBtn = document.querySelector('.login-btn');
       const registerBtn = document.querySelector('.register-btn');
