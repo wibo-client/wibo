@@ -24,7 +24,7 @@ export default class ConfigHandler {
 
     // 添加不存储的配置项
     this.runtimeConfig = {
-      debugPort: '8080'  // 调试端口配置
+      debugPort: ''  // 调试端口配置
     };
   }
 
