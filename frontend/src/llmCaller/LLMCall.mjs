@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-export class LLMCall {
+export class OpenAILLMCall {
   constructor() {
     this.currentApiKey = null;
     this.openai = null;
@@ -129,4 +129,4 @@ class Semaphore {
   }
 }
 
-export default LLMCall;
+export default OpenAILLMCall;

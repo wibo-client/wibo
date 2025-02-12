@@ -4,6 +4,7 @@ export default class BrowserConfigHandler {
     this.loadConfigValues();
     this.setupModelTabs();
     this.initServiceStatus();
+    this.setupCustomModelToggle();
   }
 
   setupEventListeners() {
@@ -231,6 +232,36 @@ export default class BrowserConfigHandler {
           panel.classList.add('active');
         }
       });
+    });
+  }
+
+  async setupCustomModelToggle() {
+    const toggle = document.getElementById('customModelToggle');
+    const configPanel = document.getElementById('customModelConfig');
+
+    // 初始化开关状态
+    const config = await window.electron.getGlobalConfig();
+    toggle.checked = config.llmProvider === 'openai';
+    configPanel.style.display = toggle.checked ? 'block' : 'none';
+
+    // 监听开关变化
+    toggle.addEventListener('change', async (e) => {
+      const isChecked = e.target.checked;
+      configPanel.style.display = isChecked ? 'block' : 'none';
+
+      // 更新 provider 设置
+      const currentConfig = await window.electron.getGlobalConfig();
+      currentConfig.llmProvider = isChecked ? 'openai' : 'wibo';
+      await window.electron.setGlobalConfig(currentConfig);
+
+      // 如果关闭自定义模型，提示用户
+      if (!isChecked) {
+        await window.electron.showMessageBox({
+          type: 'info',
+          title: '切换模型提供者',
+          message: '已切换回WIBO托管服务'
+        });
+      }
     });
   }
 }

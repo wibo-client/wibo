@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, clipboard, shell } from 'electron'; // 添加 clipboard 和 shell 导入
 import PluginHandlerImpl from './indexHandler/pluginHandlerImpl.mjs';
-import LLMCall from './llmCaller/LLMCall.mjs';
+import UnifiedLLMCall from './llmCaller/UnifiedLLMCall.mjs'; // 引入 UnifiedLLMCall
 import MainWindow from './mainWindow.mjs';
 import ConfigHandler from './config/configHandler.mjs';
 import ContentAggregator from './contentHandler/contentAggregator.mjs'; // 引入 ContentAggregator
@@ -33,11 +33,14 @@ async function init() {
   const rerankImpl = new LLMBasedRerankImpl(); // 实例化 LLMBasedRerankImpl
   const rewriteQueryer = new LLMBasedQueryRewriter(); // 实例化 LLMBasedQueryRewriter
   const localServerManager = new LocalServerManager(); // 添加 LocalServerManager 实例
-  const llmCaller = new LLMCall();
+  const llmCaller = new UnifiedLLMCall();
   const contentCrawler = new ContentCrawler();
   const chatStore = new ChatStore(); // 实例化 ChatStore
   const referenceHandler = new ReferenceHandler();
-  const logHandler = new LogHandler(); // 添加这行
+  const logHandler = new LogHandler();
+
+  // 初始化 AuthService
+  const authService = new AuthService();
 
   globalContext = { // 初始化全局变量
     pluginHandler,
@@ -50,7 +53,8 @@ async function init() {
     localServerManager,
     chatStore,
     referenceHandler,
-    logHandler  // 添加这行
+    logHandler,
+    authService
   };
 
   await llmCaller.init(globalContext);
@@ -62,6 +66,7 @@ async function init() {
   await referenceHandler.init(globalContext);
   await localServerManager.init(globalContext);
   await logHandler.init(globalContext); // 添加这行
+  await authService.init(globalContext); // 初始化 AuthService
   mainWindow = new MainWindow();
   mainWindow.init();
   mainWindow.create();
@@ -71,14 +76,10 @@ app.whenReady().then(async () => {
   console.log('App is ready.');
 
   await init(); // 初始化全局变量
-
-  // 初始化 AuthService
-  const authService = new AuthService();
-
   // 添加认证相关的 IPC 处理器
   ipcMain.handle('auth-login', async (event, username, password, captchaCode, sessionId) => {
     try {
-      const result = await authService.login(username, password, captchaCode, sessionId);
+      const result = await globalContext.authService.login(username, password, captchaCode, sessionId);
       if (result.token) {
         await globalContext.configHandler.setToken(result.token);
       }
@@ -91,7 +92,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('auth-register', async (event, username, password) => {
     try {
-      return await authService.register(username, password);
+      return await globalContext.authService.register(username, password);
     } catch (error) {
       console.error('Register failed:', error);
       throw error;
@@ -102,7 +103,7 @@ app.whenReady().then(async () => {
     try {
       const token = await globalContext.configHandler.getToken();
       if (!token) return null;
-      return await authService.getCurrentUser(token);
+      return await globalContext.authService.getCurrentUser(token);
     } catch (error) {
       console.error('Get current user failed:', error);
       throw error;
@@ -111,7 +112,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('auth-generate-captcha', async (event, sessionId) => {
     try {
-      return await authService.generateCaptcha(sessionId);
+      return await globalContext.authService.generateCaptcha(sessionId);
     } catch (error) {
       console.error('Generate captcha failed:', error);
       throw error;

@@ -1,9 +1,24 @@
 import logger from '../../utils/loggerUtils.mjs';
 
 class AuthService {
+  static API_PATH = '/api';  // 添加静态类变量存储 API 路径
+
   constructor() {
-    this.baseUrl = 'http://localhost:8989/api';
+    this.baseUrl = null;
     this.currentSessionId = null;
+  }
+
+  async init(globalContext) {
+    this.globalContext = globalContext;
+    await this.updateBaseUrl();
+  }
+
+  async updateBaseUrl() {
+    if (!this.globalContext) {
+      throw new Error('Global context not initialized');
+    }
+    const baseUrl = await this.globalContext.configHandler.getWiboServiceUrl();
+    this.baseUrl = `${baseUrl}${AuthService.API_PATH}`;
   }
 
   // 添加通用的请求配置
@@ -23,6 +38,7 @@ class AuthService {
 
   async register(username, password) {
     try {
+      await this.updateBaseUrl();  // 确保使用最新的 baseUrl
       const response = await fetch(`${this.baseUrl}/user/register`, {
         method: 'POST',
         headers: {
@@ -72,6 +88,7 @@ class AuthService {
 
   async login(username, password, captchaCode) {
     try {
+      await this.updateBaseUrl();  // 确保使用最新的 baseUrl
       if (!this.currentSessionId) {
         logger.error('No valid session found');
         throw new Error('会话已失效，请重新获取验证码');
@@ -126,6 +143,7 @@ class AuthService {
 
   async getCurrentUser(token) {
     try {
+      await this.updateBaseUrl();  // 确保使用最新的 baseUrl
       const response = await fetch(`${this.baseUrl}/user/current`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -147,6 +165,7 @@ class AuthService {
 
   async generateCaptcha() {
     try {
+      await this.updateBaseUrl();  // 确保使用最新的 baseUrl
       const response = await fetch(`${this.baseUrl}/captcha`,
         this.getRequestConfig()
       );

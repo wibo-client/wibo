@@ -17,7 +17,15 @@ export default class ConfigHandler {
       modelName: 'qwen-plus',
       authToken: null,
       defaultHandlerPath: '/baidu/', // 新增默认处理器路径配置
-      llmConcurrency: 20  // 添加默认的LLM并发限制
+      llmConcurrency: 20,  // 添加默认的LLM并发限制
+      llmProvider: 'wibo', // 新增：默认使用wibo实现
+      useCustomModel: false, // 新增：默认不使用自定义模型
+      wiboServiceBaseUrl: 'http://localhost:8989',  // 只保留基础URL配置
+    };
+
+    // 添加不存储的配置项
+    this.runtimeConfig = {
+      debugPort: '8080'  // 调试端口配置
     };
   }
 
@@ -116,4 +124,36 @@ export default class ConfigHandler {
     return config.llmConcurrency || this.defaultConfig.llmConcurrency;
   }
 
+  async getLlmProvider() {
+    const config = await this.getGlobalConfig();
+    return config.llmProvider || this.defaultConfig.llmProvider;
+  }
+
+  async setLlmProvider(provider) {
+    const config = await this.getGlobalConfig();
+    config.llmProvider = provider;
+    config.useCustomModel = provider === 'openai';  // 同步更新 useCustomModel 状态
+    await this.setGlobalConfig(config);
+  }
+
+  async isUsingCustomModel() {
+    const config = await this.getGlobalConfig();
+    return config.useCustomModel || this.defaultConfig.useCustomModel;
+  }
+
+  async getWiboServiceUrl() {
+    const config = await this.getGlobalConfig();
+    return config.wiboServiceBaseUrl || this.defaultConfig.wiboServiceBaseUrl;
+  }
+
+  async setWiboServiceBaseUrl(baseUrl) {
+    const config = await this.getGlobalConfig();
+    config.wiboServiceBaseUrl = baseUrl;
+    await this.setGlobalConfig(config);
+  }
+
+  // 添加获取调试端口的方法
+  getDebugPort() {
+    return this.runtimeConfig.debugPort;
+  }
 }

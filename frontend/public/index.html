@@ -367,29 +367,40 @@
         <!-- 自定义模型面板 -->
         <div class="model-tab-content" id="custom-panel">
           <div class="form-group">
-            <label for="accessKey">Access Key：</label>
-            <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
-            <div id="masked-ak" class="small-text"></div>
-            <div class="text-muted">
-              <a href="#" id="toggleAdvancedSettings" class="settings-link small">显示高级设置</a>
+            <div class="switch-label-group">
+              <label class="switch">
+                <input type="checkbox" id="customModelToggle">
+                <span class="slider"></span>
+              </label>
+              <span>启用自定义模型</span>
             </div>
           </div>
-          <div id="advancedSettings" style="display: none;">
+          <div id="customModelConfig" style="display: none;">
             <div class="form-group">
-              <label for="modelBaseUrl">API 基础地址：</label>
-              <input type="text" id="modelBaseUrl" class="form-control"
-                placeholder="请输入API基础地址，例如: https://dashscope.aliyuncs.com/compatible-mode/v1" />
-              <div id="masked-modelBaseUrl" class="small-text"></div>
+              <label for="accessKey">Access Key：</label>
+              <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
+              <div id="masked-ak" class="small-text"></div>
+              <div class="text-muted">
+                <a href="#" id="toggleAdvancedSettings" class="settings-link small">显示高级设置</a>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="modelName">模型名称：</label>
-              <input type="text" id="modelName" class="form-control" placeholder="请输入模型名称，例如: qwen-plus" />
-              <div id="masked-modelName" class="small-text"></div>
+            <div id="advancedSettings" style="display: none;">
+              <div class="form-group">
+                <label for="modelBaseUrl">API 基础地址：</label>
+                <input type="text" id="modelBaseUrl" class="form-control"
+                  placeholder="请输入API基础地址，例如: https://dashscope.aliyuncs.com/compatible-mode/v1" />
+                <div id="masked-modelBaseUrl" class="small-text"></div>
+              </div>
+              <div class="form-group">
+                <label for="modelName">模型名称：</label>
+                <input type="text" id="modelName" class="form-control" placeholder="请输入模型名称，例如: qwen-plus" />
+                <div id="masked-modelName" class="small-text"></div>
+              </div>
             </div>
-          </div>
-          <div class="button-group">
-            <button id="saveConfigButton" class="btn">保存</button>
-            <a href="#" id="restoreDefaultSettings" class="settings-link warning small">还原默认</a>
+            <div class="button-group">
+              <button id="saveConfigButton" class="btn">保存</button>
+              <a href="#" id="restoreDefaultSettings" class="settings-link warning small">还原默认</a>
+            </div>
           </div>
         </div>
       </div>

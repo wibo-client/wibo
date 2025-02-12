@@ -25,7 +25,7 @@ export default class LocalServerManager {
         this.inited = false;
         this.portManager = new PortManager();
         this.store = new Store();
-        this.portForDebug = '8080'; // 添加调试端口配置，可以根据需要修改端口号
+        // 删除 this.portForDebug 的定义
 
         this.MAX_PROCESS_HISTORY = 5;
 
@@ -110,7 +110,7 @@ export default class LocalServerManager {
 
     // 增加状态检查方法
     isDebugMode() {
-        return Boolean(this.portForDebug);
+        return Boolean(this.globalContext?.configHandler.getDebugPort());
     }
 
     // 修改状态同步逻辑
@@ -151,20 +151,21 @@ export default class LocalServerManager {
         const savedProcess = this.getJavaProcess();
         const hasPid = Boolean(savedProcess?.pid);
         let processExists = false;
+        const debugPort = this.globalContext?.configHandler.getDebugPort();
 
-        if (this.isDebugMode() && this.portForDebug) {
+        if (this.isDebugMode() && debugPort) {
             // 调试模式下，直接做健康检查
             try {
-                processExists = await this.checkHealth(this.portForDebug);
+                processExists = await this.checkHealth(debugPort);
                 // 如果健康检查成功，保存调试进程信息
                 if (processExists && !savedProcess) {
                     this.setJavaProcess({
-                        port: this.portForDebug,
+                        port: debugPort,
                         pid: 0  // 调试模式下不需要真实PID
                     });
                 }
                 // 如果健康检查成功，同步配置
-                await this.syncConfig(this.portForDebug);
+                await this.syncConfig(debugPort);
             } catch (e) {
                 processExists = false;
             }
@@ -186,8 +187,8 @@ export default class LocalServerManager {
             hasPid,
             processExists,
             pid: savedProcess?.pid,
-            port: this.isDebugMode() ? this.portForDebug : savedProcess?.port,
-            debugPort: this.isDebugMode() ? this.portForDebug : null,
+            port: this.isDebugMode() ? debugPort : savedProcess?.port,
+            debugPort: this.isDebugMode() ? debugPort : null,
             isHealthy: processExists
         };
     }
