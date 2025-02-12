@@ -560,7 +560,7 @@ export default class ChatHandler {
       const requestContext = {
         requestId, // 传递生成的 UUID
         lastUpdateTime: 0, // 添加最后更新时间记录
-        
+
         onChunk: (chunk) => {
           wholeMessage += chunk;
           const currentTime = Date.now();
@@ -568,7 +568,7 @@ export default class ChatHandler {
 
           // 确定更新间隔
           // 短消息(<200字符)时实时更新,长消息时降低更新频率
-          const updateInterval = messageLength < 300 ? 0 : 6000; // 250ms = 1/4秒
+          const updateInterval = messageLength < 1000 ? 0 : 6000; // 250ms = 1/4秒
 
           // 检查是否应该更新
           if (currentTime - requestContext.lastUpdateTime >= updateInterval) {
@@ -583,14 +583,14 @@ export default class ChatHandler {
             requestContext.lastUpdateTime = currentTime;
           }
         },
-          onComplete: () => { // 添加 onComplete 回调
-            // 强制最终更新
-            wibaMessageElement.innerHTML = marked(wholeMessage);
-            wibaHiddenMarkdown.textContent = wholeMessage;
-            wibaMessageElement.appendChild(wibaHiddenMarkdown);
+        onComplete: () => { // 添加 onComplete 回调
+          // 强制最终更新
+          wibaMessageElement.innerHTML = marked(wholeMessage);
+          wibaHiddenMarkdown.textContent = wholeMessage;
+          wibaMessageElement.appendChild(wibaHiddenMarkdown);
 
-            // 添加链接处理
-            this.setupLinks(wibaMessageElement);
+          // 添加链接处理
+          this.setupLinks(wibaMessageElement);
         },
         onSystemLog: (log) => {
           const logElement = document.createElement('div');
@@ -620,7 +620,7 @@ export default class ChatHandler {
 
           // 构建完整内容
           let fullContent = '### 参考文档\n\n';
-          referenceData.fullContent.forEach(doc => {    
+          referenceData.fullContent.forEach(doc => {
             const encodedUrl = encodeURI(doc.url);
             fullContent += `${doc.index}. [${doc.title}](${encodedUrl})\n`;
             if (doc.date) {
@@ -945,14 +945,14 @@ export default class ChatHandler {
   setupLinks(container) {
     container.querySelectorAll('a').forEach(link => {
 
-        link.addEventListener('click', async (e) => {
-          e.preventDefault();
-          const url = link.getAttribute('href');
-          if (url) {
-            await this.handleLinkClick(url);
-          }
-        });
-        link.setAttribute('data-handled', 'true');
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const url = link.getAttribute('href');
+        if (url) {
+          await this.handleLinkClick(url);
+        }
+      });
+      link.setAttribute('data-handled', 'true');
     });
   }
 

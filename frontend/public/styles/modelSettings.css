@@ -1,0 +1,172 @@
+/* 模型设置标签页样式 */
+.model-tabs {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.tab-header {
+  display: flex;
+  border-bottom: 1px solid #e5e5e5;
+  background: #f8f9fa;
+}
+
+.model-tab {
+  padding: 12px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  transition: all 0.3s;
+  border-bottom: 2px solid transparent;
+}
+
+.model-tab.active {
+  color: #2196F3;
+  border-bottom-color: #2196F3;
+  background: #fff;
+}
+
+.model-tab:hover {
+  color: #2196F3;
+}
+
+.model-tab-content {
+  display: none;
+  padding: 20px;
+}
+
+.model-tab-content.active {
+  display: block;
+}
+
+/* 服务状态框样式 */
+.service-status-box {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.status-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 12px;
+}
+
+.status-icon.connected {
+  background: #4CAF50;
+  box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.2);
+}
+
+.status-text {
+  flex: 1;
+}
+
+.status-title {
+  font-weight: 500;
+  color: #333;
+}
+
+.status-detail {
+  font-size: 13px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.login-btn {
+  padding: 8px 16px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.login-btn:hover {
+  background: #1976D2;
+}
+
+/* 使用统计表格样式 */
+.usage-stats {
+  margin-top: 24px;
+}
+
+.usage-stats h4 {
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.usage-table th {
+  background: #f5f5f5;
+  font-weight: 500;
+  color: #666;
+}
+
+.usage-table tr:hover {
+  background: #f8f9fa;
+}
+
+/* 设置链接样式 */
+.settings-link {
+  color: #2196F3;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s ease;
+  cursor: pointer;
+}
+
+.settings-link:hover {
+  color: #1976D2;
+  text-decoration: underline;
+}
+
+.settings-link.warning {
+  color: #FF9800;
+}
+
+.settings-link.warning:hover {
+  color: #F57C00;
+}
+
+/* 按钮组样式 */
+.button-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.button-group .settings-link {
+  margin-top: 2px;
+}
+
+/* 小字体链接样式 */
+.settings-link.small {
+  font-size: 12px;
+}
+
+.text-muted {
+  color: #6c757d;
+  margin-top: 8px;
+}

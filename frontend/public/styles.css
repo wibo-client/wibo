@@ -227,3 +227,56 @@ input:checked+.slider:before {
 .index-settings-actions .btn {
   min-width: 120px;
 }
+
+/* 新增应用头部样式 */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eaeaea;
+  background: linear-gradient(to right, #ffffff, #f8f9fa);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-emoji {
+  font-size: 24px;
+  transform: rotate(-15deg);
+  display: inline-block;
+  animation: wave 2s ease-in-out infinite;
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 24px;
+  font-weight: bold;
+  background: linear-gradient(120deg, #2b4acb, #575fcf);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-slogan {
+  font-size: 16px;
+  color: #666;
+  padding-left: 20px;
+  border-left: 2px solid #ddd;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}
+
+@keyframes wave {
+
+  0%,
+  100% {
+    transform: rotate(-15deg);
+  }
+
+  50% {
+    transform: rotate(0deg);
+  }
+}

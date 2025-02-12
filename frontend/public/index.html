@@ -13,12 +13,19 @@
   <link rel="stylesheet" href="styles/logs.css">
   <link rel="stylesheet" href="styles/knowledge-refinery.css">
   <link rel="stylesheet" href="styles/user.css">
+  <link rel="stylesheet" href="styles/modelSettings.css">
 </head>
 
 <body>
+  <div class="app-header">
+    <div class="brand">
+      <span class="brand-emoji">🧣</span>
+      <h3 class="brand-name">围脖 WIBO</h3>
+    </div>
+    <div class="brand-slogan">你的私人专家</div>
+  </div>
 
-
-  <h3>围脖 WIBO 你的个人知识助手</h3>
+  <h3>围脖 WIBO</h3>
   <div class="tabs">
     <div class="tab active" data-tab="interaction">对话</div>
     <div class="tab" data-tab="config">基础配置</div>
@@ -312,30 +319,79 @@
   <div id="config" class="tab-content">
     <div class="section">
       <h3>模型设置</h3>
-      <div class="form-group">
-        <label for="accessKey">Access Key：</label>
-        <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
-        <div id="masked-ak" class="small-text"></div>
-        <div class="text-muted">
-          <a href="#" id="toggleAdvancedSettings" class="settings-link small">显示高级设置</a>
+      <div class="model-tabs">
+        <div class="tab-header">
+          <button class="model-tab active" data-tab="hosted">WIBO托管服务</button>
+          <button class="model-tab" data-tab="custom">自定义模型</button>
         </div>
-      </div>
-      <div id="advancedSettings" style="display: none;">
-        <div class="form-group">
-          <label for="modelBaseUrl">API 基础地址：</label>
-          <input type="text" id="modelBaseUrl" class="form-control"
-            placeholder="请输入API基础地址，例如: https://dashscope.aliyuncs.com/compatible-mode/v1" />
-          <div id="masked-modelBaseUrl" class="small-text"></div>
+
+        <!-- WIBO托管服务面板 -->
+        <div class="model-tab-content active" id="hosted-panel">
+          <div class="service-status-box">
+            <div class="status-icon"></div>
+            <div class="status-text">
+              <div class="status-title">服务状态：<span id="serviceStatusText">检查中...</span></div>
+              <div class="status-detail">用户：<span id="serviceUsername">未登录</span></div>
+            </div>
+          </div>
+
+          <div class="usage-stats">
+            <h4>本月使用统计</h4>
+            <table class="usage-table">
+              <thead>
+                <tr>
+                  <th>服务类型</th>
+                  <th>已用Token</th>
+                  <th>剩余Token</th>
+                  <th>费用预估</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>对话服务</td>
+                  <td>12,345</td>
+                  <td>87,655</td>
+                  <td>¥2.47</td>
+                </tr>
+                <tr>
+                  <td>知识库服务</td>
+                  <td>8,421</td>
+                  <td>91,579</td>
+                  <td>¥1.68</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="modelName">模型名称：</label>
-          <input type="text" id="modelName" class="form-control" placeholder="请输入模型名称，例如: qwen-plus" />
-          <div id="masked-modelName" class="small-text"></div>
+
+        <!-- 自定义模型面板 -->
+        <div class="model-tab-content" id="custom-panel">
+          <div class="form-group">
+            <label for="accessKey">Access Key：</label>
+            <input type="text" id="accessKey" class="form-control" placeholder="请输入Access Key" />
+            <div id="masked-ak" class="small-text"></div>
+            <div class="text-muted">
+              <a href="#" id="toggleAdvancedSettings" class="settings-link small">显示高级设置</a>
+            </div>
+          </div>
+          <div id="advancedSettings" style="display: none;">
+            <div class="form-group">
+              <label for="modelBaseUrl">API 基础地址：</label>
+              <input type="text" id="modelBaseUrl" class="form-control"
+                placeholder="请输入API基础地址，例如: https://dashscope.aliyuncs.com/compatible-mode/v1" />
+              <div id="masked-modelBaseUrl" class="small-text"></div>
+            </div>
+            <div class="form-group">
+              <label for="modelName">模型名称：</label>
+              <input type="text" id="modelName" class="form-control" placeholder="请输入模型名称，例如: qwen-plus" />
+              <div id="masked-modelName" class="small-text"></div>
+            </div>
+          </div>
+          <div class="button-group">
+            <button id="saveConfigButton" class="btn">保存</button>
+            <a href="#" id="restoreDefaultSettings" class="settings-link warning small">还原默认</a>
+          </div>
         </div>
-      </div>
-      <div class="button-group">
-        <button id="saveConfigButton" class="btn">保存</button>
-        <a href="#" id="restoreDefaultSettings" class="settings-link warning small">还原默认</a>
       </div>
     </div>
     <div class="section">

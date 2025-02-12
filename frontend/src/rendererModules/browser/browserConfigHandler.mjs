@@ -2,6 +2,8 @@ export default class BrowserConfigHandler {
   constructor() {
     this.setupEventListeners();
     this.loadConfigValues();
+    this.setupModelTabs();
+    this.initServiceStatus();
   }
 
   setupEventListeners() {
@@ -189,5 +191,46 @@ export default class BrowserConfigHandler {
         });
       }
     }
+  }
+
+  async initServiceStatus() {
+    try {
+      const currentUser = await window.auth.getCurrentUser();
+      const statusIcon = document.querySelector('#hosted-panel .status-icon');
+      const statusText = document.querySelector('#serviceStatusText');
+      const usernameText = document.querySelector('#serviceUsername');
+
+      if (currentUser) {
+        statusIcon.classList.add('connected');
+        statusText.textContent = '已连接';
+        usernameText.textContent = currentUser.username;
+      } else {
+        statusIcon.classList.remove('connected');
+        statusText.textContent = '未连接';
+        usernameText.textContent = '未登录';
+      }
+    } catch (error) {
+      console.error('初始化服务状态失败:', error);
+    }
+  }
+
+  setupModelTabs() {
+    const tabs = document.querySelectorAll('.model-tab');
+    const panels = document.querySelectorAll('.model-tab-content');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // 移除所有活动状态
+        tabs.forEach(t => t.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+
+        // 添加新的活动状态
+        tab.classList.add('active');
+        const panel = document.getElementById(`${tab.dataset.tab}-panel`);
+        if (panel) {
+          panel.classList.add('active');
+        }
+      });
+    });
   }
 }
