@@ -18,7 +18,7 @@ class WIBOLLMCall {
 
   // 获取认证头部
   async getAuthHeaders() {
-    const token = await this.authService.getToken();  // 从AuthService获取token
+    const token = await this.authService.getAccessToken();  // 从AuthService获取token
     return token ? {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -45,7 +45,7 @@ class WIBOLLMCall {
     }
   }
 
-  async callAsync(userPrompts, stream = false, onStreamChunk = null, onComplete = null) {
+  async callAsync(userPrompts, stream = true, onStreamChunk = null, onComplete = null) {
     logger.debug('调用WIBO LLM:', userPrompts);
     try {
       await this.semaphore.acquire();
@@ -61,116 +61,99 @@ class WIBOLLMCall {
       };
 
       logger.debug('请求数据:', requestBody);
-      if (stream) {
-        logger.debug('流式调用 , url ' + `${this.baseUrl}/async`);
-        const response = await fetch(`${this.baseUrl}/async`, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Accept': 'text/event-stream'
-          },
-          body: JSON.stringify(requestBody)
-        });
 
-        logger.debug('响应状态:', response.status);
-        // 首先尝试解析响应的第一行，检查是否有错误信息
-        const firstChunk = await response.text();
-        try {
-          const errorResponse = JSON.parse(firstChunk);
-          if (!errorResponse.success) {
-            logger.error('LLM调用失败:', errorResponse.message);
-            throw new Error(errorResponse.message);
+      logger.debug('流式调用 , url ' + `${this.baseUrl}/async`);
+      const response = await fetch(`${this.baseUrl}/async`, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      logger.debug('响应状态:', response.status);
+      // 首先尝试解析响应的第一行，检查是否有错误信息
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullResponse = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { steam: false });
+        if (this.isJSON(chunk)) {
+          //这一般是返回了错误等，解析错误
+          const jsonData = JSON.parse(chunk);
+
+          logger.debug('json 数据', jsonData);
+          if (jsonData.success === false) {
+            const message = jsonData.message;
+            throw new Error(message);
           }
-        } catch (e) {
-          // 如果解析JSON失败，说明是正常的流式响应，继续处理
-          const stream = new ReadableStream({
-            start(controller) {
-              controller.enqueue(new TextEncoder().encode(firstChunk));
-            }
-          });
-          const reader = stream.getReader();
-          const decoder = new TextDecoder();
-          let fullResponse = '';
+        }
+        buffer += chunk;
 
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              logger.debug('读取数据:', value);
-              if (done) {
-                if (onComplete) {
-                  onComplete();
+        // 按行处理数据
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留最后一个不完整的行
+
+        let currentEvent = '';
+        let currentData = '';
+
+        for (const aline of lines) {
+          const line = aline.trim();
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice(6);
+          } else if (line.startsWith('data:')) {
+            currentData = line.slice(5);
+            if (line && currentEvent)
+              logger.debug('SSE数据:', currentEvent, currentData);
+            switch (currentEvent) {
+              case 'conversation':
+                const convData = JSON.parse(currentData);
+                const conversationId = convData.conversationId;
+                logger.info('conversation id ' + conversationId);
+                break;
+              case 'message':
+                const messageData = JSON.parse(currentData);
+                if (messageData.content && onStreamChunk) {
+                  onStreamChunk(messageData.content);
+                  fullResponse += messageData.content;
                 }
                 break;
-              }
-
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-              logger.debug('解析数据:', lines);
-
-              // 检查第一行是否包含错误信息
-              for (const line of lines) {
-                if (line.trim() === '') continue;
-
-                // 解析事件类型
-                if (line.startsWith('event:')) {
-                  const eventType = line.slice(6).trim();
-                  continue;
-                }
-
-                // 解析数据内容
-                if (line.startsWith('data:')) {
-                  try {
-                    const jsonStr = line.slice(5).trim();
-                    const data = JSON.parse(jsonStr);
-
-                    // 处理不同类型的事件数据
-                    if (data.conversationId) {
-                      // 处理conversation事件
-                      logger.debug('获得会话ID:', data.conversationId);
-                    } else if (data.content) {
-                      // 处理message事件
-                      if (onStreamChunk) {
-                        onStreamChunk(data.content);
-                      }
-                      fullResponse += data.content;
-                    }
-                  } catch (e) {
-                    logger.error('解析SSE数据出错:', e);
-                    continue;
-                  }
-                }
-              }
+              case '':
+                continue;
+              default:
+                throw new Error('未知的SSE事件:' + currentEvent);
             }
-          } catch (error) {
-            logger.error('流式处理错误:', error);
-            throw error;
-          } finally {
-            reader.releaseLock();
-            this.semaphore.release();
+
           }
-
-          return null;
         }
-
-      } else {
-        logger.debug('非流调用 , url ' + `${this.baseUrl}/sync`);
-        const response = await fetch(`${this.baseUrl}/sync`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(requestBody)
-        });
-
-        logger.debug('响应状态:', response.status);
-        const result = await response.json();
-        this.semaphore.release();
-
-        if (!result.success) {
-          logger.error('LLM调用失败:', result.message);
-          throw new Error(result.message || '未知错误');
-        }
-
-        return result.data.responses;
       }
+      // 处理最后可能的残留数据
+      if (buffer) {
+        try {
+          const jsonData = JSON.parse(buffer.slice(5));
+          if (jsonData.content && onStreamChunk) {
+            onStreamChunk(jsonData.content);
+            fullResponse += jsonData.content;
+          }
+        } catch (e) {
+          logger.warn('解析最终SSE数据失败:', e);
+        }
+      }
+
+      if (onComplete) {
+        onComplete(fullResponse);
+      }
+
+      this.semaphore.release();
     } catch (error) {
       logger.error('LLM调用错误:', error);
       this.semaphore.release();
@@ -178,9 +161,12 @@ class WIBOLLMCall {
     }
   }
 
-  async callSync(userPrompts) {
-    return this.callAsync(userPrompts, false);
+  isJSON(str) {
+    str = str.trim();
+    return str.startsWith('{') && str.endsWith('}') ||
+      str.startsWith('[') && str.endsWith(']');
   }
+
 }
 
 class Semaphore {
@@ -209,6 +195,7 @@ class Semaphore {
       this.current++;
     }
   }
+
 }
 
 export default WIBOLLMCall;

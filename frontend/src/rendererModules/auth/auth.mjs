@@ -19,7 +19,7 @@ class AuthClass {
       // 进行登录，移除 sessionId 参数
       const result = await window.auth.login(username, password, captchaCode);
 
-      if (result.token) {
+      if (result.user) {
 
         return true;
       }
@@ -153,6 +153,20 @@ class AuthClass {
     } catch (error) {
       console.error('获取当前用户失败:', error);
       return null;
+    }
+  }
+
+  async logout() {
+    try {
+      const result = await window.auth.logout();
+      if (result.success) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      await window.electron.showErrorBox('退出失败', error.message);
+      return false;
     }
   }
 }

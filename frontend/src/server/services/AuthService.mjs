@@ -253,7 +253,9 @@ class AuthService {
       tokenTimestamp: this.store.get('tokenTimestamp', null)
     };
   }
-
+  getAccessToken() {
+    return this.store.get('accessToken', null);
+  }
   setTokens(accessToken, refreshToken) {
     this.store.set('accessToken', accessToken);
     this.store.set('refreshToken', refreshToken);
@@ -266,12 +268,6 @@ class AuthService {
     this.store.delete('refreshToken');
     this.store.delete('tokenTimestamp');
     this.lastTokenRefresh = null;
-  }
-
-  isTokenExpired() {
-    const { tokenTimestamp } = this.getTokens();
-    if (!tokenTimestamp) return true;
-    return Date.now() - tokenTimestamp > AuthService.TOKEN_EXPIRY;
   }
 
   needsRefresh() {
@@ -288,7 +284,7 @@ class AuthService {
         throw new Error('No refresh token available');
       }
 
-      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+      const response = await fetch(`${this.baseUrl}/user/refresh-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,20 +315,6 @@ class AuthService {
       await this.updateBaseUrl();
       const { accessToken } = this.getTokens();
 
-      // if (accessToken) {
-      //   // 调用后端登出接口
-      //   const response = await fetch(`${this.baseUrl}/user/logout`, {
-      //     method: 'POST',
-      //     headers: {
-      //       'Authorization': `Bearer ${accessToken}`,
-      //       'Content-Type': 'application/json'
-      //     }
-      //   });
-
-      //   if (!response.ok) {
-      //     logger.warn('Logout request failed:', response.status);
-      //   }
-      // }
 
       // 无论后端请求是否成功，都清除本地存储的令牌
       this.removeTokens();
