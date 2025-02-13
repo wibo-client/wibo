@@ -27,12 +27,6 @@ contextBridge.exposeInMainWorld('electron', {
       }
     });
 
-    // 添加完成事件监听器
-    ipcRenderer.on('llm-complete', (event, id) => {
-      if (id === requestId && context?.onComplete) {
-        context.onComplete();
-      }
-    });
 
     return ipcRenderer.invoke('send-message', message, type, path, requestId);
   },

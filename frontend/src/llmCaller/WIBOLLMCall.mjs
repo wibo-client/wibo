@@ -1,4 +1,5 @@
 import logger from '../utils/loggerUtils.mjs';
+import Store from 'electron-store';
 
 class WIBOLLMCall {
   static API_PATH = '/api/ai';
@@ -8,6 +9,12 @@ class WIBOLLMCall {
     this.currentModel = null;
     this.semaphore = new Semaphore(20);
     this.authService = null;  // 添加authService引用
+    this.conversationStore = new Store({
+      name: 'conversation-id-store', // 指定store文件名
+      defaults: {
+        conversationId: null
+      }
+    });
   }
 
   async init(globalContext) {
@@ -45,6 +52,55 @@ class WIBOLLMCall {
     }
   }
 
+  // 获取当前会话ID
+  getCurrentConversationId() {
+    return this.conversationStore.get('conversationId');
+  }
+
+  // 设置当前会话ID
+  setCurrentConversationId(id) {
+    this.conversationStore.set('conversationId', id);
+  }
+
+  async processSSEData(event, data, onStreamChunk) {
+    logger.debug('SSE数据:', event, data);
+    try {
+      switch (event) {
+        case 'conversation':
+          const convData = JSON.parse(data);
+          const conversationId = convData.conversationId;
+          // 使用Store存储conversationId
+          this.setCurrentConversationId(conversationId);
+          logger.info('conversation id ' + conversationId);
+          break;
+        case 'message':
+          const messageData = JSON.parse(data);
+          if (messageData.content && onStreamChunk) {
+            onStreamChunk(messageData.content);
+          } else {
+            throw new Error('无效的message数据:', data);
+          }
+          break;
+        case 'error':
+          const jsonData = JSON.parse(data);
+          if (jsonData.success === false) {
+            const message = jsonData.message;
+            logger.error('LLM调用错误:', message);
+            throw new Error(message); // 修改这里，直接抛出原始错误信息
+          } else {
+            logger.error('LLM调用错误:', data);
+            throw new Error(data); // 修改这里，确保错误被抛出
+          }
+
+        default:
+          logger.warn('未知的SSE事件:', event);
+      }
+    } catch (error) {
+      logger.error('处理SSE数据失败:', error);
+      throw error; // 确保错误被向上传递
+    }
+  }
+
   async callAsync(userPrompts, stream = true, onStreamChunk = null, onComplete = null) {
     logger.debug('调用WIBO LLM:', userPrompts);
     try {
@@ -54,10 +110,14 @@ class WIBOLLMCall {
       logger.debug('更新配置');
 
       const headers = await this.getAuthHeaders();
+      const currentUser = await this.authService.getCurrentUser(); // 获取当前登录用户
+
       const requestBody = {
         messages: userPrompts,
         stream: stream,
-        model: this.currentModel
+        model: this.currentModel,
+        userId: currentUser ? currentUser.id : null, // 添加userId
+        conversationId: this.getCurrentConversationId() // 从Store获取conversationId
       };
 
       logger.debug('请求数据:', requestBody);
@@ -82,70 +142,36 @@ class WIBOLLMCall {
       const decoder = new TextDecoder();
       let buffer = '';
       let fullResponse = '';
+      let currentEvent = '';
+      let currentData = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { steam: false });
-        if (this.isJSON(chunk)) {
-          //这一般是返回了错误等，解析错误
-          const jsonData = JSON.parse(chunk);
 
-          logger.debug('json 数据', jsonData);
-          if (jsonData.success === false) {
-            const message = jsonData.message;
-            throw new Error(message);
-          }
-        }
+        const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
-        // 按行处理数据
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 保留最后一个不完整的行
+        let lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 确保保留最后一个不完整的行
 
-        let currentEvent = '';
-        let currentData = '';
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine === '') continue; // 忽略空行
 
-        for (const aline of lines) {
-          const line = aline.trim();
-          if (line.startsWith('event:')) {
-            currentEvent = line.slice(6);
-          } else if (line.startsWith('data:')) {
-            currentData = line.slice(5);
-            if (line && currentEvent)
-              logger.debug('SSE数据:', currentEvent, currentData);
-            switch (currentEvent) {
-              case 'conversation':
-                const convData = JSON.parse(currentData);
-                const conversationId = convData.conversationId;
-                logger.info('conversation id ' + conversationId);
-                break;
-              case 'message':
-                const messageData = JSON.parse(currentData);
-                if (messageData.content && onStreamChunk) {
-                  onStreamChunk(messageData.content);
-                  fullResponse += messageData.content;
-                }
-                break;
-              case '':
-                continue;
-              default:
-                throw new Error('未知的SSE事件:' + currentEvent);
+          if (trimmedLine.startsWith('event:')) {
+            currentEvent = trimmedLine.slice(6).trim();
+          } else if (trimmedLine.startsWith('data:')) {
+            currentData = trimmedLine.slice(5).trim();
+            try {
+              await this.processSSEData(currentEvent, currentData, onStreamChunk);
+            } catch (error) {
+
+              throw error; // 继续向上传递错误
             }
-
+          } else {
+            logger.warn('未知的SSE行:', trimmedLine);
           }
-        }
-      }
-      // 处理最后可能的残留数据
-      if (buffer) {
-        try {
-          const jsonData = JSON.parse(buffer.slice(5));
-          if (jsonData.content && onStreamChunk) {
-            onStreamChunk(jsonData.content);
-            fullResponse += jsonData.content;
-          }
-        } catch (e) {
-          logger.warn('解析最终SSE数据失败:', e);
         }
       }
 
@@ -156,6 +182,7 @@ class WIBOLLMCall {
       this.semaphore.release();
     } catch (error) {
       logger.error('LLM调用错误:', error);
+
       this.semaphore.release();
       throw error;
     }

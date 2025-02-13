@@ -563,34 +563,25 @@ export default class ChatHandler {
 
         onChunk: (chunk) => {
           wholeMessage += chunk;
-          const currentTime = Date.now();
-          const messageLength = wholeMessage.length;
+          // const currentTime = Date.now();
+          // const messageLength = wholeMessage.length;
 
           // 确定更新间隔
           // 短消息(<200字符)时实时更新,长消息时降低更新频率
-          const updateInterval = messageLength < 1000 ? 0 : 6000; // 250ms = 1/4秒
+          // const updateInterval = messageLength < 1000 ? 0 : 6000; // 250ms = 1/4秒
 
           // 检查是否应该更新
-          if (currentTime - requestContext.lastUpdateTime >= updateInterval) {
-            wibaMessageElement.innerHTML = marked(wholeMessage);
-            wibaHiddenMarkdown.textContent = wholeMessage;
-            wibaMessageElement.appendChild(wibaHiddenMarkdown); // 确保hidden元素始终在message内部
-
-            // 为 WIBO 消息中的链接添加点击处理
-            this.setupLinks(wibaMessageElement);
-
-            // 更新最后更新时间
-            requestContext.lastUpdateTime = currentTime;
-          }
-        },
-        onComplete: () => { // 添加 onComplete 回调
-          // 强制最终更新
+          // if (currentTime - requestContext.lastUpdateTime >= updateInterval) {
           wibaMessageElement.innerHTML = marked(wholeMessage);
           wibaHiddenMarkdown.textContent = wholeMessage;
-          wibaMessageElement.appendChild(wibaHiddenMarkdown);
+          wibaMessageElement.appendChild(wibaHiddenMarkdown); // 确保hidden元素始终在message内部
 
-          // 添加链接处理
+          // 为 WIBO 消息中的链接添加点击处理
           this.setupLinks(wibaMessageElement);
+
+          // 更新最后更新时间
+          requestContext.lastUpdateTime = currentTime;
+          // }
         },
         onSystemLog: (log) => {
           const logElement = document.createElement('div');

@@ -174,12 +174,24 @@ app.whenReady().then(async () => {
     }
   });
 
-  async function callLLMAsync(messages, sendSystemLog, sendLLMStream, onComplete) {
-    await globalContext.llmCaller.callAsync(messages,
-      true,
-      (chunk) => sendLLMStream(chunk),
-      onComplete // 添加 onComplete 回调
-    );
+  async function callLLMAsync(messages, sendSystemLog, sendLLMStream) {
+    try {
+      await globalContext.llmCaller.callAsync(messages,
+        true,
+        (chunk) => {
+          // 检查是否是错误消息
+          if (chunk.startsWith('❌')) {
+            sendSystemLog(chunk); // 将错误显示在系统日志中
+          } else {
+            sendLLMStream(chunk);
+          }
+        }
+      );
+    } catch (error) {
+      // 确保错误信息被显示在系统日志中
+      sendSystemLog(`❌ ${error.message}`);
+      throw error;
+    }
   }
 
   ipcMain.handle('send-message', async (event, message, type, path, requestId) => {
@@ -274,13 +286,7 @@ app.whenReady().then(async () => {
         await callLLMAsync(
           [{ role: 'user', content: message }],
           requestContext.sendSystemLog,
-          requestContext.sendLLMStream,
-          // 添加完成回调
-          () => {
-            requestContext.sendSystemLog('✅ 回答完成');
-            event.sender.send('llm-complete', requestId);
-          }
-        );
+          requestContext.sendLLMStream);
         requestContext.sendSystemLog('✅ 开始回答');
       }
 

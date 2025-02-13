@@ -157,15 +157,32 @@ class AuthService {
   async getCurrentUser() {
     try {
       const { accessToken, refreshToken } = this.getTokens();
-      if (!accessToken || !refreshToken) {
-        return null;
+
+      // 检查令牌状态
+      if (!accessToken) {
+        // 如果没有访问令牌，但有刷新令牌
+        if (refreshToken) {
+          logger.info('Access token missing but refresh token exists, attempting refresh...');
+          try {
+            await this.refreshAccessToken();
+            // 刷新成功后，重新获取令牌
+            const newAccessToken = this.getAccessToken();
+            if (!newAccessToken) {
+              logger.error('Failed to get access token after refresh');
+              return null;
+            }
+          } catch (error) {
+            logger.error('Token refresh failed:', error);
+            return null;
+          }
+        } else {
+          // 两个令牌都没有
+          logger.info('No tokens available');
+          return null;
+        }
       }
 
-      // 检查是否需要刷新令牌
-      if (this.needsRefresh()) {
-        await this.refreshAccessToken();
-      }
-
+      // 正常进行用户信息获取流程
       const response = await fetch(`${this.baseUrl}/user/current`, {
         headers: {
           'Authorization': `Bearer ${this.getTokens().accessToken}`
@@ -202,7 +219,6 @@ class AuthService {
       logger.error('获取用户信息失败:', error);
       if (error.message.includes('Failed to refresh token')) {
         this.removeTokens();
-        return null;
       }
       throw error;
     }
@@ -263,6 +279,12 @@ class AuthService {
     this.lastTokenRefresh = Date.now();
   }
 
+  removeAccessTokenOnly() {
+    this.store.delete('accessToken');
+    this.store.delete('tokenTimestamp');
+    this.lastTokenRefresh = null;
+  }
+
   removeTokens() {
     this.store.delete('accessToken');
     this.store.delete('refreshToken');
@@ -305,7 +327,7 @@ class AuthService {
       return data.data.accessToken;
     } catch (error) {
       logger.error('Token refresh failed:', error);
-      this.removeTokens(); // 刷新失败时清除所有令牌
+      this.removeAccessTokenOnly(); // 只清除访问令牌,保留刷新令牌
       throw error;
     }
   }
