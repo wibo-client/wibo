@@ -209,8 +209,26 @@ class AuthService {
       }
 
       const data = await response.json();
+      // 改进错误处理
       if (!data.success) {
-        throw new Error(data.message);
+        const errorMessage = data.message || '未知错误';
+        const status = response.status;
+        let userMessage = '获取用户信息失败';
+
+        if (status === 500) {
+          userMessage = '服务器内部错误，请稍后重试';
+        } else if (status === 404) {
+          userMessage = '用户信息不存在';
+        }
+
+        logger.error('获取用户信息失败:', {
+          status,
+          error: errorMessage,
+          path: data.path,
+          timestamp: data.timestamp
+        });
+
+        throw new Error(`${userMessage} (${status})`);
       }
 
       return data.data;
