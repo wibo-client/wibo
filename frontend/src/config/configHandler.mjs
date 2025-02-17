@@ -19,7 +19,7 @@ export default class ConfigHandler {
       llmConcurrency: 20,  // 添加默认的LLM并发限制
       llmProvider: 'wibo', // 新增：默认使用wibo实现
       useCustomModel: false, // 新增：默认不使用自定义模型
-      wiboServiceBaseUrl: 'http://wibot.cc',  // 只保留基础URL配置
+      wiboServiceBaseUrl: 'http://api.wibot.cc',  // 只保留基础URL配置
     };
 
     // 添加不存储的配置项

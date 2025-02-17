@@ -44,7 +44,10 @@ class AuthService {
   async register(username, password) {
     try {
       await this.updateBaseUrl();  // 确保使用最新的 baseUrl
-      const response = await fetch(`${this.baseUrl}/user/register`, {
+      const url = `${this.baseUrl}/user/register`;
+      logger.debug('Register URL:', url); // 打印完整的 URL
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
