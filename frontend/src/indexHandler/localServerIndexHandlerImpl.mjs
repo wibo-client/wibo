@@ -32,34 +32,6 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
         }
     }
 
-    async fetchWithRetry(url, options) {
-        const MAX_RETRIES = 3;
-        const TIMEOUT = 10000; // 10 seconds
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-
-        const fetchOptions = {
-            ...options,
-            signal: controller.signal
-        };
-
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                const response = await fetch(url, fetchOptions);
-                clearTimeout(timeoutId);
-                return response;
-            } catch (error) {
-                clearTimeout(timeoutId);
-                if (attempt === MAX_RETRIES) {
-                    throw error;
-                }
-                console.log(`Attempt ${attempt} failed, retrying...`);
-                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
-        }
-    }
-
     async deepSearch_collectFacts(query, path, requestContext) {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');
@@ -81,7 +53,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
             }
 
             // 1. 提交任务
-            const submitResponse = await this.fetchWithRetry(`${this.BASE_URL}/submitCollectFacts`, {
+            const submitResponse = await fetch(`${this.BASE_URL}/submitCollectFacts`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -102,7 +74,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
 
             // 3. 轮询任务状态
             while (true) {
-                const statusResponse = await this.fetchWithRetry(`${this.BASE_URL}/collectFacts/${taskId}/status`, {
+                const statusResponse = await fetch(`${this.BASE_URL}/collectFacts/${taskId}/status`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -130,7 +102,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                 // 检查是否被中止
                 if (requestContext.abortSignal.aborted) {
                     logger.info(`Task ${taskId} was aborted by user`);
-                    await this.fetchWithRetry(`${this.BASE_URL}/collectFacts/${taskId}/cancel`, {
+                    await fetch(`${this.BASE_URL}/collectFacts/${taskId}/cancel`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -157,7 +129,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                         throw new Error(`Unknown task status: ${statusData.status}`);
                 }
 
-
+                
             }
         } catch (error) {
             console.error('CollectFacts failed:', error);
@@ -192,7 +164,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
                 processedPath = processedPath.replace(/\//g, '\\');
             }
             // 原有的目录搜索逻辑
-            const response = await this.fetchWithRetry(`${this.BASE_URL}/searchWithStrategy`, {
+            const response = await fetch(`${this.BASE_URL}/searchWithStrategy`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -215,7 +187,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
         }
     }
 
-    async fetchAggregatedContent(summaryList, requestContext) {
+    async fetchAggregatedContent(summaryList,requestContext) {
         if (!this.BASE_URL) {
             throw new Error('Local server is not available');
         }
@@ -225,7 +197,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
             const pageFetchLimit = await configHandler.getPageFetchLimit();
 
             // const limitedSummaryList = summaryList.slice(0, pageFetchLimit);
-            const response = await this.fetchWithRetry(`${this.BASE_URL}/fetchAggregatedContent`, {
+            const response = await fetch(`${this.BASE_URL}/fetchAggregatedContent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -260,7 +232,7 @@ export class LocalServerIndexHandlerImpl extends AbstractIndexHandler {
             return [];
         }
         try {
-            const response = await this.fetchWithRetry(`${this.BASE_URL}/getAllPaths`, {
+            const response = await fetch(`${this.BASE_URL}/getAllPaths`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
